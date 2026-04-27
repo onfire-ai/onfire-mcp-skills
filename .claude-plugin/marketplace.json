@@ -12,7 +12,7 @@
   "plugins": [
     {
       "name": "onfire-mcp-skills",
-      "source": ".",
+      "source": "./",
       "description": "Skill tree for the Onfire MCP. An orchestrator skill routes user intent across five atomic skills — one per Onfire tool — covering identity resolution, AI prospecting, contact enrichment, and prospecting schema configuration.",
       "category": "skills",
       "tags": ["onfire", "prospecting", "sales", "linkedin", "enrichment", "ai-prospecting"]
