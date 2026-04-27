@@ -21,6 +21,14 @@ The user might come in with company LinkedIn URLs, just websites, just names, a 
 
 When you've picked a path below, read the atomic skill for each tool you'll call. Atomic skills hold the input shapes, batch caps, output fields, polling rules, and pitfalls that you don't want to re-derive each time.
 
+**Dataset companion tools.** `ai_prospecting(action="run")` (and the `search_*` tools) return a `dataset_id` instead of the full row set. The full data lives in a short-lived MCP dataset that you analyse with these companions:
+
+- `describe_dataset(dataset_id)` — schema + a head sample.
+- `query_datasets({alias: dataset_id}, sql, row_limit=N)` — read-only DuckDB SQL on the parquet (filter, sort, slice, paginate).
+- `list_datasets()` — see datasets produced earlier in this conversation (handy when comparing a live vs shadow run).
+
+You don't need a separate skill for these; the relevant atomic skill (`ai-prospecting`, `search-people`, etc.) covers when and how to use them.
+
 ## Pick the path from intent, not from the input shape
 
 **"Prospect this account / list of accounts."**
@@ -28,8 +36,8 @@ When you've picked a path below, read the atomic skill for each tool you'll call
 
 1. Need company LinkedIn URLs → `match-company` (batch ≤100).
 2. `ai-prospecting` with `action="run"` (single via `company_linkedin_url`, batch via `linkedin_urls`). Be ready to poll.
-3. Render ranked results (atomic explains rendering + the `$$-onfire-bold-$$` conversion).
-4. Make the enrichment offer (see below — required, not optional).
+3. The completed payload returns a **dataset handle + a small `preview_rows` sample**, not the full prospect list. Render the preview (atomic explains rendering + the `$$-onfire-bold-$$` conversion). Use `query_datasets` / `describe_dataset` to slice or paginate the full list.
+4. Make the enrichment offer (see below — required, not optional). Pass the run's `dataset_id` to `contact-data-enrichment` to enrich the entire run set without rebuilding contact dicts.
 
 **"Score this specific person."**
 *Examples: "Is Jane Doe at Acme worth talking to?", "Score linkedin.com/in/jane-doe at Acme."*
@@ -47,8 +55,9 @@ Just `match-person` or `match-company`. Don't run prospecting unless asked.
 **"Get me emails / phones."**
 *Examples: "Enrich this list", "Get emails for everyone we just scored."*
 
-1. If rows lack LinkedIn URLs, `match-person` first (batches ≤100).
-2. `contact-data-enrichment` — atomic owns the two-phase consent flow.
+1. If rows already came from `ai_prospecting`, hand the run's `dataset_id` straight to `contact-data-enrichment` — no need to rebuild contact dicts.
+2. Otherwise: if rows lack LinkedIn URLs, `match-person` first (batches ≤100), then enrich.
+3. `contact-data-enrichment` — atomic owns the two-phase consent flow and the dataset-passthrough pattern.
 
 **"Show me / change my prospecting config."**
 *Examples: "What's in my schema?", "Tweak my hot keywords and test", "Promote my draft."*
@@ -66,13 +75,13 @@ Get to a company LinkedIn URL before any prospecting call. The matchers do the h
 
 ## The enrichment offer (don't skip this)
 
-After **every** prospecting run, tell the user they can pull verified emails and phones for any of the returned prospects — not just the top N you happened to render. Users frequently assume contact data is gated to whatever's on screen; it isn't, and most of the value of the workflow is downstream of contact data.
+After **every** prospecting run, tell the user they can pull verified emails and phones for any of the returned prospects — not just the rows in `preview_rows`. Users frequently assume contact data is gated to whatever's on screen; it isn't, and most of the value of the workflow is downstream of contact data.
 
 Phrasing should feel natural, not boilerplate:
 
-> "I can pull verified emails and phone numbers for any of these — top 5, all of them, or a subset you pick. Just say which."
+> "I can pull verified emails and phone numbers for any of these — top 5, all <total>, or a subset you pick. Just say which."
 
-Make this offer regardless of how many prospects came back, and regardless of how many you displayed. The point is to make the user aware the option exists and is theirs to scope.
+Use `total_prospects` / `filtered_prospects` from the run response so the "<total>" number is real. Make this offer regardless of how many prospects came back. To enrich the entire run, pass the run's `dataset_id` to `contact-data-enrichment(dataset_id=…, contacts=[], …)`; for a custom subset, build inline contact dicts.
 
 ## Hard rules (the things that bite)
 
@@ -83,6 +92,8 @@ Make this offer regardless of how many prospects came back, and regardless of ho
 - **Two-phase consent above 10 contacts.** Show `user_facing_message` verbatim. Wait for explicit yes.
 - **Don't promise prospect fields not in the seven returned.** See `ai-prospecting`.
 - **Convert `$$-onfire-bold-$$` sentinels** to markdown bold before display.
+- **Don't re-run `ai_prospecting` to "see more" prospects.** The run already produced the full set — use `query_datasets` / `describe_dataset` against the returned `dataset_id` instead.
+- **Treat `preview_rows` as a sample, not the result.** The full list lives in the dataset; surface the total from `total_prospects` / `filtered_prospects`.
 - **Surface low-confidence matches** from the matchers. Don't silently pick the top result.
 - **`manage_ai_prospecting` is the shadow editor**, not a SQL surface. Read its atomic skill before editing.
 
@@ -99,7 +110,7 @@ Make this offer regardless of how many prospects came back, and regardless of ho
 1. One `match-company` call with all 40 rows (multi-signal entries: both name and website).
 2. Filter matched rows; flag unmatched.
 3. `ai-prospecting(action="run", linkedin_urls=[...])`. Poll if needed.
-4. Group by company. Offer xlsx if long. Make the enrichment offer.
+4. Render the preview. If the user wants per-company groupings or a full xlsx, `query_datasets({"p": dataset_id}, "SELECT … ORDER BY COMPANY_LINKEDIN_URL")`. Make the enrichment offer (dataset_id passthrough).
 
 **Person identity + score.**
 *"Score 'Lana Patel, VP Eng at Snowflake'."*
@@ -112,6 +123,12 @@ Make this offer regardless of how many prospects came back, and regardless of ho
 1. If rows lack LinkedIn URLs, `match-person` first (batches ≤100).
 2. `contact-data-enrichment` phase 1 (consent). Show `user_facing_message` verbatim. Stop.
 3. On explicit yes: phase 2, 8 batches of ≤20 with the `confirmation_token`. Accumulate. Flag unresolvable rows.
+
+**Enriching the full result of an ai_prospecting run.**
+*"Yes, get emails for everyone you found."*
+1. Hand the run's `dataset_id` to `contact-data-enrichment` — `contacts=[]`, `dataset_id="ds_…"`, column-name params for the dataset's columns (`LINKEDIN_URL`, `COMPANY_LINKEDIN_URL`, `FULL_NAME`), `total_count` = `filtered_prospects` from the run.
+2. Phase 1 consent. Show `user_facing_message`. Stop.
+3. On explicit yes: phase 2 paginates the dataset itself via `limit` / `offset` — same `dataset_id`, same `confirmation_token`, ≤20 rows per call.
 
 **Iterating on schema config.**
 *"Try my prospecting with these new hot keywords on Acme."*

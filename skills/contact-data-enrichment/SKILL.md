@@ -10,29 +10,41 @@ Adds verified emails and phones to contact records. **Paid: 1 credit per contact
 ## When to use this
 
 - User asks for emails or phones for a list of people.
-- Standard follow-up after `ai_prospecting` ("yes, pull emails for the top 10").
+- Standard follow-up after `ai_prospecting` ("yes, pull emails for the top 10" / "all of them").
 - Enriching CRM rows that already have LinkedIn URLs.
 
 If the rows don't have LinkedIn URLs yet, run `match-person` first to fill them in — this tool needs LinkedIn URLs to do its best work.
+
+## Two ways to pass contacts
+
+You can either inline the contact dicts (best for small ad-hoc lists or a user-picked subset) or hand the tool an existing dataset and let it page through it (best for "enrich everything from that prospecting run"):
+
+| Pattern | Use when | What you pass |
+|---|---|---|
+| Inline contacts | User picked a specific subset, or the rows came from a CSV/CRM dump that isn't already a dataset. | `contacts=[…dicts…]` + the three column-name params for the keys you used. |
+| Dataset passthrough | Enrich the full result of an `ai_prospecting` run, or a dataset built via `query_datasets(persist_as_dataset=True)`. | `dataset_id="ds_…"` + the three column-name params for the **dataset's** column names (e.g. `LINKEDIN_URL`, `COMPANY_LINKEDIN_URL`, `FULL_NAME` for an `ai_prospecting` dataset). |
+
+Dataset passthrough is the canonical path after an `ai_prospecting` run — the run already returns a `dataset_id`, and reusing it avoids rebuilding contact dicts and getting the column names wrong. Set `total_count` from the run's `filtered_prospects` (or `dataset.row_count`).
 
 ## Required arguments (every call)
 
 These four are required by the schema, even on the consent phase:
 
-- `contacts` — list of contact dicts (empty list `[]` for phase 1).
-- `linkedin_url_column` — name of the column in `contacts` that holds the person's LinkedIn URL.
-- `account_website_column` — name of the column that holds the person's company website.
+- `contacts` — list of contact dicts (empty list `[]` for phase 1, **and** for any dataset-passthrough call).
+- `linkedin_url_column` — name of the column that holds the person's LinkedIn URL.
+- `account_website_column` — name of the column that holds the person's company website (or company LinkedIn URL when website isn't available — e.g. `COMPANY_LINKEDIN_URL` from an `ai_prospecting` dataset).
 - `person_name_column` — name of the column that holds the person's full name.
 
-The column-name params tell the tool how to read your contact dicts. Pass the keys you actually used in `contacts`.
+The column-name params tell the tool how to read your rows. When passing inline contacts, use the keys you put in `contacts`. When passing `dataset_id`, use the **dataset's** column names.
 
 ## Optional arguments
 
-- `total_count` — required for phase 1 and every phase 2 call when contacts > 10.
+- `total_count` — required for phase 1 and every phase 2 call when row count > 10.
 - `confirmation_token` — required on every phase 2 call. Server-issued in phase 1.
 - `include_email` *(default `True`)*
 - `include_phone` *(default `True`)* — turn one off if the user only wants the other; halves the cost.
-- `dataset_id`, `limit`, `offset` — pagination over a saved dataset (most calls don't need these).
+- `dataset_id` — enrich rows from an existing MCP dataset (e.g. an `ai_prospecting` run dataset). Pass `contacts=[]` when using this; the tool reads from the dataset.
+- `limit`, `offset` — page through a dataset when you don't want the whole thing.
 - **Never pass `target_tenant_id`** — tenant comes from OAuth.
 
 ## The flow at a glance
@@ -122,7 +134,9 @@ Loop until everyone is processed. **Accumulate results across calls.** Flag any 
 
 ## Common pitfalls
 
-- **Forgetting the column-name params.** They're required even on the empty-contacts consent call.
+- **Forgetting the column-name params.** They're required even on the empty-contacts consent call and on dataset-passthrough calls.
+- **Using the wrong column names with `dataset_id`.** When you pass an `ai_prospecting` dataset, the columns are `LINKEDIN_URL`, `COMPANY_LINKEDIN_URL`, `FULL_NAME` — not whatever your inline-contacts dicts would have used.
+- **Passing both `contacts` and `dataset_id` with non-empty contacts.** Pick one source. Dataset passthrough wants `contacts=[]`.
 - **Skipping phase 1 for "just 12 contacts".** The threshold is >10, not >20. Twelve triggers two-phase.
 - **Sending phase 2 with the wrong `total_count`.** It must match phase 1.
 - **Re-confirming the same batch silently after a server timeout.** Re-use the existing `confirmation_token`; don't kick off a fresh phase 1 unless the user genuinely wants to redo the request.
@@ -149,17 +163,48 @@ Done in one call. Render results.
 4. Accumulate, surface unresolvable rows.
 ```
 
-**Top 10 from a 50-prospect run.**
+**Top 10 from a 50-prospect run (user-picked subset).**
 ```
 After ai_prospecting returns 50 prospects, the user picks the top 10:
 contact_data_enrichment(
-    contacts=[...10 dicts built from prospect rows...],
-    linkedin_url_column="LINKEDIN_URL",   # use whatever key you used
-    account_website_column="company_website",
+    contacts=[...10 dicts built from preview_rows + dataset slice...],
+    linkedin_url_column="LINKEDIN_URL",
+    account_website_column="COMPANY_LINKEDIN_URL",
     person_name_column="FULL_NAME"
 )
 ```
 ≤10, so single call.
+
+**Enrich the entire ai_prospecting run (dataset passthrough).**
+```
+ai_prospecting(action="run", ...) returned dataset_id="ds_abc", filtered_prospects=42.
+User says "get emails and phones for all of them."
+
+# Phase 1 — consent
+contact_data_enrichment(
+    contacts=[],
+    total_count=42,
+    dataset_id="ds_abc",
+    linkedin_url_column="LINKEDIN_URL",
+    account_website_column="COMPANY_LINKEDIN_URL",
+    person_name_column="FULL_NAME",
+)
+# Show user_facing_message verbatim. Stop. After explicit yes:
+
+# Phase 2 — page through the dataset, ≤20 per call
+for offset in range(0, 42, 20):
+    contact_data_enrichment(
+        contacts=[],
+        total_count=42,
+        dataset_id="ds_abc",
+        confirmation_token=token_from_phase_1,
+        limit=20,
+        offset=offset,
+        linkedin_url_column="LINKEDIN_URL",
+        account_website_column="COMPANY_LINKEDIN_URL",
+        person_name_column="FULL_NAME",
+    )
+```
 
 **Emails only, 80 contacts.**
 ```
