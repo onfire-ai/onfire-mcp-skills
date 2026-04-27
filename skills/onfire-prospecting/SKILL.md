@@ -21,10 +21,11 @@ The user might come in with company LinkedIn URLs, just websites, just names, a 
 
 When you've picked a path below, read the atomic skill for each tool you'll call. Atomic skills hold the input shapes, batch caps, output fields, polling rules, and pitfalls that you don't want to re-derive each time.
 
-**Dataset companion tools.** `ai_prospecting(action="run")` (and the `search_*` tools) return a `dataset_id` instead of the full row set. The full data lives in a short-lived MCP dataset that you analyse with these companions:
+**Dataset companion tools.** `ai_prospecting(action="run")` (and the `search_*` tools) return a `dataset_id` instead of the full row set. The full data lives in a short-lived MCP dataset (CSV in S3, 7-day TTL) that you work with through these companions:
 
 - `describe_dataset(dataset_id)` — schema + a head sample.
-- `query_datasets({alias: dataset_id}, sql, row_limit=N)` — read-only DuckDB SQL on the parquet (filter, sort, slice, paginate).
+- `query_datasets({alias: dataset_id}, sql, row_limit=N)` — read-only DuckDB SQL on the dataset (filter, sort, slice, paginate).
+- `download_dataset(dataset_id)` — mint a short-lived URL the user can click to download the dataset as CSV. Use whenever the user asks for the file itself ("send me the CSV", "download the results", "export this", "give me the spreadsheet"). Surface the returned `download_url` directly in the chat reply — that link IS the deliverable. Default TTL 1 hour, capped at 24 hours.
 - `list_datasets()` — see datasets produced earlier in this conversation (handy when comparing a live vs shadow run).
 
 You don't need a separate skill for these; the relevant atomic skill (`ai-prospecting`, `search-people`, etc.) covers when and how to use them.
@@ -83,6 +84,16 @@ Phrasing should feel natural, not boilerplate:
 
 Use `total_prospects` / `filtered_prospects` from the run response so the "<total>" number is real. Make this offer regardless of how many prospects came back. To enrich the entire run, pass the run's `dataset_id` to `contact-data-enrichment(dataset_id=…, contacts=[], …)`; for a custom subset, build inline contact dicts.
 
+## The download offer (also don't skip)
+
+In the same breath as the enrichment offer, tell the user they can grab the full dataset as a CSV. The preview is a smell test, not the deliverable — most users want the file. One `download_dataset(dataset_id)` call returns a short-lived URL; surface it directly.
+
+Phrasing should feel natural, not boilerplate:
+
+> "I can also send you the full <total>-row CSV — say the word and I'll drop a download link."
+
+Or, if the user already asked for a file (any phrasing — "send", "export", "download", "give me the spreadsheet"), skip the offer and just call `download_dataset` immediately. The link is cheap; don't make the user ask twice.
+
 ## Hard rules (the things that bite)
 
 - **Never pass `target_tenant_id`** on `ai_prospecting` or `contact_data_enrichment`. Tenant comes from OAuth.
@@ -103,14 +114,14 @@ Use `total_prospects` / `filtered_prospects` from the run response so the "<tota
 *"Run prospecting on Datadog."*
 1. `match-company` on "Datadog" → LinkedIn URL.
 2. `ai-prospecting(action="run", company_linkedin_url=...)`. Poll if needed.
-3. Render. Make the enrichment offer.
+3. Render. Make the enrichment offer + download offer.
 
 **A sheet of 40 accounts.**
 *User uploads a CSV with `company_name` and `website`.*
 1. One `match-company` call with all 40 rows (multi-signal entries: both name and website).
 2. Filter matched rows; flag unmatched.
 3. `ai-prospecting(action="run", linkedin_urls=[...])`. Poll if needed.
-4. Render the preview. If the user wants per-company groupings or a full xlsx, `query_datasets({"p": dataset_id}, "SELECT … ORDER BY COMPANY_LINKEDIN_URL")`. Make the enrichment offer (dataset_id passthrough).
+4. Render the preview. If the user wants the file itself, `download_dataset(dataset_id)` and surface the link. For per-company groupings or other custom slicing, `query_datasets({"p": dataset_id}, "SELECT … ORDER BY COMPANY_LINKEDIN_URL")` — and persist the slice with `persist_as_dataset=True` if they then want to download just the slice. Make the enrichment offer (dataset_id passthrough).
 
 **Person identity + score.**
 *"Score 'Lana Patel, VP Eng at Snowflake'."*

@@ -107,12 +107,15 @@ Each prospect row in the dataset (and in `preview_rows`) carries only these seve
 
 If Phoenix returns zero prospects the response is the same shape with `dataset: null` and `preview_rows: []`.
 
+`failed_companies` (always present on `action="run"`) is a list of any company URLs that failed during the batch fan-out — each entry has `linkedin_url`, `error`, and `status_code` (when the failure came back as an HTTP error from Phoenix). On a fully-successful run it's `[]`. If the user passed N URLs and some are listed here, mention them — those companies were *not* prospected. If every URL failed, the tool returns `status="error"` with the same `failed_companies` list and no dataset.
+
 ## Working with the dataset
 
 The full ranked list lives in the dataset, not in `preview_rows`. Use the dataset companion tools to inspect or slice it without paying its context cost:
 
 - **`describe_dataset(dataset_id)`** — schema + a head sample. Good first call before writing SQL.
-- **`query_datasets({alias: dataset_id}, sql, row_limit=N)`** — read-only DuckDB SQL against the parquet. Filter, count, slice, or pull a specific page.
+- **`query_datasets({alias: dataset_id}, sql, row_limit=N)`** — read-only DuckDB SQL against the dataset. Filter, count, slice, or pull a specific page.
+- **`download_dataset(dataset_id)`** — mint a short-lived URL the user can click to download the dataset as CSV. Use whenever the user asks for the file ("send me the CSV", "download the results", "export this", "give me the spreadsheet"). Surface the returned `download_url` directly in the chat — that link IS the deliverable.
 - **`list_datasets()`** — surface earlier datasets from this conversation (e.g. to compare a live run vs a shadow run).
 
 Useful patterns:
@@ -171,7 +174,7 @@ A single scored prospect record returned **inline** (no dataset — it's just on
 
 **Batch / multi-company:** preview is still scored order across all companies. If the user wants per-company grouping, run `query_datasets` with `GROUP BY COMPANY_LINKEDIN_URL` (or `ORDER BY COMPANY_LINKEDIN_URL` for a flat grouped list).
 
-**Long lists / pagination:** pull additional pages via `query_datasets({"p": dataset_id}, "SELECT * FROM p LIMIT N OFFSET K")`. Offer xlsx / csv export for the full set; the dataset is the canonical source.
+**Long lists / pagination:** pull additional pages via `query_datasets({"p": dataset_id}, "SELECT * FROM p LIMIT N OFFSET K")`. If the user wants the file rather than a paged view, call `download_dataset(dataset_id)` and surface the returned `download_url` — that's the canonical CSV. For a download of just a slice (e.g. "top 50 by score"), run the slice through `query_datasets(..., persist_as_dataset=True)` first to get a new `dataset_id`, then `download_dataset` on that.
 
 ## The enrichment offer (required, not optional)
 
@@ -184,6 +187,14 @@ Phrase it naturally:
 The dataset_id from the run can be passed straight to `contact_data_enrichment(dataset_id="ds_…", ...)` to enrich the entire run set without rebuilding contact dicts; for a custom subset, build dicts from the rows the user picked. See `contact-data-enrichment`.
 
 This is part of the playbook, not a polite extra.
+
+## The download offer (also required)
+
+In the same breath as the enrichment offer, mention they can grab the full ranked list as a CSV. Most users want the file — `preview_rows` is a smell test, not the deliverable.
+
+> "I can also send you the full <total>-row CSV — say the word and I'll drop a download link."
+
+If the user already asked for a file (any phrasing — "send", "export", "download", "give me the spreadsheet"), skip the offer and just call `download_dataset(dataset_id)`. Surface the returned `download_url` directly. The link is short-lived (default 1 hour, max 24 hours), so don't sit on it.
 
 ## Hard rules
 
