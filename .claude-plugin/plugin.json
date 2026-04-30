@@ -1,7 +1,7 @@
 {
   "name": "onfire-mcp-skills",
-  "version": "0.1.0",
-  "description": "Skill tree for the Onfire MCP. An orchestrator skill routes user intent across five atomic skills — one per Onfire tool — covering identity resolution, AI prospecting, contact enrichment, and prospecting schema configuration.",
+  "version": "0.2.0",
+  "description": "Skill tree for the Onfire MCP. Includes an orchestrator skill that routes user intent across five atomic skills (one per Onfire tool) covering identity resolution, AI prospecting, contact enrichment, and prospecting schema configuration, plus a bdr-account-research skill that generates full BDR briefs by combining Onfire MCP, Snowflake EDGAR 10-K filings, and Metabase intent signals.",
   "author": {
     "name": "Onfire",
     "email": "onfire-ai@onfire.ai"
@@ -14,6 +14,11 @@
     "sales",
     "linkedin",
     "enrichment",
-    "ai-prospecting"
+    "ai-prospecting",
+    "bdr",
+    "account-research",
+    "10-k",
+    "edgar",
+    "intent-signals"
   ]
 }
