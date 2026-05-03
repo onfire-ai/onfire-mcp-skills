@@ -95,6 +95,10 @@ Full layout specification for the BDR account research report widget.
 
 ## Section 3: Live signals
 
+The text inside the `<blockquote>` is the verbatim proof excerpt from
+`message_text`. Trim with `…` if needed; never edit the words. The quoted
+span must be a contiguous substring of `message_text`.
+
 ```html
 <div class="sec" style="border-left:3px solid #E24B4A;border-radius:0 var(--border-radius-lg) var(--border-radius-lg) 0">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -115,7 +119,10 @@ Full layout specification for the BDR account research report widget.
         <span class="tag" style="background:#FAEEDA;color:#854F0B">[source · date]</span>
       </div>
       <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 3px">[Title] · [Location]</p>
-      <p style="font-size:12px;color:var(--color-text-primary);margin:0;line-height:1.5">[short_summary or long_summary]</p>
+      <blockquote style="font-size:12px;color:var(--color-text-primary);margin:4px 0 0;padding:6px 10px;border-left:2px solid var(--color-border-secondary);background:var(--color-background-secondary);line-height:1.5;font-style:italic">
+        "[verbatim excerpt from message_text — do not edit]"
+      </blockquote>
+      <p style="font-size:11px;color:var(--color-text-tertiary);margin:3px 0 0">— [source_name] · [date]</p>
       <!-- If matched to Phoenix prospect, show ai_reasoning snippet here -->
     </div>
   </div>

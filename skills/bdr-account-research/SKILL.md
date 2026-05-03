@@ -133,7 +133,7 @@ Read the table schema:
 metabase:get_table(id=<table_id>, with-fields=true)
 ```
 
-Confirm it has columns: `tenant_id`, `account_website`, `signal_type`, `short_summary`,
+Confirm it has columns: `tenant_id`, `account_website`, `signal_type`, `message_text`,
 `intent_holder_linkedin_url`, `date`, `source_type`, `source_name`, `name`.
 
 ### 3b — Construct and execute the query
@@ -141,7 +141,7 @@ Confirm it has columns: `tenant_id`, `account_website`, `signal_type`, `short_su
 ```
 metabase:construct_query(
   table_id=<discovered_table_id>,
-  fields=[signal_type, short_summary, long_summary, intent_holder_linkedin_url,
+  fields=[signal_type, message_text, intent_holder_linkedin_url,
           date, source_type, source_name, name, product_lines, topics],
   filters=[
     {field_id: account_website, operation: "equals", value: "<company_website>"},
@@ -160,6 +160,14 @@ Then `metabase:execute_query(query=<constructed_query>)`.
 `Slack`, `Discord`) and by signal intent holder. For each unique person, resolve their
 identity (name + title + LinkedIn URL) from the `intent_holder_linkedin_url` field.
 Cross-reference with Phoenix prospects where possible.
+
+**Quote, never rewrite.** For every signal row rendered in the report, attach a
+verbatim excerpt from `message_text` as the proof of intent. You MAY trim with
+leading/trailing ellipses (`…`) to focus on the relevant span, but you MUST NOT
+paraphrase, summarize, translate, fix typos, reflow whitespace, or otherwise alter
+the characters inside the quoted span. The text inside the quote must be a
+contiguous substring of `message_text` byte-for-byte. If `message_text` is empty
+or null, render `(no message text on record)` — do not substitute another column.
 
 ---
 
