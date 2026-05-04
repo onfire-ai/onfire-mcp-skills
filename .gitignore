@@ -1,0 +1,9 @@
+# Packaged plugin distribution artifacts (the marketplace reads source files
+# directly — committing the bundled .plugin archive at the repo root makes
+# the marketplace API treat it as a packaged plugin source and fail
+# extraction due to the duplicate .claude-plugin/ structure inside).
+*.plugin
+*.zip
+
+# macOS
+.DS_Store
