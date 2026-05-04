@@ -1,233 +1,438 @@
-# Report Structure & HTML Widget Template
+# Report Structure — A4 HTML Template
 
-Full layout specification for the BDR account research report widget.
-
----
-
-## Design principles
-
-- Follow the claude.ai design system (CSS variables, flat surfaces, no gradients)
-- Use sentence case everywhere — never ALL CAPS or Title Case
-- LinkedIn URLs must be `<a href="...">` links
-- 10-K quotes use a left-border blockquote; never reproduce > 15 words verbatim
-- Fit score bars: filled `div` inside a 90px × 5px container
-- Avatars: 32×32px circles with initials, colored per use case
-- All source attribution: small 10px label with `letter-spacing: 0.05em`
+Full layout specification for the BDR account research report.
+This is a **customer-facing, print-ready A4 HTML file** - not a widget.
 
 ---
 
-## CSS base
+## Core design principles
+
+- **Fortinet branded** — red header bar, Fortinet red color palette throughout
+- **A4 print layout** — 174mm content width, all sizes in `pt`, `@page` CSS set
+- **Self-contained** — no external dependencies. No Google Fonts CDN. No external images.
+  System fonts only. Logo as base64 data URI.
+- **Customer-facing** — zero mentions of internal tools. Use "market intelligence",
+  "intent signals", "annual filing", "industry research".
+- **No em dashes** — use a regular hyphen `-` everywhere. Never use `—`
+- **"Account Research"** — never "Account Brief"
+- **LinkedIn links** — company name in header is an `<a>` link with dotted underline
+- **Employee stat clarity** — always explain headcount with a breakdown
+- **Key contacts on new pages** — each use case contacts block starts with `break-before: page`
+- **No break mid-card** — every `.card` has `break-inside: avoid`
+- **No buying committee or cold opens** — these sections are removed
+- **No footer sources line** — footer is: [logo] · [Company] · Account Research · [Month Year]
+- **Signal messages quoted verbatim** — never paraphrase `message_text`
+- **Background graphics preserved for PDF** — `print-color-adjust: exact` in `@media print`
+
+---
+
+## Full CSS block
 
 ```css
-.sec { background: var(--color-background-primary); border: .5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.25rem; margin-bottom: 1rem; }
-.lbl { font-size: 11px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-secondary); margin: 0 0 6px; }
-.tag { font-size: 11px; padding: 2px 8px; border-radius: var(--border-radius-md); font-weight: 500; white-space: nowrap; }
-.sig { font-size: 13px; color: var(--color-text-primary); margin: 0 0 4px; line-height: 1.55; }
-.tp  { font-size: 13px; color: var(--color-text-primary); margin: 0 0 6px; line-height: 1.65; }
-.pr  { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: .5px solid var(--color-border-tertiary); }
+/* Reset */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Fortinet brand tokens */
+:root {
+  --ftn-red:        #D9261C;
+  --ftn-red-dark:   #A8190F;
+  --ftn-red-light:  #FBEAE9;
+  --ftn-red-mid:    #F4C0BD;
+  --bg:       #F6F5F2;
+  --surface:  #FFFFFF;
+  --border:   #E0DDD6;
+  --border-md:#C9C6BE;
+  --text:     #1A1816;
+  --muted:    #68655E;
+  --faint:    #AEABA5;
+  --netsec-bg:#E6F1FB; --netsec-text:#155496; --netsec-bar:#2E74C8;
+  --secops-bg:#E1F5EE; --secops-text:#0D6350; --secops-bar:#199068;
+  --cnapp-bg: #EAF3DE; --cnapp-text: #3B6D11; --cnapp-bar: #5C8F1E;
+  --aisec-bg: #EEEDFE; --aisec-text: #4840A8; --aisec-bar: #7269CC;
+  --hi-bg:    #FBEAE9; --hi-text:    #8C1B15;
+  --med-bg:   #F9EDDA; --med-text:   #7A4A0A;
+  --low-bg:   #EEECE6; --low-text:   #565350;
+}
+
+/* Page — A4 */
+@page { size: A4; margin: 16mm 18mm 18mm 18mm; }
+html  { font-size: 10pt; }
+body  {
+  /* SYSTEM FONTS ONLY — no Google Fonts CDN (blocked in file:// context) */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  background: #fff; color: var(--text);
+  line-height: 1.55; width: 174mm; margin: 0 auto; padding: 0 0 10mm;
+}
+
+/* Force background colors to print in PDF — REQUIRED */
+@media print {
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}
+
+/* Screen preview */
+@media screen {
+  html { background: #C9C6BE; font-size: 11px; }
+  body { box-shadow: 0 2px 28px rgba(0,0,0,.15); padding: 0 0 20mm; margin: 20px auto; }
+  .header-bar { margin: 0; }
+}
+
+/* Typography */
+p    { font-size: 9pt; line-height: 1.65; margin-bottom: 3pt; }
+p:last-child { margin-bottom: 0; }
+strong { font-weight: 600; }
+a    { color: var(--netsec-text); text-decoration: none; }
+
+/* Labels, tags */
+.lbl { display: block; font-size: 7pt; font-weight: 600; letter-spacing: .08em;
+       text-transform: uppercase; color: var(--muted); margin-bottom: 4pt; }
+.tag { display: inline-block; font-size: 7.5pt; font-weight: 500;
+       padding: 1.5pt 6pt; border-radius: 3pt; white-space: nowrap; line-height: 1.5; }
+
+/* Cards */
+.card { background: var(--surface); border: .5pt solid var(--border);
+        border-radius: 6pt; padding: 9pt 11pt; margin-bottom: 7pt; break-inside: avoid; }
+.card-accent  { border-left: 2.5pt solid var(--ftn-red); border-radius: 0 6pt 6pt 0; }
+.card-red-top { border-top: 2pt solid var(--ftn-red); }
+
+/* Layout helpers */
+.two  { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; margin-bottom: 8pt; }
+.sig  { font-size: 8.5pt; margin-bottom: 3pt; line-height: 1.5; }
+.tp   { font-size: 8.5pt; margin-bottom: 5pt; line-height: 1.6; }
+
+/* Quote block */
+.quote { background: var(--ftn-red-light); border-left: 2.5pt solid var(--ftn-red-mid);
+         border-radius: 0 4pt 4pt 0; padding: 6pt 8pt; margin: 7pt 0; }
+.quote p { font-size: 7.5pt; color: var(--muted); font-style: italic; margin: 0; line-height: 1.65; }
+.quote .src { font-size: 6.5pt; color: var(--faint); margin-top: 3pt; font-style: normal; font-weight: 500; }
+
+/* Evidence block (real message_text / LinkedIn profile quotes) */
+.evidence { margin-top: 5pt; background: #F6F5F2; border-left: 1.5pt solid #C9C6BE;
+            border-radius: 0 3pt 3pt 0; padding: 4pt 7pt; }
+.evidence-lbl { font-size: 6pt; font-weight: 700; letter-spacing: .08em;
+                text-transform: uppercase; color: #AEABA5; margin-bottom: 2pt; }
+.evidence p { font-size: 7.5pt !important; line-height: 1.55 !important;
+              color: #68655E !important; margin-bottom: 0 !important; font-style: italic; }
+
+/* Prospect / signal rows */
+.pr { display: flex; align-items: flex-start; gap: 7pt; padding: 6pt 0;
+      border-bottom: .4pt solid var(--border); break-inside: avoid; }
 .pr:last-child { border-bottom: none; }
-.av  { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; flex-shrink: 0; }
-.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
-.quote { background: var(--color-background-secondary); border-left: 3px solid var(--color-border-secondary); border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0; padding: 10px 12px; margin: 8px 0; }
-.quote p { font-size: 12px; color: var(--color-text-secondary); line-height: 1.6; margin: 0; font-style: italic; }
-.src { font-size: 10px; color: var(--color-text-secondary); margin: 4px 0 0; font-style: normal; font-weight: 500; letter-spacing: .05em; }
-.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 16px; }
-.stat { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 12px; }
-.stat-val { font-size: 18px; font-weight: 500; color: var(--color-text-primary); margin: 0 0 2px; line-height: 1.2; }
-.stat-lbl { font-size: 11px; color: var(--color-text-secondary); margin: 0; line-height: 1.3; }
-@media(max-width:500px) { .two { grid-template-columns: 1fr; } .stat-grid { grid-template-columns: 1fr 1fr; } }
+.signal-row { display: flex; align-items: flex-start; gap: 7pt; padding: 7pt 0;
+              border-bottom: .4pt solid var(--border); break-inside: avoid; }
+.signal-row:last-child { border-bottom: none; }
+.av { width: 22pt; height: 22pt; border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; font-family: monospace; font-size: 7pt; font-weight: 600; flex-shrink: 0; }
+.signal-name  { font-size: 9pt; font-weight: 600; color: var(--text); text-decoration: none; }
+.signal-title { font-size: 7.5pt; color: var(--muted); margin-bottom: 2pt; }
+.signal-body  { font-size: 8pt; line-height: 1.55; }
+
+/* Stats */
+.stat-grid { display: grid; grid-template-columns: repeat(6,1fr); gap: 5pt; margin-bottom: 9pt; }
+.stat { background: var(--bg); border-radius: 4pt; padding: 5pt 6pt; }
+.stat-val { font-family: monospace; font-size: 11pt; font-weight: 500;
+            color: var(--ftn-red); margin-bottom: 1pt; line-height: 1.2; }
+.stat-lbl { font-size: 6.5pt; color: var(--muted); line-height: 1.3; }
+
+/* Score bar */
+.score-track { width: 50pt; height: 3.5pt; background: var(--bg); border-radius: 2pt;
+               overflow: hidden; border: .3pt solid var(--border); }
+.score-fill  { height: 100%; border-radius: 2pt; }
+.score-num   { font-family: monospace; font-size: 8.5pt; font-weight: 500; }
+
+/* Why-now rows */
+.why-row { display: flex; gap: 8pt; align-items: flex-start; margin-bottom: 7pt; break-inside: avoid; }
+.why-num { font-family: monospace; font-size: 10pt; color: var(--ftn-red);
+           font-weight: 600; flex-shrink: 0; min-width: 14pt; margin-top: 1pt; }
+
+/* Section title */
+.section-title { font-size: 7pt; font-weight: 700; letter-spacing: .1em;
+                 text-transform: uppercase; color: var(--ftn-red);
+                 margin: 10pt 0 7pt; display: flex; align-items: center; gap: 6pt; break-after: avoid; }
+.section-title::after { content: ""; flex: 1; height: .5pt; background: var(--ftn-red-mid); }
+
+/* Page break rules */
+.contacts-page-break { break-before: page; }
+hr.divider { border: none; border-top: .4pt solid var(--border); margin: 6pt 0 8pt; }
 ```
 
 ---
 
-## Section 1: Report header
+## Section 1: Red header bar
+
+Embed the Fortinet logo as base64. Generate with:
+```bash
+base64 fortinet_logo.jpeg | tr -d '\n'
+# Then prefix: data:image/jpeg;base64,<output>
+```
 
 ```html
-<!-- Red dot + source label -->
-<div class="sec">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-    <div style="width:7px;height:7px;border-radius:50%;background:#E24B4A;flex-shrink:0"></div>
-    <span class="lbl" style="margin:0">BDR Intelligence · [data source badges]</span>
-    <!-- Data source badges: show only sources that contributed data -->
-    <!-- Snowflake: background:#E6F1FB;color:#185FA5 -->
-    <!-- Metabase: background:#FCEBEB;color:#A32D2D -->
-    <!-- Phoenix: background:#EAF3DE;color:#3B6D11 -->
-    <!-- Missing source: background:#F1EFE8;color:#5F5E5A with "N/A" suffix -->
-  </div>
-
-  <!-- Company name + top use case + notable tags -->
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+<div class="header-bar" style="background:#D9261C;margin:0 -18mm;padding:7pt 18mm;
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:10pt">
+  <div style="display:flex;align-items:center;gap:8pt">
+    <img src="[BASE64_DATA_URI]" alt="Fortinet" style="width:26pt;height:26pt;border-radius:3pt">
     <div>
-      <p style="font-size:20px;font-weight:500;margin:0 0 3px">[Company Name]</p>
-      <p style="font-size:13px;color:var(--color-text-secondary);margin:0">[Exchange:Ticker] · [Industry] · [HQ] · 10-K [Filing Date]</p>
-    </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <!-- Top use case tag, notable finding tags (max 3) -->
+      <div style="font-size:11pt;font-weight:600;color:#fff">Fortinet</div>
+      <div style="font-size:7.5pt;color:rgba(255,255,255,.75);margin-top:1pt">
+        Account Research - [Company Name]
+      </div>
     </div>
   </div>
-
-  <!-- Stat grid: revenue, employees, signals count, prospects scored, notable metric -->
-  <div class="stat-grid">...</div>
-
-  <!-- 2–3 sentence company overview -->
-  <p style="font-size:14px;line-height:1.7;margin:0">...</p>
+  <div style="font-family:monospace;font-size:7pt;color:rgba(255,255,255,.65);
+    text-align:right;line-height:1.5">[Month Year]<br>Confidential</div>
 </div>
 ```
 
 ---
 
-## Section 2: Why now
+## Section 2: Company header card
 
 ```html
-<div class="sec" style="border-left:3px solid #E24B4A;border-radius:0 var(--border-radius-lg) var(--border-radius-lg) 0">
-  <p class="lbl" style="margin-bottom:10px">Why this account — why now · [sources cited]</p>
-  <!-- 3–5 numbered points, each with a bold title and 2–3 sentence explanation -->
-  <!-- Each point ends with a source badge or inline citation -->
-  <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px">
-    <span style="font-size:14px;color:#E24B4A;font-weight:500;flex-shrink:0;min-width:18px">01</span>
-    <p class="tp" style="margin:0"><strong style="font-weight:500">Bold title.</strong> Explanation text...</p>
+<div class="card card-red-top">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;
+    flex-wrap:wrap;gap:6pt;margin-bottom:9pt">
+    <div>
+      <!-- ALWAYS a LinkedIn link with dotted underline -->
+      <div style="font-size:15pt;font-weight:600;letter-spacing:-.02em;margin-bottom:2pt">
+        <a href="[COMPANY_LINKEDIN_URL]"
+          style="color:inherit;text-decoration:none;border-bottom:1.5pt dotted #AEABA5"
+          target="_blank">[Company Name] ↗</a>
+      </div>
+      <div style="font-size:8pt;color:var(--muted)">[Exchange:Ticker] - [Industry] - [HQ]</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:3pt;align-items:flex-end">
+      <!-- 2-3 top tags -->
+    </div>
   </div>
-  <!-- repeat for 02, 03, etc -->
+  <div class="stat-grid">
+    <div class="stat"><div class="stat-val">$X.XB</div><div class="stat-lbl">FY[year] revenue</div></div>
+    <!-- ALWAYS include breakdown in employee label -->
+    <div class="stat"><div class="stat-val">~100K</div>
+      <div class="stat-lbl">Total employees (Company A 55K + Acquired Co 45K, post-acquisition)</div></div>
+    <!-- 4 more stats -->
+  </div>
+  <p style="font-size:9pt;line-height:1.65">[2-3 sentence overview. No internal tool names.]</p>
 </div>
 ```
 
 ---
 
-## Section 3: Live signals
-
-The text inside the `<blockquote>` is the verbatim proof excerpt from
-`message_text`. Trim with `…` if needed; never edit the words. The quoted
-span must be a contiguous substring of `message_text`.
+## Section 3: Why this account - why now
 
 ```html
-<div class="sec" style="border-left:3px solid #E24B4A;border-radius:0 var(--border-radius-lg) var(--border-radius-lg) 0">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-    <p class="lbl" style="margin:0">Live signals · Metabase · [tenant_id] · [company_website]</p>
-    <div style="display:flex;gap:5px">
-      <span class="tag" style="background:#EAF3DE;color:#3B6D11">[N] signals returned</span>
-      <span class="tag" style="background:#FCEBEB;color:#A32D2D">All [signal_type]</span>
-    </div>
+<div class="card card-accent">
+  <span class="lbl">Why this account - why now</span>
+  <div class="why-row">
+    <span class="why-num">01</span>
+    <p><strong>Bold title.</strong> Body text. Cite sources as "annual filing",
+      "market intelligence", "[Event Name] [Year]" - never internal tool names.</p>
   </div>
+  <!-- repeat 02-05 -->
+</div>
+```
 
-  <!-- One row per signal holder (merge if same person has multiple signals) -->
-  <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:.5px solid var(--color-border-tertiary)">
-    <div class="av" style="background:[uc-color-bg];color:[uc-color-text]">[initials]</div>
+---
+
+## Section 4: Confirmed technology deployment — LinkedIn profiles
+
+Placed **immediately after "Why Now"**, before signals. This is the strongest evidence
+section — real people at the account who list the tenant's products or competitors in
+their own LinkedIn job descriptions.
+
+```html
+<div class="section-title">Confirmed technology deployment - LinkedIn profiles - [Company]</div>
+<div class="card card-accent">
+  <span class="lbl" style="margin-bottom:6pt">
+    Current employees listing [tenant] or competitor products directly in their LinkedIn
+    job descriptions
+  </span>
+
+  <!-- One .pr row per person, 3 max -->
+  <div class="pr">
+    <div class="av" style="background:[uc-bg];color:[uc-text]">[Initials]</div>
     <div style="flex:1;min-width:0">
-      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:2px">
-        <a href="[linkedin_url]" style="font-size:13px;font-weight:500;color:var(--color-text-primary);text-decoration:none">[Full Name]</a>
-        <span class="tag" style="background:#FCEBEB;color:#A32D2D">Priority</span>
-        <span class="tag" style="background:#FAEEDA;color:#854F0B">[source · date]</span>
+      <div style="display:flex;align-items:center;gap:7pt;flex-wrap:wrap;margin-bottom:2pt">
+        <a href="[LINKEDIN_URL]" style="font-size:9pt;font-weight:600;
+          color:var(--text);text-decoration:none">[Full Name]</a>
+        <!-- Confirmation tag — what the profile proves -->
+        <span class="tag" style="background:var(--hi-bg);color:var(--hi-text)">
+          [FortiGate confirmed / Palo Alto in-seat / etc.]
+        </span>
+        <span class="tag" style="background:[uc-bg];color:[uc-text]">[Job Title]</span>
       </div>
-      <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 3px">[Title] · [Location]</p>
-      <blockquote style="font-size:12px;color:var(--color-text-primary);margin:4px 0 0;padding:6px 10px;border-left:2px solid var(--color-border-secondary);background:var(--color-background-secondary);line-height:1.5;font-style:italic">
-        "[verbatim excerpt from message_text — do not edit]"
-      </blockquote>
-      <p style="font-size:11px;color:var(--color-text-tertiary);margin:3px 0 0">— [source_name] · [date]</p>
-      <!-- If matched to Phoenix prospect, show ai_reasoning snippet here -->
+      <div style="font-size:7.5pt;color:var(--muted);margin-bottom:3pt">
+        [Job Title] - [Company] - [Location]
+      </div>
+      <p style="font-size:8pt;line-height:1.5">
+        [1 sentence explaining what this profile confirms and why it matters]
+      </p>
+      <!-- Evidence block with VERBATIM quote from their LinkedIn profile -->
+      <div class="evidence">
+        <div class="evidence-lbl">Source - LinkedIn profile - current role</div>
+        <p>&ldquo;[Exact text from JOB_SUMMARY or HEADLINE that mentions the product]&rdquo;</p>
+      </div>
     </div>
   </div>
 </div>
 ```
 
-If no signals: show a single row with "No live signals found for [tenant_id] at [company_website]."
+**Picking the 3 best profiles:**
+- Direct product name mention beats general category mention
+  - STRONG: "Managed Fortinet firewalls, including FortiGate models"
+  - WEAK: "experience with various security tools"
+- Currently employed beats former employee (check JOB_START_DATE recency)
+- Sr. Engineer / Architect / Manager beats junior titles
+- For competitor evidence: prefer "Palo Alto confirmed in-seat" + model numbers
 
 ---
 
-## Section 4: Use case cards (one per derived use case)
+## Section 5: Intent signals
 
 ```html
-<div class="sec">
-  <!-- Header: use case badge + prospect count note + fit score bar -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:6px">
-    <div style="display:flex;align-items:center;gap:8px">
-      <span class="tag" style="background:[uc-bg];color:[uc-text]">[Use Case Name]</span>
-      <span style="font-size:12px;color:var(--color-text-secondary)">[supporting note]</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px">
-      <div style="width:90px;height:5px;background:var(--color-background-secondary);border-radius:4px;overflow:hidden">
-        <div style="width:[score*10]%;height:100%;background:[uc-bar];border-radius:4px"></div>
-      </div>
-      <span style="font-size:13px;font-weight:500;color:var(--color-text-primary)">[score]/10</span>
+<div class="card card-accent">
+  <div style="display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:8pt;flex-wrap:wrap;gap:4pt">
+    <!-- Label: "Intent signals" only - NEVER "Metabase signals" -->
+    <span class="lbl" style="margin-bottom:0">Intent signals - [Date range]</span>
+    <div style="display:flex;gap:4pt">
+      <span class="tag" style="background:[uc-bg];color:[uc-text]">[N] signals detected</span>
+      <span class="tag" style="background:var(--hi-bg);color:var(--hi-text)">All verified</span>
     </div>
   </div>
 
-  <!-- Two-column: account signals (left) + tenant config match (right) -->
+  <!-- Signal row -->
+  <div class="signal-row">
+    <div class="av" style="background:[uc-bg];color:[uc-text]">[Initials]</div>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5pt;flex-wrap:wrap;margin-bottom:2pt">
+        <a href="[linkedin_url]" class="signal-name">[Full Name]</a>
+        <!-- Source tag - see source substitution table -->
+        <span class="tag" style="...">[Neutral source tag]</span>
+        <span style="font-family:monospace;font-size:7pt;color:var(--faint)">[Date]</span>
+      </div>
+      <div class="signal-title">[Title] - [Company] - [Location]</div>
+      <p class="signal-body">[Your own analysis of why this signal is relevant — NOT the AI summary]</p>
+      <!-- Evidence block: VERBATIM message_text (if non-empty) -->
+      <div class="evidence">
+        <div class="evidence-lbl">Source - [source_name / source_type] - [Date]</div>
+        <p>&ldquo;[Exact message_text from the database]&rdquo;</p>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+**Source tag substitution:**
+
+| Raw `source_name` / `source_type` | Display tag |
+|-----------------------------------|-------------|
+| RSA Conference | "RSA Conference [Year]" |
+| KubeCon, CloudNativeCon | "[Conference] [Year]" |
+| NVIDIA GTC | "NVIDIA GTC [Year]" |
+| Slack | "Professional community" |
+| Discord | "Community engagement" |
+| LinkedIn | "Digital intent signal" |
+| Reddit | "Professional community" |
+| GitHub | "Developer community signal" |
+| Company Change | "Company change - [New Company]" |
+| Promotion | "Promotion - [New Title]" |
+| Event Attendee (generic) | "[Event Name] - attendee" |
+
+**Evidence block rule (CRITICAL — applies to all signal types):**
+- The evidence block always quotes `message_text` **verbatim**. Trim with leading
+  or trailing `…` only; never paraphrase, summarize, translate, fix typos, reflow
+  whitespace, or alter the characters inside the quoted span. The quoted text
+  must be a contiguous substring of `message_text` byte-for-byte.
+- **Never substitute `short_summary` or any other column** — including for
+  `Event Attendee`, `Company Change`, or `Promotion` signals.
+- `message_text` is empty — skip the evidence block. Do not invent one and do
+  not substitute another field.
+
+---
+
+## Section 6: Use case cards
+
+```html
+<!-- Use case card -->
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:8pt;flex-wrap:wrap;gap:4pt">
+    <div style="display:flex;align-items:center;gap:6pt">
+      <span class="tag" style="background:[uc-bg];color:[uc-text]">[Use Case]</span>
+      <span style="font-size:7.5pt;color:var(--muted)">[Supporting note]</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:5pt">
+      <!-- Score bar: fill width = score * 10% -->
+      <div class="score-track">
+        <div class="score-fill" style="width:[score*10]%;background:[uc-bar]"></div>
+      </div>
+      <span class="score-num" style="color:[uc-text]">[score] / 10</span>
+    </div>
+  </div>
   <div class="two">
     <div>
-      <p class="lbl">Account signals</p>
-      <!-- 3–5 bullet signals from Metabase + 10-K -->
+      <span class="lbl">Account signals</span>
+      <!-- Cite as "annual filing", "market intelligence", "[Event Year]" -->
     </div>
     <div>
-      <p class="lbl">Fortinet tenant config match</p>
-      <!-- Technologies ✓, Personas ✓, Competitors confirmed/likely -->
+      <!-- Label: "Fortinet solution alignment" — NOT "Tenant config match" -->
+      <span class="lbl">Fortinet solution alignment</span>
     </div>
   </div>
+  <span class="lbl">Talking points</span>
+  <!-- 10-K quote block (under 15 words verbatim) -->
+  <div class="quote">
+    <p>"[Short verbatim quote from filing]"</p>
+    <p class="src">[Company] Annual Report (10-K) - [Section] - [Filing Date]</p>
+  </div>
+</div>
 
-  <!-- Talking points: 2–3, each grounded in a specific data source -->
-  <p class="lbl">Talking points</p>
-  <!-- If 10-K quote available: show blockquote, then add talking point referencing it -->
-
-  <!-- Top prospects for this use case -->
-  <p class="lbl" style="margin-top:12px">Top prospects</p>
-  <!-- prospect rows (see signal row template above, same structure) -->
+<!-- KEY CONTACTS — ALWAYS new page, color-coded label -->
+<div class="card contacts-page-break">
+  <span class="lbl" style="color:[uc-text];border-bottom:.5pt solid [uc-bg];
+    padding-bottom:4pt;margin-bottom:8pt">Key contacts - [Use Case]</span>
+  <!-- .pr rows -->
 </div>
 ```
 
 ---
 
-## Section 5: Buying committee table
+## Section 7: Footer
+
+No sources line. Just: logo + company name + label + date.
 
 ```html
-<div class="sec" style="margin-bottom:0">
-  <p class="lbl" style="margin-bottom:10px">Buying committee</p>
-  <!-- One row per person, priority badge on right -->
-  <!-- Priority colors: high=#FCEBEB/#A32D2D, medium=#FAEEDA/#854F0B, support=#F1EFE8/#5F5E5A -->
-  <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:.5px solid var(--color-border-tertiary)">
-    <div>
-      <p style="font-size:13px;font-weight:500;margin:0">[Name or Role]</p>
-      <p style="font-size:11px;color:var(--color-text-secondary);margin:0">[Title] · [data source]</p>
-    </div>
-    <span class="tag" style="background:[priority-bg];color:[priority-text]">[priority]</span>
+<div style="margin-top:10pt;padding-top:6pt;border-top:.5pt solid #F4C0BD;
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4pt">
+  <div style="display:flex;align-items:center;gap:5pt">
+    <img src="[BASE64_DATA_URI]" alt="Fortinet" style="width:14pt;height:14pt;border-radius:2pt">
+    <span style="font-size:7.5pt;font-weight:600;color:#D9261C">Fortinet</span>
   </div>
+  <p style="font-family:monospace;font-size:6.5pt;color:var(--faint)">
+    [Company Name] - Account Research - [Month Year]
+  </p>
+  <!-- NO sources line -->
 </div>
 ```
 
 ---
 
-## Section 6: Approach + cold opens
+## Quick reference: forbidden vs correct
 
-```html
-<!-- 2-column: approach narrative (left) + cold open scripts (right) -->
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px">
-  <div class="sec" style="margin-bottom:0">
-    <p class="lbl" style="margin-bottom:8px">Recommended sequence</p>
-    <p style="font-size:13px;line-height:1.7;margin:0">...</p>
-  </div>
-  <div style="display:flex;flex-direction:column;gap:10px">
-    <!-- Cold open 1: most senior buyer -->
-    <div class="sec" style="margin-bottom:0;background:var(--color-background-secondary)">
-      <p class="lbl" style="margin-bottom:5px">Cold open · [Buyer Name/Role]</p>
-      <p style="font-size:13px;line-height:1.6;margin:0;font-style:italic">"..."</p>
-    </div>
-    <!-- Cold open 2: top technical champion -->
-    <div class="sec" style="margin-bottom:0;background:var(--color-background-secondary)">
-      <p class="lbl" style="margin-bottom:5px">Cold open · [Champion Name/Role]</p>
-      <p style="font-size:13px;line-height:1.6;margin:0;font-style:italic">"..."</p>
-    </div>
-  </div>
-</div>
-```
-
----
-
-## Missing data states
-
-When a section has no data from a source, show a muted inline note rather than hiding
-the section entirely:
-
-```html
-<p style="font-size:13px;color:var(--color-text-secondary);line-height:1.6;margin:0">
-  No [Snowflake 10-K / Metabase signals / Phoenix prospects] found for this account.
-  [Brief note on what would appear here if data were available.]
-</p>
-```
+| Never write | Write instead |
+|-------------|---------------|
+| `—` (em dash) | `-` (hyphen) |
+| "Metabase signals" | "Intent signals" |
+| "Slack signal" | "Professional community" |
+| "Discord signal" | "Community engagement" |
+| "Phoenix prospects" | "Key contacts" |
+| "Snowflake 10-K" | "Annual filing" |
+| "Tenant config match" | "Fortinet solution alignment" |
+| "Account Brief" | "Account Research" |
+| `~100K Employees post-Discover` | `~100K Total employees (Co A 55K + Co B 45K, post-acquisition)` |
+| Company name plain text | `<a href="[linkedin]">` with dotted underline |
+| AI summary of message | Verbatim `message_text` from database |
+| Buying committee section | Removed — do not include |
+| Cold opens section | Removed — do not include |
+| Footer sources line | Removed — footer is name + label + date only |
+| Google Fonts CDN `<link>` | System font stack only |
+| Background colors not printing | `@media print { * { print-color-adjust: exact !important } }` |
