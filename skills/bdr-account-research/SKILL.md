@@ -1,18 +1,6 @@
 ---
 name: bdr-account-research
-description: >
-  Generate a full BDR (Business Development Representative) account research report for any
-  company, combining live data from four sources: Onfire MCP (tenant config + Phoenix AI
-  prospecting), Snowflake (SEC 10-K/EDGAR filings + LinkedIn profile data), and Metabase
-  (intent signals).
-  Use this skill whenever a user asks to "generate a report", "research an account",
-  "build a BDR brief", "run account research", or mentions a company domain alongside
-  words like "signals", "prospects", "10-K", "use cases", or "tenant". The skill
-  automatically reads the tenant's configuration to determine relevant use cases,
-  excludes what the tenant has flagged as not interesting, and produces a
-  customer-facing A4 HTML file. Always use this skill rather than manually querying
-  sources one by one.
-compatibility: "claude.ai with Onfire MCP, Snowflake, and Metabase MCP connectors"
+description: Generate a full BDR (Business Development Representative) account research report for any company, combining live data from four sources - Onfire MCP (tenant config + Phoenix AI prospecting), Snowflake (SEC 10-K/EDGAR filings + LinkedIn profile data), and Metabase (intent signals). Use this skill whenever a user asks to "generate a report", "research an account", "build a BDR brief", "run account research", or mentions a company domain alongside words like "signals", "prospects", "10-K", "use cases", or "tenant". The skill automatically reads the tenant's configuration to determine relevant use cases, excludes what the tenant has flagged as not interesting, and produces a customer-facing A4 HTML file. Always use this skill rather than manually querying sources one by one.
 ---
 
 # BDR Account Research Report
