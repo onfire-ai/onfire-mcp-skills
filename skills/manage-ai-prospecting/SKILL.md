@@ -1,5 +1,5 @@
 ---
-name: onfire-manage-ai-prospecting
+name: manage-ai-prospecting
 description: Inspect and edit the caller's AI Prospecting schema configuration via the Onfire `manage_ai_prospecting` tool. Use when the user wants to view their prospecting schema (regions, ranking, keywords, prompts, tags), draft changes safely without touching the live config, test those changes with shadow runs, then promote or discard them. Covers the full shadow lifecycle: get_my_schema, get_shadow, create_shadow, update_shadow, ship_shadow, discard_shadow.
 ---
 
