@@ -1,5 +1,5 @@
 ---
-name: onfire-ai-prospecting
+name: ai-prospecting
 description: Run AI prospecting against a target company (rank likely buyers/champions) or score a single named person at a company using the Onfire `ai_prospecting` tool. Use when the user wants prospects for an account, a ranked list of who to talk to, a score on a specific person ("is X worth a meeting"), or a batch run across multiple companies. Covers both `action='run'` and `action='get_prospect'`, the dataset-backed response and how to query it, the polling pattern for long runs, and the shadow-schema test mode.
 ---
 

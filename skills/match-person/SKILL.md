@@ -1,5 +1,5 @@
 ---
-name: onfire-match-person
+name: match-person
 description: Resolve a person (from name, email, and/or company context) to a verified LinkedIn profile plus current title and employer using the Onfire `match_person` tool. Use when you have a person reference but no LinkedIn URL, when CRM contacts need identity resolution before enrichment, or as the upstream step before `ai_prospecting(action="get_prospect")` or `contact_data_enrichment` on rows missing LinkedIn URLs.
 ---
 

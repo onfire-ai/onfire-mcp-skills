@@ -1,5 +1,5 @@
 ---
-name: onfire-contact-data-enrichment
+name: contact-data-enrichment
 description: Append verified professional emails and phone numbers to contact records using the Onfire `contact_data_enrichment` tool. Use when the user asks for emails, phones, or "contact info" for prospects, when enriching a CSV / CRM list, or as the standing follow-up to any `ai_prospecting` run. PAID per contact per data type — has a strict two-phase consent flow above 10 contacts. This skill enforces that flow.
 ---
 

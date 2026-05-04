@@ -1,5 +1,5 @@
 ---
-name: onfire-match-company
+name: match-company
 description: Resolve a company (from name, website, or LinkedIn URL) to a verified LinkedIn URL plus firmographics using the Onfire `match_company` tool. Use when you have any starting signal about a company — a name, a website, a CRM row, a LinkedIn URL you want to verify — and need a canonical identity. Also use as the upstream step before any `ai_prospecting` call that doesn't already have a company LinkedIn URL.
 ---
 
