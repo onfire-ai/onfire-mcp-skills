@@ -218,15 +218,45 @@ base64 fortinet_logo.jpeg | tr -d '\n'
 
 ## Section 3: Why this account - why now
 
+**Every point must cite its source inline in the first sentence.** No separate evidence
+blocks — the source and date are woven into the opening sentence naturally.
+
+**Format pattern:**
+`[Bold title.] [Source with date] [verb: confirms/discloses/shows/states] [the claim]. [BDR relevance.]`
+
+**Source reference by origin:**
+
+| Origin | Inline citation format |
+|--------|----------------------|
+| SEC 10-K | `[Company]'s annual filing (10-K, [Date])` |
+| LinkedIn post | `[Person/Role] posted on LinkedIn ([Month Year])` |
+| LinkedIn company change | `LinkedIn company change notification ([Month Year])` |
+| LinkedIn promotion | `LinkedIn promotion notification ([Month Year])` |
+| Fortinet Discord/Slack | `A [Company] [role] posted in the Fortinet community [platform] ([Date])` |
+| Public event | `[Person/Company] at [Event Name] [Year]` |
+| Press release | `[Company] press release ([Month Year])` |
+| EU/gov regulation | `[Regulation] ([Official reference, date] - enforcement [date])` |
+| Phoenix results | `AI prospecting results ([Month Year]) identified...` |
+
+**Correct examples:**
+- `Capital One's annual filing (10-K, Feb 19, 2026) explicitly discloses that employee AI tools risk PII leakage...`
+- `A Siemens security engineer posted in the Fortinet community Discord (Mar 17, 2026): "How do you guys like FortiPAM?" — confirming an active evaluation.`
+- `LinkedIn company change notification (Dec 2025) shows George G. moved from AMS to PMI as Senior IT Service Manager.`
+
+**Wrong:**
+- `Market intelligence shows...` — too vague
+- `Sources confirm...` — no source named
+- Adding a separate evidence block below the point — inline only
+
 ```html
 <div class="card card-accent">
   <span class="lbl">Why this account - why now</span>
   <div class="why-row">
     <span class="why-num">01</span>
-    <p><strong>Bold title.</strong> Body text. Cite sources as "annual filing",
-      "market intelligence", "[Event Name] [Year]" - never internal tool names.</p>
+    <p><strong>Bold title.</strong> [Source with date] confirms/discloses [claim].
+      [Supporting context and BDR relevance.]</p>
   </div>
-  <!-- repeat 02-05 -->
+  <!-- repeat 02-05 — each point MUST have inline source in first sentence -->
 </div>
 ```
 
@@ -434,5 +464,6 @@ No sources line. Just: logo + company name + label + date.
 | Buying committee section | Removed — do not include |
 | Cold opens section | Removed — do not include |
 | Footer sources line | Removed — footer is name + label + date only |
-| Google Fonts CDN `<link>` | System font stack only |
+| "Market intelligence shows..." in Why Now | `[Source] ([Date]) confirms/discloses...` inline in first sentence |
+| Why Now point with no source | Remove the point or find a real source — never use vague attribution |
 | Background colors not printing | `@media print { * { print-color-adjust: exact !important } }` |

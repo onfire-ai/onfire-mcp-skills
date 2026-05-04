@@ -294,12 +294,72 @@ Read `references/report-structure.md` for the full A4 HTML template.
 - **No buying committee or cold opens section** — remove from all reports.
 - **No footer sources line** — the footer shows only: company name · Account Research · [Month Year].
 - **Signal messages are quoted verbatim** — never paraphrase or reframe what someone said.
+- **Why Now points always cite their source inline** — see rules below.
+
+### Why this account - why now — evidence rules (CRITICAL)
+
+Every why-now point must include the source and date **inline in the first sentence**.
+This is the only evidence format for why-now points — no separate evidence blocks, no
+quote boxes. Just the source woven naturally into the opening sentence.
+
+**Format pattern:**
+```
+[Bold title.] [Source reference with date] confirms/shows/discloses/states [the claim].
+[Supporting context and BDR relevance.]
+```
+
+**Source reference by data origin:**
+
+| Data origin | How to cite inline |
+|-------------|-------------------|
+| SEC 10-K filing | `[Company]'s annual filing (10-K, [Filing Date])` |
+| LinkedIn post | `[Person/Role] posted on LinkedIn ([Month Year])` |
+| LinkedIn company change | `LinkedIn company change notification ([Month Year])` |
+| LinkedIn promotion | `LinkedIn promotion notification ([Month Year])` |
+| Fortinet community (Discord/Slack) | `A [Company] [role] posted in the Fortinet community [platform] ([Date])` |
+| Public event (RSA, KubeCon, GTC, MWC) | `[Person/Company] at [Event Name] [Year] ([Month Year])` |
+| Official press release / announcement | `[Company] press release / announcement ([Month Year])` |
+| EU/government regulation | `[Regulation name] ([Official journal reference, date] - enforcement [date])` |
+| Phoenix AI prospecting results | `AI prospecting results ([Month Year]) identified...` |
+
+**Examples (correct):**
+
+```
+✓ "Capital One's annual filing (10-K, Feb 19, 2026) explicitly discloses that employee
+   use of third-party AI tools risks PII leakage into training sets."
+
+✓ "A Siemens security engineer posted in the Fortinet community Discord (Mar 17, 2026):
+   'How do you guys like FortiPAM?' — confirming an active evaluation in progress."
+
+✓ "A Siemens Digital Industries executive posted on LinkedIn (Apr 14, 2026) announcing
+   the Palo Alto Networks Prisma AIRS integration into the Siemens Xcelerator portfolio."
+
+✓ "LinkedIn company change notification (Dec 2025) shows George G. moved from AMS
+   to Philip Morris International as Senior IT Service Manager in Poland."
+
+✓ "The EU Cyber Resilience Act (Official Journal of the EU, Oct 23, 2024 -
+   enforcement deadline Sept 11, 2026) mandates..."
+```
+
+**Examples (wrong):**
+
+```
+✗ "Market intelligence shows..." — too vague, no date
+✗ "Sources confirm..." — no source named
+✗ "It has been reported that..." — passive, no origin
+✗ Adding a separate evidence block under the why-now point — use inline citation only
+```
+
+**What if no specific source is available for a point?**
+Only include why-now points you can cite with a real source and date. If you cannot
+attribute a claim to a specific document, post, filing, or signal with a date, either
+find the source or remove the point. Never make up sources or use vague attributions.
 
 ### Report section order
 
 1. **Red header bar** — Fortinet logo (base64) + "Account Research - [Company]" + date
 2. **Company header card** — name (LinkedIn link), ticker, HQ, stat grid, overview paragraph
-3. **Why this account - why now** — 3-5 numbered points from 10-K, signals, M&A, LinkedIn profiles
+3. **Why this account - why now** — 3-5 numbered points, each with inline source citation in the first sentence
 4. **Confirmed technology deployment** — LinkedIn profile evidence section (Step 3 results)
    - Label: "Current employees listing [tenant] or competitor products directly in their LinkedIn job descriptions"
    - 3 strongest profiles, each with real quoted evidence from their profile text
