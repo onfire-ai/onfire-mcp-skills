@@ -218,17 +218,104 @@ base64 fortinet_logo.jpeg | tr -d '\n'
 
 ## Section 3: Why this account - why now
 
+**REQUIRED — every Why Now point must carry an inline evidence reference.**
+The bold title or the first prose sentence must include the source AND the
+date (or date range) of the evidence. This applies to every numbered point
+without exception. The reader should be able to point to which document /
+event / profile / signal a claim came from, in what timeframe, without
+clicking out.
+
+### Acceptable inline-citation formats
+
+| Source type | Inline format examples |
+|-------------|----------------------|
+| 10-K / annual filing | `(Berkshire 10-K, March 2, 2026)` · `(Thermo Fisher 10-K, February 26, 2026)` · `(annual filing, [Month Year])` |
+| LinkedIn profile (current role) | `(LinkedIn profile evidence, current role)` · `(LinkedIn profile, in seat since [Month Year])` |
+| LinkedIn company-change record | `(company-change records)` · `(LinkedIn company-change, [Month Year])` |
+| Conference / event | `(RSA Conference 2026, April 2026)` · `(KubeCon NA 2025 promotion, November 2025)` · `(Splunk .conf25, September 2025)` |
+| Community Slack / Discord | `(SPIFFE community Slack, June 2025)` · `(Fortinet community Discord, [Month Year])` |
+| LinkedIn post (intent signal) | `(LinkedIn post, [Date])` |
+| Phoenix-derived prospect data | `(Phoenix prospect data)` (paired with Phoenix scoring date if material) |
+
+### Required citation structure on each point
+
+Each `<div class="why-row">` body must satisfy these rules:
+
+1. **Bold title carries the source-and-date stamp** — either as a parenthetical
+   at the end of the bold (`<strong>...title... (10-K, [date])</strong>`) or
+   inside the bold itself if the source IS the headline (`<strong>...spoke
+   at RSA Conference February 2026...</strong>`).
+2. **Body prose names the specific person, document, or event** — not a
+   generic "annual filing" or "a current employee." Use the actual name,
+   title, role, or filing date pulled from the data.
+3. **No date-less claims.** If a claim has no date, do not include it as a
+   Why Now point. Demote it into a use-case card or drop it.
+4. **Date precision** — match the precision of the source. 10-K → exact
+   filing date. LinkedIn profile → "in seat since [Month Year]". Slack
+   message → exact post date. Event → "[Event Name] [Year]" (with month
+   if known).
+5. **Multi-source points** — when a single point is supported by two or
+   more pieces of evidence (e.g., two LinkedIn profiles or a 10-K plus a
+   community post), cite all of them. Use a semicolon-separated list inside
+   the parenthetical: `(KubeCon NA 2025 promotion, November 2025; SPIFFE
+   community Slack, June 2025)`.
+6. **Never cite internal tool names.** "Phoenix prospect data" and "intent
+   signals" are the only acceptable abstractions; everything else must be
+   "annual filing", "LinkedIn profile", "RSA Conference 2026", "Splunk
+   .conf25", "company-change records", or the actual community channel.
+
+### Required template
+
 ```html
 <div class="card card-accent">
   <span class="lbl">Why this account - why now</span>
+
   <div class="why-row">
     <span class="why-num">01</span>
-    <p><strong>Bold title.</strong> Body text. Cite sources as "annual filing",
-      "market intelligence", "[Event Name] [Year]" - never internal tool names.</p>
+    <p><strong>[Bold claim] ([source], [date or date range]).</strong> [Body
+      prose that names the specific person / document / event evidence.]
+      [Tie to Fortinet talk track or solution.]</p>
   </div>
-  <!-- repeat 02-05 -->
+
+  <!-- 3 to 5 more numbered points, each with the same source-and-date stamp -->
 </div>
 ```
+
+### Worked examples (use these patterns verbatim where they fit)
+
+```
+01. Heavy single-vendor concentration on Palo Alto Networks (LinkedIn profile
+    evidence, current roles). Three current GEICO engineers list Palo Alto
+    deployments in their LinkedIn job descriptions: 15-plus PA-5250 / PA-3220
+    firewalls tied to Panorama (Okpidu Apeh, in seat since June 2022)…
+
+02. Berkshire's federated cyber model leaves each business group autonomous
+    (Berkshire 10-K, March 2, 2026). The most recent annual filing makes clear
+    that each Business Group's CISO sets its own program…
+
+03. Principal Cybersecurity Architect publicly active at RSA Conference 2026
+    (April 2026 LinkedIn post). Daksha Bhasker (CISM CISSP CCSK CCZT) earned
+    her 5-year RSAC LoyaltyPlus pin…
+
+04. AI / ML misuse and ransomware named as material risk factors (Thermo
+    Fisher 10-K, February 26, 2026). Risk factors specifically call out
+    "ransomware attacks, misuse of AI and machine learning technologies,
+    governmental actions and legislative or regulatory changes."
+
+05. Active zero-trust hybrid cloud fabric build-out is on display (KubeCon NA
+    2025 promotion, November 2025; SPIFFE community Slack, June 2025). A GEICO
+    engineering leader (Michael Kinsley) promoted KubeCon talks on zero-trust
+    network fabric using SPIFFE/SPIRE, Istio, and Kubernetes…
+```
+
+### Quick reference: forbidden vs correct on Why Now
+
+| Never write | Write instead |
+|-------------|---------------|
+| `A current employee at the company says…` | `Network security firewall engineer Okpidu Apeh (LinkedIn profile, in seat since June 2022) states…` |
+| `The most recent annual filing notes…` | `(Berkshire 10-K, March 2, 2026) The most recent annual filing notes…` |
+| `Cybersecurity team is hiring right now.` | `Cybersecurity team is hiring and re-leveling, October 2025 to January 2026 (company-change records).` |
+| `Active zero-trust build-out is happening.` | `Active zero-trust build-out is on display (KubeCon NA 2025 promotion, November 2025).` |
 
 ---
 
