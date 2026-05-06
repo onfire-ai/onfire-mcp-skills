@@ -352,3 +352,33 @@ Tell the user:
 - `references/persona-to-usecase.md` — Map prospect titles → use cases
 - `references/report-structure.md` — Full HTML template, CSS, layout rules
 - `references/pdf-generation.md` — PDF conversion instructions
+
+---
+
+## Pre-delivery checklist — every report
+
+Before saving the final HTML and calling `present_files`, run these four
+checks. All four must pass.
+
+1. **Four-use-case structure**
+   `grep -E '<span class="tag" style="background:var\(--(netsec|secops|cnapp|aisec|appsec|identity|endpoint)-bg' report.html`
+   Only `--netsec-bg`, `--secops-bg`, `--cnapp-bg`, and `--aisec-bg`
+   may appear. If `--appsec`, `--identity`, or `--endpoint` appear,
+   fold their content into one of the four canonical cards and rerun.
+
+2. **No internal tool names**
+   `grep -iE 'phoenix|metabase|mcp|onfire'` → must return zero matches.
+
+3. **No em dashes**
+   `grep -- '—' report.html` → must return zero matches outside
+   verbatim evidence-block quotes (which preserve byte-for-byte).
+
+4. **Why Now evidence references**
+   Every `<div class="why-row">` body must contain a parenthetical
+   in its bold strong tag — `(... [date] / [date range] / "current role")`
+   — with one of the acceptable source types (10-K, LinkedIn profile,
+   conference, community Slack/Discord, LinkedIn post, company-change
+   records). No date-less Why Now points.
+
+If any check fails, fix the report and rerun all four. Do not deliver
+a report until all four pass.

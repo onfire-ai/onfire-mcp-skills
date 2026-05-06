@@ -370,6 +370,41 @@ their own LinkedIn job descriptions.
 - Sr. Engineer / Architect / Manager beats junior titles
 - For competitor evidence: prefer "Palo Alto confirmed in-seat" + model numbers
 
+### Profile-validation rule — employee vs contractor
+
+Before citing a LinkedIn profile as evidence of internal product
+deployment OR as an internal champion, validate the relationship.
+Reject (or reframe) any profile whose HEADLINE or SUMMARY uses any of:
+
+  - "supporting [Fortune 100 / a financial / etc.] client"
+  - "consulting for"
+  - "contracted to"
+  - "managed services for"
+  - "augmenting [Company]'s team"
+  - any wording other than direct employment at the target
+
+Even if the dataset maps the person's JOB_COMPANY_LINKEDIN_URL to the
+target account, the headline language is the source of truth on
+employment relationship. Contractors at managed-services firms commonly
+get mapped to client account URLs in third-party data — this is a known
+data-mapping artifact, not a citation reason.
+
+Rejection workflow:
+  1. Drop the profile entirely from Why Now and Confirmed Technology
+     Deployment sections.
+  2. Drop the profile from Key Contacts.
+  3. If the underlying technical evidence (e.g. "manages FortiGate
+     firewalls") is unique and lost when the profile is dropped, find
+     a second profile that is a direct employee, OR demote the claim
+     to general industry context.
+
+Allowed alternative framing for valuable contractor profiles:
+  - Cite as "industry research" without naming the person
+  - Cite as a contractor explicitly: "...contracted to support [Company]
+    since [Month Year]"
+
+Never frame a contractor as an "internal champion" or "in seat".
+
 ---
 
 ## Section 5: Intent signals
@@ -433,6 +468,50 @@ their own LinkedIn job descriptions.
   `Event Attendee`, `Company Change`, or `Promotion` signals.
 - `message_text` is empty — skip the evidence block. Do not invent one and do
   not substitute another field.
+
+---
+
+## Section 6 prerequisite — the four-use-case rule
+
+EVERY account research report uses EXACTLY these four use case cards,
+in this order, with no exceptions:
+
+  1. Network Sec
+  2. Sec Ops
+  3. CNAPP
+  4. AI Sec
+
+There is no Identity card, no AppSec card, no Endpoint card, no ICS / OT
+card, and no DevSecOps card. The off-template use cases from the original
+use-case-mapping.md (Identity, AppSec, Endpoint) are folded into the four
+canonical ones:
+
+  - PAM / IAM signals (CyberArk, BeyondTrust, SailPoint, Okta, Azure AD,
+    FortiAuthenticator, FortiTrust Identity, FortiPAM) → fold into
+    Network Sec under the ZTNA / FortiSASE talk track, OR into Sec Ops
+    if the framing is governance / audit-driven.
+
+  - AppSec signals (Snyk, Veracode, Microfocus FOD, Mend.io, FortiDevSec,
+    FortiWeb, FortiAppSec Cloud) → fold into Sec Ops under the SOC
+    consolidation pitch, or surface as a sub-bullet inside the CNAPP
+    card if tied to CI/CD pipeline scope.
+
+  - Endpoint signals (CrowdStrike, SentinelOne, Microsoft Defender,
+    McAfee EPO, FortiEDR, FortiClient) → fold into Sec Ops under the
+    SIEM / SOAR consolidation pitch.
+
+  - ICS / OT signals (industrial control systems, SANS GIAC, NIST + ISA
+    frameworks, FortiGate Rugged, FortiGuard ICS) → fold into Network
+    Sec as a sub-bullet, do not surface as a separate card.
+
+If a use case has no genuine signal at the account, write a short card
+that frames it as a follow-on to the stronger use cases. Honest framing
+("AI Sec is a follow-on, not an opener") is acceptable. Removing the
+card entirely is not — the structure must be the same on every report.
+
+Each card scores 1.0–10.0 with one decimal. Each card is followed by
+its own Key Contacts card. The Key Contacts card uses the same accent
+color as the use case card (--netsec / --secops / --cnapp / --aisec).
 
 ---
 
@@ -523,3 +602,44 @@ No sources line. Just: logo + company name + label + date.
 | Footer sources line | Removed — footer is name + label + date only |
 | Google Fonts CDN `<link>` | System font stack only |
 | Background colors not printing | `@media print { * { print-color-adjust: exact !important } }` |
+
+---
+
+## Forbidden internal tool names
+
+Never name an internal Onfire / vendor product or tool in the
+customer-facing report under any circumstance. Internal-tool names get
+replaced with neutral abstractions:
+
+  Internal name              →  Customer-facing label
+  ─────────────────────────  →  ──────────────────────────────────────
+  Phoenix                    →  Identified prospects / verified key contacts
+  Phoenix prospect data      →  LinkedIn profile evidence (when the
+                                underlying source is profile data) OR
+                                "buyer signals data" (generic)
+  AI prospecting             →  Buyer signals
+  Metabase                   →  Intent signals
+  Snowflake (as source)      →  Annual filing / 10-K (cite the doc)
+  MCP, Onfire, OnFire        →  (never appears in report text)
+
+The only acceptable abstractions in customer-facing prose are:
+  - "annual filing" / "10-K"
+  - "LinkedIn profile evidence"
+  - "company-change records"
+  - "intent signals"
+  - "industry research"
+  - "market intelligence"
+  - "[Conference Name] [Year]" (real events, e.g. RSA Conference 2026)
+  - "[Community channel] community Slack / Discord" (e.g. SPIFFE Slack)
+
+Snowflake CAN appear as a CUSTOMER product (e.g. "Snowflake Cortex AI is
+in production at the account") — it cannot appear as the SOURCE of our
+data ("we queried Snowflake to find..."). Same rule for any vendor: if
+they sell it and the account uses it, mention freely. If we use it to
+research, never mention.
+
+Run a final grep on the rendered HTML before delivery:
+
+  Phoenix | phoenix | Metabase | metabase | MCP | Onfire | OnFire | onfire
+
+Zero matches required.
