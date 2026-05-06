@@ -469,6 +469,48 @@ Never frame a contractor as an "internal champion" or "in seat".
 - `message_text` is empty — skip the evidence block. Do not invent one and do
   not substitute another field.
 
+### Section 5 rule — when there are no signals, omit the section
+
+If the platform_signals query returns zero verified signals for the
+tenant + account combination AND no other intent-signal source produces
+relevant content, OMIT the entire Intent Signals section from the
+report. Do not render an empty placeholder card with "No verified
+intent signals on file" or any other negative-state copy.
+
+Specifically, when there are zero signals to render:
+- Skip the `<div class="section-title">Intent signals - last 12
+  months</div>` heading.
+- Skip the empty `<div class="card card-accent">…</div>` block.
+- Go directly from the Confirmed Technology Deployment section to
+  the `<hr class="divider">` that introduces the Solution fit
+  section.
+
+The reader should never see negative-state copy about missing data.
+The Confirmed Technology Deployment section, the company header,
+the 10-K quotes inside use-case cards, and the Why Now bullets
+together carry the substance of the report when intent signals are
+absent.
+
+When there ARE signals (one or more), render the section as defined
+in the body of Section 5 above. There is no minimum-signal threshold
+for showing the section - one verified signal is enough.
+
+**CRITICAL prerequisite — actually run the query first.** Only omit
+the section after the platform_signals query has been actually
+executed for the correct `account_website` value AND returned zero
+rows. Never omit on assumption. Common pitfalls to avoid:
+- Don't assume zero signals because the user didn't paste a query.
+- Don't assume zero signals because the company is private or
+  international.
+- Don't reuse a previous account's empty result.
+Run the query for every account, every report.
+
+Pre-delivery check: grep the rendered HTML for the literal strings
+"No verified intent signals on file" and "No verified live intent
+signals" and "Recommend revisiting after the next quarterly signal
+refresh." All three must return zero matches. If any match, the
+empty placeholder card was not removed - delete it before delivery.
+
 ---
 
 ## Section 6 prerequisite — the four-use-case rule
