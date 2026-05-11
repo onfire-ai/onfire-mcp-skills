@@ -69,7 +69,21 @@ When you see this, **call the tool again with identical arguments**. Keep callin
 
 ## Output shape (action="run", completed)
 
-A completed run returns a **dataset handle plus four agent-facing accelerators** — not the full prospect list inline. The whole prospect set is persisted as a short-lived MCP dataset (auto-expires); the tool response is intentionally compact so it never blows past the per-tool output token budget, even for large batch runs.
+A completed run returns a **dataset handle plus agent-facing accelerators** — not the full prospect list inline. The whole prospect set is persisted as a short-lived MCP dataset (auto-expires); the tool response is intentionally compact so it never blows past the per-tool output token budget, even for large batch runs.
+
+**The response is self-describing — but the full contract lives outside the response.** Every completed-run payload includes:
+
+- `field_index` — the sorted list of every field name documented in the glossary. This is your **safety-net check**: if every field you encounter in the response is in `field_index`, you already have the contract loaded; if you see something new, the schema has evolved and you should re-fetch.
+- `field_glossary_resource_uri` — pointer to the full glossary (`onfire://ai_prospecting/field_glossary`).
+
+The full glossary (~12 KB JSON) is reachable two ways:
+
+1. **As an MCP resource** at `onfire://ai_prospecting/field_glossary`. MCP clients that support resource injection (auto-loading server-attached metadata into the agent's context at session start) will pick this up automatically — you'll see the contract in your available context without making any call.
+2. **As a tool** — `get_field_glossary()`. Use this on MCP clients that don't auto-load resources, or any time you need to explicitly re-fetch. **Call it ONCE per conversation** — the content is stable across the server version, so re-fetching it is pure waste.
+
+**When to fetch the glossary:** on your first prospecting call of a conversation, if you don't already see the glossary content in your context (i.e. the resource wasn't auto-loaded), call `get_field_glossary` once and keep the result mentally cached for the rest of the session. On subsequent prospecting calls, the `field_index` check tells you whether anything new appeared — if not, skip the re-fetch.
+
+**The glossary is the source of truth for field semantics; this skill is the playbook for using them.**
 
 ```json
 {
