@@ -71,17 +71,25 @@ When you see this, **call the tool again with identical arguments**. Keep callin
 
 A completed run returns a **dataset handle plus agent-facing accelerators** — not the full prospect list inline. The whole prospect set is persisted as a short-lived MCP dataset (auto-expires); the tool response is intentionally compact so it never blows past the per-tool output token budget, even for large batch runs.
 
-**The response is self-describing — but the full contract lives outside the response.** Every completed-run payload includes:
+**The response is self-describing — but the full contract lives outside the response by default.** Every completed-run payload includes:
 
 - `field_index` — the sorted list of every field name documented in the glossary. This is your **safety-net check**: if every field you encounter in the response is in `field_index`, you already have the contract loaded; if you see something new, the schema has evolved and you should re-fetch.
 - `field_glossary_resource_uri` — pointer to the full glossary (`onfire://ai_prospecting/field_glossary`).
+- `field_glossary` — only present when the caller passed `include_field_glossary=True` on the call.
 
-The full glossary (~12 KB JSON) is reachable two ways:
+The full glossary (~12 KB JSON) is reachable two ways. **There is no separate `get_field_glossary` tool** — the metadata flows entirely through the `ai_prospecting` tool surface plus the MCP resource:
 
-1. **As an MCP resource** at `onfire://ai_prospecting/field_glossary`. MCP clients that support resource injection (auto-loading server-attached metadata into the agent's context at session start) will pick this up automatically — you'll see the contract in your available context without making any call.
-2. **As a tool** — `get_field_glossary()`. Use this on MCP clients that don't auto-load resources, or any time you need to explicitly re-fetch. **Call it ONCE per conversation** — the content is stable across the server version, so re-fetching it is pure waste.
+1. **As an MCP resource** at `onfire://ai_prospecting/field_glossary`. MCP clients that support resource injection (auto-loading server-attached metadata into the agent's context at session start) will pick this up automatically — you'll see the contract in your available context without making any explicit call.
+2. **As an opt-in inline payload** by passing `include_field_glossary=True` on a single `ai_prospecting` call. Use this on MCP clients that don't auto-load resources. **Pass True at most ONCE per conversation** — the content is byte-stable across the server version, re-fetching wastes tokens. After the first call returns the glossary, omit the flag (defaults to False) on every subsequent prospecting call and rely on `field_index` to confirm nothing new appeared.
 
-**When to fetch the glossary:** on your first prospecting call of a conversation, if you don't already see the glossary content in your context (i.e. the resource wasn't auto-loaded), call `get_field_glossary` once and keep the result mentally cached for the rest of the session. On subsequent prospecting calls, the `field_index` check tells you whether anything new appeared — if not, skip the re-fetch.
+**Decision tree for the agent:**
+
+```
+Is the glossary already in your context (resource auto-loaded by the host)?
+├── Yes  → proceed normally; rely on field_index to detect drift
+└── No   → on your FIRST ai_prospecting call this conversation, pass
+            include_field_glossary=True; for every subsequent call, omit it
+```
 
 **The glossary is the source of truth for field semantics; this skill is the playbook for using them.**
 
