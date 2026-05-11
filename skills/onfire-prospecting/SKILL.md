@@ -37,7 +37,7 @@ You don't need a separate skill for these; the relevant atomic skill (`ai-prospe
 
 1. Need company LinkedIn URLs → `match-company` (batch ≤100).
 2. `ai-prospecting` with `action="run"` (single via `company_linkedin_url`, batch via `linkedin_urls`). Be ready to poll.
-3. The completed payload returns a **dataset handle + a small `preview_rows` sample**, not the full prospect list. Render the preview (atomic explains rendering + the `$$-onfire-bold-$$` conversion). Use `query_datasets` / `describe_dataset` to slice or paginate the full list.
+3. The completed payload returns a **dataset handle plus four prioritization layers**: `top_picks` (slim "start here" top 3, ranked by Phoenix's canonical order), `priority_summary` (count histograms — tier 1 prospects, warm-intro tiers, alumni, tech champions), `preview_rows` (up to 5 full projected rows), and `facets` (tier/warm-intro/persona distribution). Lead with `priority_summary` as a one-line lede, then render `top_picks` with the warm-intro path + opener from `product_talking_points`. Don't flat-dump `preview_rows` — that's the failure mode. The atomic skill explains the full rendering playbook + the `$$-onfire-bold-$$` conversion. Use `query_datasets` / `describe_dataset` (ordering on `rank_position`) to slice or paginate the full list.
 4. Make the enrichment offer (see below — required, not optional). Pass the run's `dataset_id` to `contact-data-enrichment` to enrich the entire run set without rebuilding contact dicts.
 
 **"Score this specific person."**
@@ -104,7 +104,7 @@ Or, if the user already asked for a file (any phrasing — "send", "export", "do
 - **Don't promise prospect fields not in the seven returned.** See `ai-prospecting`.
 - **Convert `$$-onfire-bold-$$` sentinels** to markdown bold before display.
 - **Don't re-run `ai_prospecting` to "see more" prospects.** The run already produced the full set — use `query_datasets` / `describe_dataset` against the returned `dataset_id` instead.
-- **Treat `preview_rows` as a sample, not the result.** The full list lives in the dataset; surface the total from `total_prospects` / `filtered_prospects`.
+- **Lead with `top_picks` + `priority_summary`, not `preview_rows`.** The response is structured: `priority_summary` gives the lede ("5 PLATINUM warm intros — start there"), `top_picks` gives the ranked "start here" subset with the warm-intro path and pre-written openers, `preview_rows` is just the next-N sample. Flat-dumping preview_rows is the failure mode. Surface the total from `total_prospects` / `filtered_prospects` and the `dataset_id` so the user knows there's more.
 - **Surface low-confidence matches** from the matchers. Don't silently pick the top result.
 - **`manage_ai_prospecting` is the shadow editor**, not a SQL surface. Read its atomic skill before editing.
 
