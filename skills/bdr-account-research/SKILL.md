@@ -49,11 +49,12 @@ Onfire MCP: bdr_account_research(
 ```
 
 Polling pattern: if the response carries `status="still_running"`, the
-AI prospecting run hasn't finished. Re-call the tool with the same
-arguments. The orchestrator picks up the in-flight prospecting task and
-the second call typically completes. The non-prospecting blocks
-(`filings_10k`, `linkedin_footprint`, `intent_signals`) are always
-complete on the first call.
+AI prospecting run hasn't finished. Re-call `bdr_account_research` with
+the same arguments — Phoenix's server-side dedup picks up the in-flight
+prospecting run row and the second call typically completes without
+spawning a duplicate. The non-prospecting blocks (`filings_10k`,
+`linkedin_footprint`, `intent_signals`) are always complete on the first
+call.
 
 ## Step 1a - Load the prospecting field glossary (REQUIRED when prospects are present)
 

@@ -62,10 +62,23 @@ Both URLs required. `linkedin_urls`, `use_cache`, and `activate_shadow_run` don'
 Phoenix runs can take a few minutes. The MCP server polls Phoenix internally and may return:
 
 ```json
+{"status": "still_running", "message": "...", "companies": ["..."], "run_ids": [24685]}
+```
+
+When you see this, **call the tool again**. Two equivalent options:
+
+1. **Preferred — pass `run_ids` back**: `ai_prospecting(action="run", run_ids=[24685])`. Skips the redundant POST to Phoenix and polls the existing run directly via `GET /v1/prospecting/runs/{run_id}`. Use this whenever the previous response surfaced `run_ids`.
+2. **Identical arguments**: `ai_prospecting(action="run", company_linkedin_url="...")` (same as the first call). Phoenix's server-side dedup picks up the in-flight run row and returns the same `run_id`. Slightly more network, same outcome.
+
+Either path is safe — **the server never creates a duplicate `public.runs` row**. Keep calling until you get a `status="completed"` payload back. If you change `company_linkedin_url` or `linkedin_urls` between polls, that's a new request for a different company, not a retry.
+
+On the very first response (before any `run_ids` are known), you may instead see:
+
+```json
 {"status": "still_running", "message": "...", "companies": ["..."]}
 ```
 
-When you see this, **call the tool again with identical arguments**. Keep calling until you get a `status="completed"` payload back. The server deduplicates — you will not trigger a duplicate run by retrying. Don't change arguments between polls (changing them will look like a new request).
+— no `run_ids` yet because the start request itself didn't return in time. Retry with identical arguments; the next call will pick up the in-flight row and surface its `run_ids`.
 
 ## Output shape (action="run", completed)
 
@@ -351,7 +364,7 @@ If the user already asked for a file (any phrasing — "send", "export", "downlo
 ## Hard rules
 
 - **Never pass `target_tenant_id`.** Tenant comes from OAuth. The override is super-tenant only and will error for everyone else.
-- **Polling is mandatory** — `{"status": "still_running"}` means call again with identical args.
+- **Polling is mandatory** — `{"status": "still_running"}` means call again, preferably with `run_ids` from the response (or identical args if no `run_ids` are present yet).
 - **Don't invent fields outside the projected set.** The dataset carries the field set documented in the table above — no emails, no phones, no full tenure history. If the user asks for those, route to `contact-data-enrichment`.
 - **Render every available row as a full prospect card.** On inline shape, render every prospect. On preview shape, render every row in `top_picks` and `preview_rows`. Drop a card-line only when its underlying field is null/empty — never silently skip a no-drop field on row 4 that you showed on row 1. Consistency across rows is the contract.
 - **Render `ai_reasoning` verbatim.** Server already converts the `$$-onfire-bold-$$` sentinels to markdown bold and strips JSON-leak artifacts. Don't paraphrase the bullets into a one-liner — that's where the evidence quotes live.
@@ -368,7 +381,8 @@ If the user already asked for a file (any phrasing — "send", "export", "downlo
 - **Inventing opener prose when `product_talking_points` exists.** Phoenix already wrote product-specific openers per prospect. Use them. Don't paraphrase `ai_reasoning` into an opener and pretend you did the work.
 - **Ignoring the warm-intro path.** If `CONNECTING_EMPLOYEE_NAME` is populated, name them in the output. That's the warm-intro contact the user can ping; burying it inside `ai_reasoning` is wasteful.
 - **Missing the alumni callout.** `WORKED_IN_CLIENT_COMPANY_IN_PAST=TRUE` is the highest-value expansion signal in the response. If any row has it, prepend the warm-intro line with the alumni callout.
-- **Treating `still_running` as an error.** It's the documented async signal. Just call again.
+- **Treating `still_running` as an error.** It's the documented async signal. Just call again — pass back the `run_ids` if present.
+- **Forgetting to pass `run_ids` on the retry when they were surfaced.** Both paths work (identical args also dedups server-side), but passing `run_ids` is one round-trip cheaper and signals to the server "I'm resuming, not starting over."
 - **Treating `top_picks` or `preview_rows` as the full list on preview shape.** They're ranked subsets; the rest live in the dataset. Pull more via `query_datasets("SELECT * FROM p ORDER BY rank_position LIMIT N OFFSET K")` and render with the same card template.
 - **Re-running `ai_prospecting` to "see more."** Use the dataset tools instead — the run already produced the full list.
 - **Mixing `linkedin_urls` and `company_linkedin_url`.** Pick one — `linkedin_urls` wins if both are set, but it's clearer to use only the one you need.
@@ -381,7 +395,7 @@ If the user already asked for a file (any phrasing — "send", "export", "downlo
 ```
 1. match-company on "Datadog" → linkedin_url
 2. ai_prospecting(action="run", company_linkedin_url=<url>)
-3. If still_running, call again until status="completed".
+3. If still_running, call again until status="completed" — pass back `run_ids` from the previous response when present.
 4. Detect the shape:
    - response has ``prospects`` → inline shape, render EVERY row.
    - response has ``top_picks`` + ``preview_rows`` → preview shape,
