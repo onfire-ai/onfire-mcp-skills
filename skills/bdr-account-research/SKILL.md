@@ -55,6 +55,46 @@ the second call typically completes. The non-prospecting blocks
 (`filings_10k`, `linkedin_footprint`, `intent_signals`) are always
 complete on the first call.
 
+## Step 1a - Load the prospecting field glossary (REQUIRED when prospects are present)
+
+The `prospects` block carries fields whose meaning is non-obvious and
+easy to invert (e.g. `MASTER_SCORE_PRIORITY` is a tier where **lower
+is better**; `SCORE_WARM_INTRO` is an enum -- `PLATINUM > GOLD >
+SILVER > COLD` -- not a number). Misinterpreting these silently
+produces wrong reports. Before rendering any prospect, call:
+
+```
+Onfire MCP: ai_prospecting_field_glossary()
+```
+
+This returns a self-describing contract for every prospect field:
+`type`, `values` (enum or bounded range), `what_it_means`, `how_to_use`,
+and examples. Use it as the authoritative source for:
+
+- **What "good" looks like** on every score (`COMPOSITE_SCORE` is
+  bounded 0-1500; >800 is top-decile, <400 is a stretch).
+- **Tier direction** -- `MASTER_SCORE_PRIORITY=1` is the actionable
+  cohort, not tier 5.
+- **Warm-intro enum ordering** -- PLATINUM (alumni at target) is the
+  highest-leverage path; COLD requires cold outbound.
+- **Boolean signals** -- `WORKED_IN_CLIENT_COMPANY_IN_PAST=true` is
+  the alumni flag, the highest-value expansion play.
+- **Which fields are ready-made copy** -- `product_talking_points` and
+  `ai_reasoning` are pre-written outreach payload; never rewrite, just
+  surface verbatim.
+
+The prospects response also carries:
+- `prospects.field_glossary_resource_uri` - the MCP resource URI for
+  the same glossary. Clients that auto-inject resources will load it
+  without an explicit call; on other clients fall back to the tool.
+- `prospects.field_index` - the sorted list of every field name as a
+  fast schema-drift check. If a field in `top_picks` is missing from
+  `field_index`, treat it as unverified and skip rendering it rather
+  than guessing.
+
+When `prospects.skipped` is true or `prospects.status="still_running"`,
+do not call the glossary -- there's nothing to interpret yet.
+
 ## Response shape (the envelope you render from)
 
 ```
@@ -125,8 +165,18 @@ component snippets.
 7. **Use case cards** - one per use case in `tenant_config.derived_use_cases`,
    in the order provided (highest evidence first). Each card pulls
    relevant signals + 10-K quotes + prospect rows that map to that use case.
+   When surfacing prospect rows here or in section 8, interpret every
+   field through the `ai_prospecting_field_glossary` contract loaded
+   in Step 1a -- never invent score semantics.
 8. **Key contacts per use case** - `break-before: page`, color-coded
-   from `render_spec.use_case_palette` by the use case `tag`.
+   from `render_spec.use_case_palette` by the use case `tag`. Each
+   contact card must render the fields the glossary's `how_to_use`
+   guidance calls out: warm-intro tier + connector name + shared
+   company, composite score with breakdown, top three personas from
+   `CURRENT_PERSONAS`, `PAST_COMPANIES_USED_CLIENT_TECH` when non-empty,
+   career-momentum signals, the `ai_reasoning` bullets verbatim, and
+   an opener from `product_talking_points`. Do not drop these fields
+   silently -- consistency across contact cards matters.
 
 ### Hard rules (from `render_spec.hard_rules` - non-negotiable)
 
@@ -203,8 +253,16 @@ four checks. All four must pass.
    conference, community Slack/Discord, LinkedIn post, company-change
    records). No date-less Why Now points.
 
-If any check fails, fix the report and rerun all four. Do not deliver
-until all four pass.
+5. **Prospect field interpretation**
+   If `prospects` carries real rows (not `skipped` / `still_running`),
+   confirm `ai_prospecting_field_glossary` was loaded and every
+   prospect-derived rendering decision (tier label, warm-intro
+   wording, score commentary) traces to a `what_it_means` /
+   `how_to_use` entry in the glossary. If you cannot point to the
+   glossary entry that justifies a phrase, remove the phrase.
+
+If any check fails, fix the report and rerun all checks. Do not
+deliver until all pass.
 
 ---
 
