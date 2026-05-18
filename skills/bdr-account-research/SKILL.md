@@ -12,15 +12,19 @@ The Onfire MCP owns the data pipeline. This skill owns the rendering.
 Given a **company website** (e.g. `capitalone.com`) and a **tenant ID**
 (e.g. `fortinet`), this skill:
 
-1. Calls **one MCP tool**: `bdr_account_research`. The response carries
-   tenant config + derived use cases, 10-K extracts, LinkedIn footprint,
-   intent signals, AI-scored prospects (when enabled), and an inline
-   `render_spec` that defines the rendering contract.
-2. Enforces the rendering contract on a self-contained A4 HTML file.
-3. Runs the pre-delivery checklist before delivery.
-4. Handles follow-up questions by slicing the datasets the orchestrator
-   already pulled, or by calling one of the narrow typed tools when the
-   user asks for genuinely new data.
+1. Calls `bdr_account_research` for the non-prospect data sources: tenant
+   config + derived use cases, 10-K extracts, LinkedIn footprint, intent
+   signals, and the inline `render_spec` that defines the rendering
+   contract. **Ignore any `prospects` block the orchestrator returns** —
+   prospects come from the dedicated tool below.
+2. Calls `ai_prospecting` (action="run") directly to get the ranked
+   prospect set for the account. This is the authoritative source for
+   every prospect rendered in the report.
+3. Enforces the rendering contract on a self-contained A4 HTML file.
+4. Runs the pre-delivery checklist before delivery.
+5. Handles follow-up questions by slicing the datasets the orchestrator
+   and `ai_prospecting` already produced, or by calling one of the narrow
+   typed tools when the user asks for genuinely new data.
 
 The skill **never** queries Snowflake or the signals database directly.
 All data plumbing lives inside the Onfire MCP.
@@ -37,29 +41,62 @@ All data plumbing lives inside the Onfire MCP.
 
 ---
 
-## Step 1 - Call the orchestrator
+## Step 1 - Call the orchestrator for non-prospect data
 
 ```
 Onfire MCP: bdr_account_research(
   company_website="<company_website>",
   tenant_id="<tenant_id>",
-  company_linkedin_url="<url>",   # optional but enables footprint + prospects
+  company_linkedin_url="<url>",   # optional but enables footprint
   telemetry={intent: "BDR account research report for tenant <tenant_id>"}
 )
 ```
 
-Polling pattern: if the response carries `status="still_running"`, the
-AI prospecting run hasn't finished. Re-call `bdr_account_research` with
-the same arguments — Phoenix's server-side dedup picks up the in-flight
-prospecting run row and the second call typically completes without
-spawning a duplicate. The non-prospecting blocks (`filings_10k`,
-`linkedin_footprint`, `intent_signals`) are always complete on the first
-call.
+The `filings_10k`, `linkedin_footprint`, and `intent_signals` blocks are
+always complete on the first call. **The `prospects` block on this
+response is ignored by this skill** — prospects are sourced from the
+explicit `ai_prospecting` call in Step 1b. If the envelope returns
+`status="still_running"` solely because of a prospecting run, you do
+not need to poll the orchestrator; move on to Step 1b which owns
+prospect data end-to-end.
 
-## Step 1a - Load the prospecting field glossary (REQUIRED when prospects are present)
+## Step 1b - Call `ai_prospecting` directly for the prospect set (REQUIRED)
 
-The `prospects` block carries fields whose meaning is non-obvious and
-easy to invert (e.g. `MASTER_SCORE_PRIORITY` is a tier where **lower
+The BDR report's prospect rows come from a standalone `ai_prospecting`
+run, not from the orchestrator envelope. Requires the company LinkedIn
+URL — if you do not have it, resolve it first via the `match-company`
+skill (or reuse `company.linkedin_url` from the orchestrator envelope).
+
+```
+Onfire MCP: ai_prospecting(
+  action="run",
+  company_linkedin_url="<company_linkedin_url>"
+)
+```
+
+Polling pattern: if the response is `status="still_running"`, re-call
+with either the returned `run_ids` (`ai_prospecting(action="run",
+run_ids=[...])`) or the identical arguments. Phoenix's server-side
+dedup never creates a duplicate run. Keep polling until you get
+`status="completed"`.
+
+Render every prospect on the report from this response — both the
+inline-shape `prospects` array (when present) and the preview-shape
+`top_picks` + `preview_rows` arrays. Treat the response's `dataset.id`
+as the authoritative prospect dataset for any follow-up slicing
+(`query_datasets`) and for CSV download (`download_dataset`).
+
+When tenant config has `prospecting_enabled=false`, or when
+`ai_prospecting` returns zero prospects (`top_picks: []` and either
+`prospects: []` or no `prospects` key), skip the prospects-driven
+sections (Section 8 "Key contacts per use case", and the prospect
+columns inside Section 7 "Use case cards"). Do not fall back to the
+orchestrator's `prospects` block — it is not used.
+
+## Step 1c - Load the prospecting field glossary (REQUIRED when prospects are present)
+
+The `ai_prospecting` response carries fields whose meaning is non-obvious
+and easy to invert (e.g. `MASTER_SCORE_PRIORITY` is a tier where **lower
 is better**; `SCORE_WARM_INTRO` is an enum -- `PLATINUM > GOLD >
 SILVER > COLD` -- not a number). Misinterpreting these silently
 produces wrong reports. Before rendering any prospect, call:
@@ -84,17 +121,17 @@ and examples. Use it as the authoritative source for:
   `ai_reasoning` are pre-written outreach payload; never rewrite, just
   surface verbatim.
 
-The prospects response also carries:
-- `prospects.field_glossary_resource_uri` - the MCP resource URI for
-  the same glossary. Clients that auto-inject resources will load it
-  without an explicit call; on other clients fall back to the tool.
-- `prospects.field_index` - the sorted list of every field name as a
-  fast schema-drift check. If a field in `top_picks` is missing from
+The `ai_prospecting` response also carries:
+- `field_glossary_resource_uri` - the MCP resource URI for the same
+  glossary. Clients that auto-inject resources will load it without
+  an explicit call; on other clients fall back to the tool.
+- `field_index` - the sorted list of every field name as a fast
+  schema-drift check. If a field in `top_picks` is missing from
   `field_index`, treat it as unverified and skip rendering it rather
   than guessing.
 
-When `prospects.skipped` is true or `prospects.status="still_running"`,
-do not call the glossary -- there's nothing to interpret yet.
+When `ai_prospecting` returned zero prospects, do not call the
+glossary -- there's nothing to interpret yet.
 
 ## Response shape (the envelope you render from)
 
@@ -112,7 +149,7 @@ do not call the glossary -- there's nothing to interpret yet.
                    dataset: { id, ... } },
   "linkedin_footprint": { dataset, preview_rows, top_profiles, facets },
   "intent_signals": { dataset, preview_rows, facets, total_count },
-  "prospects": { dataset, top_picks, status, ... },
+  "prospects": { /* IGNORED by this skill — see Step 1b */ },
   "datasets": { filings_10k, linkedin_footprint, intent_signals, prospects },
   "render_spec": {
     "section_order": [...],
@@ -296,12 +333,20 @@ four checks. All four must pass.
    records). No date-less Why Now points.
 
 5. **Prospect field interpretation**
-   If `prospects` carries real rows (not `skipped` / `still_running`),
-   confirm `ai_prospecting_field_glossary` was loaded and every
+   If the `ai_prospecting` response from Step 1b carries real rows
+   (not `still_running` / zero-result), confirm
+   `ai_prospecting_field_glossary` was loaded and every
    prospect-derived rendering decision (tier label, warm-intro
    wording, score commentary) traces to a `what_it_means` /
    `how_to_use` entry in the glossary. If you cannot point to the
    glossary entry that justifies a phrase, remove the phrase.
+
+6. **Prospect source provenance**
+   Every prospect rendered on the report must originate from the
+   Step 1b `ai_prospecting` call — not from the orchestrator's
+   `prospects` block. If you find yourself reading
+   `envelope.prospects.top_picks`, stop and re-source from the
+   standalone `ai_prospecting` response.
 
 If any check fails, fix the report and rerun all checks. Do not
 deliver until all pass.
@@ -329,9 +374,12 @@ Tell the user:
 
 ## Handling follow-up questions
 
-The orchestrator ships four dataset IDs in `envelope.datasets`. Every
-slicing question reuses those datasets via `query_datasets` - no
-re-orchestration, no new SQL.
+The orchestrator ships three dataset IDs in `envelope.datasets`
+(`filings_10k`, `linkedin_footprint`, `intent_signals`). The
+`ai_prospecting` call from Step 1b ships the fourth — the prospects
+dataset — on its own response (`dataset.id`). Every slicing question
+reuses those datasets via `query_datasets` - no re-orchestration, no
+new SQL.
 
 ### Slice already-pulled data (zero-cost follow-ups)
 
@@ -340,7 +388,8 @@ attendees", "give me all the prospects, not just the top 10":
 
 ```
 query_datasets(
-  dataset_id="<envelope.datasets.signals | filings_10k | linkedin_footprint | prospects>",
+  dataset_id="<envelope.datasets.signals | filings_10k | linkedin_footprint
+               | ai_prospecting_response.dataset.id>",
   sql="SELECT ... FROM dataset WHERE ..."
 )
 ```
@@ -372,11 +421,13 @@ sliceable via `query_datasets`.
 
 | Situation | Action |
 |-----------|--------|
-| `bdr_account_research` returns `status="still_running"` | Re-call with the same args; the in-flight prospecting task is shared. |
+| `bdr_account_research` returns `status="still_running"` solely because of prospecting | Ignore — Step 1b owns prospect data. Use the completed non-prospect blocks. |
 | `filings_10k.found` is `false` | Skip 10-K sections silently; note non-SEC-registered company in the report header if relevant. |
 | `linkedin_footprint.skipped` is `true` | Skip the "Confirmed deployment" section silently. |
 | `intent_signals.total_count` is 0 | Show "No live signals found". |
-| `prospects.skipped` is `true` | Skip the prospects section (no scored prospects to show). |
+| `ai_prospecting` returns `status="still_running"` | Re-call with the returned `run_ids` (or identical args). Phoenix dedups server-side. |
+| `ai_prospecting` returns zero prospects (`top_picks: []`) or `tenant_config.prospecting_enabled` is `false` | Skip Section 8 and the prospect columns in Section 7 cards. |
+| Company has no LinkedIn URL even after `match-company` | Skip Step 1b entirely; render the report without prospect sections. |
 | One of `*.error` keys is set | Skip that section; never fail the whole report. |
 
 ---
