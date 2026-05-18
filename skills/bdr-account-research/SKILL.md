@@ -125,7 +125,7 @@ do not call the glossary -- there's nothing to interpret yet.
 }
 ```
 
-## Use the inline `render_spec` and `tenant_config.brand`
+## Use the inline `render_spec` (and the fixed Onfire palette)
 
 The orchestrator ships the rendering contract inline. Do not invent your
 own section order, palette, or rules. Read each from `render_spec`:
@@ -136,14 +136,16 @@ own section order, palette, or rules. Read each from `render_spec`:
 - `render_spec.page_setup` - A4 dimensions, font stack, print-color-adjust CSS
 - `render_spec.pre_delivery_checklist` - the four checks you must run
 
-Brand (color, display name, logo) is **tenant-driven, not hardcoded**.
-Pull these at render time:
+**The report's color palette is Onfire's, not the tenant's.** The
+`--brand` (navy) / `--accent` (purple) tokens are hard-coded in the CSS
+block in `references/report-structure.md` and do not vary per tenant.
+Ignore `tenant_config.brand.primary` if present — it's legacy. The only
+tenant-driven content in the header bar is the display name and logo:
 
 | Render value | Source | Fallback when absent |
 |---|---|---|
-| `--brand` accent color | `tenant_config.brand.primary` | `#1A2B4A` (deep navy) |
-| Brand display name (header + footer) | `tenant_config.brand.display_name` | `tenant_config.tenant_id`, title-cased |
-| Brand logo (header + footer) | `tenant_config.brand.logo_data_uri` | omit logo; render text wordmark only |
+| Tenant display name (header + footer) | `tenant_config.brand.display_name` | `tenant_config.tenant_id`, title-cased |
+| Tenant logo (header + footer) | `tenant_config.brand.logo_data_uri` | omit logo; render text wordmark only |
 
 If `render_spec` is missing or empty (older orchestrator version), use
 the defaults documented in `references/report-structure.md` as a fallback,
@@ -178,12 +180,18 @@ component snippets.
    See "Quote, never rewrite" below. Omit the entire section when
    there are zero signals - do not render a negative-state placeholder.
 6. **Solution fit divider + section head** - hairline divider followed
-   by an eyebrow + title + subtitle introducing the use case cards.
+   by a single eyebrow line "Solution fit - [Tenant Display Name] use
+   cases at [Account Display Name]" introducing the use case cards
+   (no separate title/subtitle).
 7. **Use case cards** - one per entry in `tenant_config.derived_use_cases`,
    in the order provided (highest evidence first). The set is dynamic -
    render exactly the use cases the orchestrator returned, no more, no
-   fewer. Each card pulls relevant signals + 10-K quotes + prospect
-   rows that map to that use case. Tag colors come from
+   fewer. Each card pulls relevant signals + verbatim talking-point
+   quote (10-K, LinkedIn profile, public talk, or any other verifiable
+   source - see `report-structure.md` "Talking-points source citation")
+   + prospect rows that map to that use case. The right column is
+   brand-named: render its label as "[Tenant Display Name] solution
+   alignment" (e.g. "JFrog solution alignment"). Tag colors come from
    `render_spec.use_case_palette` keyed by the use case `tag` - never
    invent a color.
 8. **Key contacts per use case** - `break-before: page`, color-coded
@@ -212,9 +220,12 @@ in Step 1a - never invent score semantics.
   Trim with leading/trailing ellipsis only.
 - **Company name is a LinkedIn link** - `<a href="[linkedin]">` with a
   1.5pt dotted underline in `var(--faint)`.
-- **Brand color is a CSS variable** - `var(--brand)` injected from
-  `tenant_config.brand.primary` (fallback `#1A2B4A`). Do not hardcode
-  hex literals for the brand anywhere in the document.
+- **Brand colors are fixed Onfire tokens** - `var(--brand)` (navy
+  `#0A2540`) and `var(--accent)` (purple `#7C5CFF`) are hard-coded in
+  the CSS block. Do not hardcode hex literals; do not pull
+  `tenant_config.brand.primary` to override them. The report is
+  Onfire-branded; tenant brand surfaces only as text/logo content in
+  the header bar.
 - **Footer** - company name, Account Research, [Month Year]. Nothing else.
 - **No buying committee or cold opens section.**
 - **System fonts only** - no Google Fonts CDN (file:// blocks it).

@@ -12,10 +12,13 @@ time. Nothing in this file is hardcoded to a specific tenant.
 
 ## Core design principles
 
-- **One brand accent, used sparingly.** A single color from
-  `tenant_config.brand.primary` (or the fallback below) anchors the
-  header, section eyebrows, score fills, and footer mark. Everywhere
-  else is neutral. Multi-color palettes muddy a print page.
+- **Onfire palette, used sparingly.** The report's visual identity is
+  Onfire's, not the tenant's: navy (`--brand`) anchors the header bar,
+  section eyebrows, score fills, and footer mark; purple (`--accent`)
+  is reserved for one or two single-word highlights per page. Everywhere
+  else is cool neutral. Tenant brand colors are NOT used as theme
+  colors — only the tenant display name + logo appear as content inside
+  the header bar.
 - **A4 print layout.** 174mm body width, `@page` block set, all sizes
   in `pt`, every `.card` has `break-inside: avoid`.
 - **Self-contained.** No external dependencies. No Google Fonts CDN.
@@ -48,17 +51,21 @@ Before rendering, pull these values from the envelope:
 
 | Render value | Source | Fallback |
 |---|---|---|
-| Brand primary color | `tenant_config.brand.primary` | `#1A2B4A` (deep navy) |
-| Brand display name | `tenant_config.brand.display_name` | `tenant_config.tenant_id`, title-cased |
-| Brand logo (base64) | `tenant_config.brand.logo_data_uri` | omit logo, use text wordmark only |
+| Tenant display name | `tenant_config.brand.display_name` | `tenant_config.tenant_id`, title-cased |
+| Tenant logo (base64) | `tenant_config.brand.logo_data_uri` | omit logo, use text wordmark only |
 | Section order | `render_spec.section_order` | the order in this file |
 | Use case palette | `render_spec.use_case_palette` | required — never invent |
 | Page setup | `render_spec.page_setup` | the CSS block below |
 | Hard rules | `render_spec.hard_rules` | the list below |
 
-Only the brand block is currently optional in the envelope. If it's
-missing, fall back to the neutral defaults and skip the logo — the
-report still reads as polished.
+**The report is Onfire-branded, not tenant-branded.** The color palette,
+header-bar background, eyebrows, and score fills come from the fixed
+Onfire palette baked into the CSS below — they do not vary per tenant.
+The tenant display name and (optional) tenant logo still appear in the
+header bar / footer so the BDR reading the report sees their own org's
+name, but they are content, not theme. Ignore any
+`tenant_config.brand.primary` value if present; it's legacy and no
+longer drives anything.
 
 ---
 
@@ -68,29 +75,35 @@ report still reads as polished.
 /* Reset */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Design tokens — single brand accent + neutrals + semantic intents */
+/* Design tokens — Onfire palette (fixed) + cool neutrals + semantic intents.
+   Brand color does NOT vary per tenant; the report's visual identity is
+   Onfire's. */
 :root {
-  /* Brand — injected from tenant_config.brand.primary */
-  --brand:        [BRAND_PRIMARY];        /* e.g. #1A2B4A */
-  --brand-dark:   [BRAND_DARK];           /* derive: HSL L -10% */
-  --brand-light:  [BRAND_LIGHT];          /* derive: HSL L +45%, S -30% */
-  --brand-mid:    [BRAND_MID];            /* derive: HSL L +25% */
+  /* Onfire brand — fixed. Do not inject tenant colors here. */
+  --brand:        #0A2540;        /* Onfire navy — header bar, primary text */
+  --brand-dark:   #051628;        /* deepest navy — hover/active accents */
+  --brand-mid:    #6B8FA8;        /* mid slate — quote borders, subdued fills */
+  --brand-light:  #DCEFF5;        /* cyan-tint — soft section bands / hero fills */
+  --accent:       #7C5CFF;        /* Onfire purple — single-word highlights, key callouts */
+  --accent-light: #ECE7FF;        /* purple tint — accent fills, no-flood */
 
-  /* Neutrals */
-  --bg:        #F7F6F3;
+  /* Cool neutrals — shifted from the warm Helvetica palette to a slightly
+     cyan-leaning off-white. Keeps the report from looking like a print
+     mailer and matches the Onfire web aesthetic. */
+  --bg:        #F4F8FA;
   --surface:   #FFFFFF;
-  --border:    #E4E1DA;
-  --border-md: #C9C6BE;
-  --text:      #14110E;
-  --muted:     #5F5C56;
-  --faint:     #AEABA5;
+  --border:    #E2E8EE;
+  --border-md: #C5D0DA;
+  --text:      #0A2540;
+  --muted:     #4A5B6D;
+  --faint:     #94A3B8;
 
   /* Semantic intents — used for Why-Now alerts, not for branding */
   --hi-bg:    #FBEAE9; --hi-text:    #8C1B15;  /* danger / red flag */
   --med-bg:   #FAEEDA; --med-text:   #7A4A0A;  /* warn / amber */
-  --low-bg:   #EEECE6; --low-text:   #565350;  /* neutral / context */
+  --low-bg:   #EEF1F4; --low-text:   #4A5B6D;  /* neutral / context */
   --ok-bg:    #E2F2E7; --ok-text:    #1E5C32;  /* success / green */
-  --info-bg:  #ECEAF8; --info-text:  #3C3593;  /* info / violet */
+  --info-bg:  #ECE7FF; --info-text:  #3D2C99;  /* info / Onfire purple */
 
   /* Use case palette — injected dynamically from render_spec.use_case_palette
      One block per use case tag the orchestrator returned. Do not invent. */
@@ -117,12 +130,45 @@ body  {
       color-adjust: exact !important; }
 }
 
+/* Header bar — full-bleed across the page on PDF, contained on screen.
+   Defined in the stylesheet (not inline) so screen-media overrides can
+   actually reach it; inline-style specificity used to defeat the screen
+   override, which made the bar clip off the visible viewport in
+   browser previews. */
+.header-bar {
+  background: var(--brand);
+  color: #fff;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9pt 18mm;
+  margin: 0 -18mm 10pt;   /* bleed past the 174mm body column on PDF */
+}
+.header-bar .wm { display: flex; align-items: center; gap: 8pt; }
+.header-bar .wm-logo {
+  width: 26pt; height: 26pt; border-radius: 3pt;
+  background: #fff; padding: 2pt;
+}
+.header-bar .wm-name {
+  font-size: 11pt; font-weight: 700; color: #fff; letter-spacing: -.01em;
+}
+.header-bar .wm-sub {
+  font-size: 7.5pt; color: rgba(255,255,255,.78);
+  margin-top: 1pt; letter-spacing: .02em;
+}
+.header-bar .meta {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 7pt; color: rgba(255,255,255,.7);
+  text-align: right; line-height: 1.5;
+}
+
 /* Screen preview */
 @media screen {
-  html { background: #C9C6BE; font-size: 11px; }
+  html { background: #E2E8EE; font-size: 11px; }
   body { box-shadow: 0 2px 28px rgba(0,0,0,.15);
          padding: 0 0 20mm; margin: 20px auto; }
-  .header-bar { margin: 0; }
+  /* On screen the body is centred in a viewport that's often narrower
+     than the printable A4 width, so the PDF edge-bleed trick clips off
+     the visible area. Contain the bar inside the body box instead. */
+  .header-bar { margin: 0 0 10pt; padding-left: 12pt; padding-right: 12pt; }
 }
 
 /* Typography */
@@ -180,7 +226,9 @@ hr.divider { border: none; border-top: .4pt solid var(--border-md);
 .alert.info{ background: var(--info-bg);color: var(--info-text);}
 .alert strong { color: inherit; font-weight: 700; }
 
-/* Quote block — for verbatim 10-K filing excerpts */
+/* Quote block — for verbatim talking-point excerpts (10-K filings,
+   LinkedIn profiles, public talks, press releases — anything cited in
+   the solution-fit "Talking points" block) */
 .quote { background: var(--bg); border-left: 2.5pt solid var(--brand-mid);
          border-radius: 0 4pt 4pt 0; padding: 6pt 9pt; margin: 7pt 0;
          break-inside: avoid; }
@@ -247,52 +295,60 @@ hr.divider { border: none; border-top: .4pt solid var(--border-md);
 .contacts-page-break { break-before: page; page-break-before: always; }
 ```
 
-### Brand color derivation
+### Onfire palette reference
 
-If the envelope provides only `tenant_config.brand.primary`, derive the
-other three brand tokens locally before injecting them:
+The brand tokens are hard-coded — no per-tenant injection. When in doubt,
+use these values verbatim:
 
-| Token | Derivation rule |
-|---|---|
-| `--brand-dark` | Same hue, lightness −10%. Used for hover-equivalents and very dark accents. |
-| `--brand-mid`  | Same hue, lightness +25%, saturation −15%. Used for quote borders and subdued fills. |
-| `--brand-light`| Same hue, lightness +45%, saturation −35%. Used for soft tinted backgrounds (rare in print). |
+| Token | Hex | Role |
+|---|---|---|
+| `--brand`        | `#0A2540` | Onfire navy. Header bar bg, section eyebrows, primary text. |
+| `--brand-dark`   | `#051628` | Deepest navy. Hover-equivalents, ultra-dark accents. |
+| `--brand-mid`    | `#6B8FA8` | Mid slate. Quote-block left border, subdued dividers. |
+| `--brand-light`  | `#DCEFF5` | Cyan-tinted off-white. Hero bands, soft section fills (use sparingly). |
+| `--accent`       | `#7C5CFF` | Onfire purple. Single-word highlights, key callouts (≤2 uses per page). |
+| `--accent-light` | `#ECE7FF` | Purple tint. Accent fills behind a highlighted noun. |
 
-Pick the values once and inline them as hex. Do not ship CSS color
-functions (`color-mix`, `hsl(from ...)`) — print rendering of those is
-inconsistent across PDF engines.
+The purple accent is the differentiator — use it like the Onfire
+marketing pages do ("Life's too short for **bad data**"): one or two
+times per page on the noun that matters, never as block fills, never
+on body copy. If the page has three accent uses you've made it look
+loud; pull one back to navy.
+
+Do not ship CSS color functions (`color-mix`, `hsl(from ...)`) — print
+rendering of those is inconsistent across PDF engines.
 
 ---
 
 ## Section 1: Header bar
 
-Brand-colored bar across the full page width. Logo if provided, else
-text-only wordmark.
+Onfire-navy bar across the full page width on PDF (contained inside the
+body column on screen — the `.header-bar` CSS handles both contexts).
+The tenant logo and display name still appear inside the bar so the
+BDR's own org is identified, but the bar's color is fixed (Onfire
+navy), not tenant-driven.
 
 ```html
-<div class="header-bar" style="background:var(--brand);margin:0 -18mm;
-  padding:7pt 18mm;display:flex;align-items:center;justify-content:space-between;
-  margin-bottom:10pt">
-  <div style="display:flex;align-items:center;gap:8pt">
-    <!-- Logo (optional, only if tenant_config.brand.logo_data_uri present) -->
-    <img src="[BASE64_DATA_URI]" alt="[Brand]"
-      style="width:26pt;height:26pt;border-radius:3pt;background:#fff;padding:2pt">
+<div class="header-bar">
+  <div class="wm">
+    <!-- Tenant logo (optional, only if tenant_config.brand.logo_data_uri present).
+         The bar's background is Onfire navy, not the tenant's brand color. -->
+    <img class="wm-logo" src="[BASE64_DATA_URI]" alt="[Tenant Display Name]">
     <div>
-      <div style="font-size:11pt;font-weight:700;color:#fff;letter-spacing:-.01em">
-        [Brand display name]
-      </div>
-      <div style="font-size:7.5pt;color:rgba(255,255,255,.75);margin-top:1pt;
-        letter-spacing:.02em">
-        Account Research - [Company Name]
-      </div>
+      <div class="wm-name">[Tenant Display Name]</div>
+      <div class="wm-sub">Account Research - [Company Name]</div>
     </div>
   </div>
-  <div style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-    font-size:7pt;color:rgba(255,255,255,.65);text-align:right;line-height:1.5">
+  <div class="meta">
     [Month Year]<br>Confidential
   </div>
 </div>
 ```
+
+**Do not** add inline `style="..."` to `.header-bar` overriding margin /
+padding / background. The screen-media override needs the stylesheet
+rule to win; inline styles defeat it and re-introduce the left-clip bug
+in browser previews.
 
 ---
 
@@ -628,16 +684,15 @@ orchestrator returns three use cases, render three. If it returns six,
 render six. Tag colors come from `render_spec.use_case_palette` keyed
 by the use case `tag` — never invent a color.
 
+The section header collapses to a single eyebrow line that combines the
+fixed label with the active brand and target account, so the divider
+reads as a self-contained heading without a separate title/subtitle pair.
+
 ```html
 <hr class="divider">
 
 <div class="section-head">
-  <div class="section-eye">Solution fit</div>
-  <div class="section-title">Use cases mapped to evidence</div>
-  <div class="section-sub">
-    Each card pairs account signals with the brand's solution alignment
-    and a verbatim 10-K talking point.
-  </div>
+  <div class="section-eye">Solution fit - [Tenant Display Name] use cases at [Account Display Name]</div>
 </div>
 
 <!-- One per derived_use_case -->
@@ -661,17 +716,22 @@ by the use case `tag` — never invent a color.
   <div class="two">
     <div>
       <span class="lbl">Account signals</span>
-      <!-- Cite as "annual filing", "market intelligence", "[Event Year]" -->
+      <!-- Cite as "annual filing", "market intelligence", "[Event Year]",
+           LinkedIn profile (in-seat date), hiring-pattern data, etc. -->
     </div>
     <div>
-      <span class="lbl">Solution alignment</span>
-      <!-- Brand-side talking points, drawn from tenant_config.derived_use_cases[].evidence -->
+      <span class="lbl">[Tenant Display Name] solution alignment</span>
+      <!-- Brand-side talking points, drawn from
+           tenant_config.derived_use_cases[].evidence. The label is
+           rendered uppercase by the .lbl class; spell the tenant name
+           the way it appears in tenant_config (e.g. "JFrog solution
+           alignment" -> "JFROG SOLUTION ALIGNMENT"). -->
     </div>
   </div>
-  <span class="lbl">Talking point</span>
+  <span class="lbl">Talking points</span>
   <div class="quote">
-    <p>&ldquo;[Short verbatim quote from filing, under 15 words]&rdquo;</p>
-    <p class="src">[Company] Annual Report (10-K) - [Section] - [Filing Date]</p>
+    <p>&ldquo;[Short verbatim quote, under ~20 words]&rdquo;</p>
+    <p class="src">[Attribution - see source-citation guidance below]</p>
   </div>
 </div>
 
@@ -684,6 +744,26 @@ by the use case `tag` — never invent a color.
   <!-- .pr rows for each contact -->
 </div>
 ```
+
+### Talking-points source citation
+
+The verbatim quote in the `Talking points` block does **not** have to be
+a 10-K excerpt. Any first-party, verifiable source the orchestrator
+surfaced (or that the agent quoted directly from a referenced artifact)
+is acceptable. Cite the source in the `.src` line with enough detail
+that a reader can find it again. Examples:
+
+| Source type | `.src` line |
+|---|---|
+| Annual filing (10-K) | `[Company] Annual Report (10-K) - [Section] - [Filing Date]` |
+| LinkedIn profile (current role / summary) | `[Person Name] ([Role at Account]) - LinkedIn profile - current role` |
+| Public talk / conference | `[Person Name] - [Conference Name] [Year]` |
+| Press release / blog | `[Company] - [Headline] - [Publication Date]` |
+| Job posting | `[Company] - [Job Title] posting - [Date observed]` |
+
+Never invent an attribution. If the quote can't be sourced to a
+verifiable artifact, drop the talking-points block for that card rather
+than guess.
 
 ### If a use case has no signal at the account
 
@@ -753,7 +833,8 @@ No sources line. Logo (if available) + company name + label + date.
 | Footer sources line | Removed — footer is name + label + date |
 | Google Fonts CDN `<link>` | System font stack only |
 | Background colors not printing | `@media print { * { print-color-adjust: exact !important } }` |
-| Hardcoded brand color literal | `var(--brand)` referencing the injected token |
+| Hardcoded brand color literal | `var(--brand)` / `var(--accent)` from the fixed Onfire palette |
+| Tenant brand color in CSS | Tenant brand never colors the report; only the display name + logo appear as content |
 | Invented use case tag color | The exact entry from `render_spec.use_case_palette` |
 
 ---
