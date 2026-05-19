@@ -1,9 +1,9 @@
 ---
-name: bdr-account-research
-description: Generate a full BDR (Business Development Representative) account research report for any company. The Onfire MCP `bdr_account_research` tool fetches every data source - tenant config, 10-K extracts, employee LinkedIn footprint, intent signals, and AI-scored prospects - in one call and returns a rendering contract alongside the data. This skill enforces the rendering contract and produces the final customer-facing A4 HTML file. Use whenever a user asks to "generate a report", "research an account", "build a BDR brief", "run account research", or mentions a company domain alongside words like "signals", "prospects", "10-K", "use cases", or "tenant".
+name: account-research
+description: Generate a full account research report for any company. The Onfire MCP `account_research` tool fetches every data source - tenant config, 10-K extracts, employee LinkedIn footprint, intent signals, and AI-scored prospects - in one call and returns a rendering contract alongside the data. This skill enforces the rendering contract and produces the final customer-facing A4 HTML file. Use whenever a user asks to "generate a report", "research an account", "build a BDR brief", "run account research", or mentions a company domain alongside words like "signals", "prospects", "10-K", "use cases", or "tenant".
 ---
 
-# BDR Account Research Report
+# Account Research Report
 
 ## What this skill does
 
@@ -12,7 +12,7 @@ The Onfire MCP owns the data pipeline. This skill owns the rendering.
 Given a **company website** (e.g. `capitalone.com`) and a **tenant ID**
 (e.g. `fortinet`), this skill:
 
-1. Calls `bdr_account_research` for the non-prospect data sources: tenant
+1. Calls `account_research` for the non-prospect data sources: tenant
    config + derived use cases, 10-K extracts, LinkedIn footprint, intent
    signals, and the inline `render_spec` that defines the rendering
    contract. **Ignore any `prospects` block the orchestrator returns** —
@@ -44,11 +44,11 @@ All data plumbing lives inside the Onfire MCP.
 ## Step 1 - Call the orchestrator for non-prospect data
 
 ```
-Onfire MCP: bdr_account_research(
+Onfire MCP: account_research(
   company_website="<company_website>",
   tenant_id="<tenant_id>",
   company_linkedin_url="<url>",   # optional but enables footprint
-  telemetry={intent: "BDR account research report for tenant <tenant_id>"}
+  telemetry={intent: "Account research report for tenant <tenant_id>"}
 )
 ```
 
@@ -62,7 +62,7 @@ prospect data end-to-end.
 
 ## Step 1b - Call `ai_prospecting` directly for the prospect set (REQUIRED)
 
-The BDR report's prospect rows come from a standalone `ai_prospecting`
+The report's prospect rows come from a standalone `ai_prospecting`
 run, not from the orchestrator envelope. Requires the company LinkedIn
 URL — if you do not have it, resolve it first via the `match-company`
 skill (or reuse `company.linkedin_url` from the orchestrator envelope).
@@ -421,7 +421,7 @@ sliceable via `query_datasets`.
 
 | Situation | Action |
 |-----------|--------|
-| `bdr_account_research` returns `status="still_running"` solely because of prospecting | Ignore — Step 1b owns prospect data. Use the completed non-prospect blocks. |
+| `account_research` returns `status="still_running"` solely because of prospecting | Ignore — Step 1b owns prospect data. Use the completed non-prospect blocks. |
 | `filings_10k.found` is `false` | Skip 10-K sections silently; note non-SEC-registered company in the report header if relevant. |
 | `linkedin_footprint.skipped` is `true` | Skip the "Confirmed deployment" section silently. |
 | `intent_signals.total_count` is 0 | Show "No live signals found". |

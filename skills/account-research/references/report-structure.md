@@ -1,11 +1,11 @@
 # Report Structure — A4 HTML Template
 
-Full layout specification for the BDR account research report.
+Full layout specification for the account research report.
 This is a **customer-facing, print-ready A4 HTML file** — not a widget,
 not a web dashboard.
 
 The template is **tenant-agnostic**. Brand color, display name, and use
-case palette flow in from the `bdr_account_research` envelope at render
+case palette flow in from the `account_research` envelope at render
 time. Nothing in this file is hardcoded to a specific tenant.
 
 ---
