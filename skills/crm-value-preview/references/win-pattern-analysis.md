@@ -3,6 +3,12 @@
 The single most important analysis in the report. Everything in the Open Pipeline tab — and
 much of the Accounts tab — flows from this. Get it right.
 
+**Canonical persona buckets come from
+[`../../poc-intelligence/references/persona-taxonomy.md`](../../poc-intelligence/references/persona-taxonomy.md).**
+Don't invent new buckets here — re-use the taxonomy poc-intelligence already maintains. This
+doc captures *how to derive the buckets from raw SF Title data* + *how to use them to score
+open opps*; the underlying bucket definitions are owned upstream.
+
 ## What the customer sees
 
 > "Across your 261 closed-won accounts, two patterns dominate. Onfire derived these from
@@ -157,19 +163,28 @@ Open Pipeline tab.
 the signal routing lift compounds with the persona-coverage lift (you can't double-count an
 intent signal becoming an opp). Keep only two lifts.
 
-## Why not invoke poc-intelligence as a sub-skill?
+## Inline vs invoking poc-intelligence
 
-Earlier versions of this skill called `poc-intelligence` once to consume its hero numbers and
-plays. Dropped in favor of deriving the pattern inline because:
+Both paths are valid. By **default**, derive inline:
 
 1. **Cheaper.** Inline SF queries cost a few seconds; poc-intelligence is a 10+ minute run.
 2. **More reliable.** poc-intelligence has its own failure modes (schema discovery, Metabase
    timeouts, missing tenants).
 3. **More direct.** The customer wants the win-pattern presented from their CRM data, not
-   filtered through another report. Inline queries are easier to explain ("this came from one
-   SOQL").
+   filtered through another report. Inline queries are easier to explain ("this came from
+   one SOQL against your Salesforce").
 4. **Simpler narrative.** A 5-section report is cleaner than 5 sections + an embedded
    poc-intelligence frame.
 
-If a tenant has rich activity history and the Open Pipeline tab feels thin, consider calling
-poc-intelligence as a *separate* deliverable to complement this preview — not embedded.
+**Invoke poc-intelligence as a sub-skill when:**
+
+- The customer specifically asks for "more depth" or "show me the plays".
+- The tenant has heavy CRM activity (1000+ won deals over 12 months) and the inline derivation
+  produces aggregates that feel coarse.
+- You want to surface the **4 named plays** poc-intelligence generates (Signal pipeline,
+  Recover closed-lost, Buying committee gap, Competitive expansion) as additional Open Pipeline
+  drill-downs.
+
+When invoked: strip the internal-facing copy before injecting into the customer report.
+Internal terms like `Net_New_ARR__c`, "POC stage", "Technical Validation" must be re-worded.
+See [`../SKILL.md`](../SKILL.md) "Reuse from poc-intelligence" for the full protocol.

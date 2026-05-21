@@ -19,6 +19,8 @@ compatibility:
     - Onfire MCP (get_tenant_settings, integration_proxy, match_company, match_person, contact_data_enrichment, ai_prospecting)
     - Salesforce via integration_proxy (SOQL — preferred path; Metabase execute_query is unreliable)
     - Snowflake (sql_exec_tool — GOLD.ENTITIES.PEOPLE, GOLD.ENTITIES.COMPANIES.TECHNOLOGIES, SILVER.SIGNALS.ARTIFACTS, SILVER.SIGNALS.JOB_POST)
+  sibling_skills:
+    - poc-intelligence — sister skill that produces a deeper internal-facing CRM analysis with 4 named plays and a 6-phase POC playbook. This skill (crm-value-preview) is the customer-facing pre-sync version of the same idea. They share the win-pattern derivation pattern and the persona-coverage analysis; this skill borrows poc-intelligence's reference docs for persona taxonomy, SOQL patterns, and play structures (see "Reuse from poc-intelligence" section below).
 ---
 
 # CRM Value Preview Skill
@@ -94,6 +96,54 @@ mention, competitor mention, job-change on champion, hiring signal. Don't show o
   freshness column — let the data speak.
 - For competitor tools, always name them explicitly (Cortex XSOAR, Swimlane, IBM QRadar, Tines,
   Splunk SOAR), not just "competitor tech."
+
+---
+
+## Reuse from poc-intelligence
+
+This skill is the customer-facing twin of [`poc-intelligence`](../poc-intelligence/SKILL.md).
+Both produce a CRM analysis for a tenant; the difference is audience and depth:
+
+| | `poc-intelligence` | `crm-value-preview` (this skill) |
+|---|---|---|
+| Audience | Internal Onfire AEs preparing for a POC | The customer themselves (pre-sync) |
+| Length | 16+ sections, exhaustive | 5 sections, focused on the buying decision |
+| Framing | Internal field names OK in the appendix | Zero internal jargon anywhere |
+| Plays | 4 named plays with 3 examples each | One live AI-Prospecting drill on one open opp |
+| Runtime | 10+ min per tenant (heavier discovery) | 3–5 min per tenant |
+| Output | Self-contained A4 HTML with appendix | Self-contained 1280px interactive HTML |
+
+**Reuse these references directly from poc-intelligence — do not duplicate their content:**
+
+- [`../poc-intelligence/references/sf-soql-patterns.md`](../poc-intelligence/references/sf-soql-patterns.md)
+  — the canonical Salesforce field-candidate tables (Amount / Stage / Owner / Last Activity / ARR
+  field aliases across tenants). Our [`sf-query-patterns.md`](references/sf-query-patterns.md)
+  layers tested SOQL on top of that taxonomy.
+
+- [`../poc-intelligence/references/persona-taxonomy.md`](../poc-intelligence/references/persona-taxonomy.md)
+  — the canonical Onfire persona-bucket taxonomy. Our
+  [`win-pattern-analysis.md`](references/win-pattern-analysis.md) Step 2 derives buckets from
+  this same taxonomy; never invent ad-hoc buckets.
+
+- [`../poc-intelligence/references/play-templates.md`](../poc-intelligence/references/play-templates.md)
+  — the canonical Onfire play structures (problem statement / Onfire action / warm-intro path /
+  outcome box). Our Buyers & Champions section is one live single-deal play; if a tenant has
+  the depth for it, you can extend with additional plays following these templates.
+
+**Optional sub-skill invocation.** If the tenant has heavy CRM activity and the customer wants
+more depth, you may invoke `poc-intelligence` once at the start and consume two of its outputs:
+- Its **plays** can become additional Open Pipeline drill-downs (one per missing-persona type).
+- Its **persona distribution** can replace the inline win-pattern derivation in Step 4 if you
+  want the same numbers shown both internally and externally.
+
+When invoked as a sub-skill, **strip its internal-facing copy** before injecting into the
+customer-facing report. The poc-intelligence body intentionally uses field names like
+`Net_New_ARR__c` and concepts like "POC stage" / "Technical Validation" — those must be
+re-worded for the customer-facing report ("annual recurring revenue", "deal stage", etc.).
+
+The default behavior of this skill is **not** to call poc-intelligence — inline derivation is
+faster, cheaper, and easier to explain to the customer ("this came from one SOQL against your
+Salesforce"). Invoke poc-intelligence only when the customer specifically requests more depth.
 
 ---
 
@@ -474,5 +524,8 @@ End-to-end against Torq (the reference tenant):
 - Does not write back to the CRM.
 - Does not run server-side PDF rendering — browser print is the v1 export path.
 - Does not host the HTML — the operator emails / shares the file directly.
-- Does not invoke poc-intelligence as a sub-skill — the close-won pattern is derived inline
-  from raw Salesforce queries (cheaper and more reliable).
+- Does not invoke `poc-intelligence` by default — the close-won pattern is derived inline from
+  raw Salesforce queries (cheaper, faster, easier to explain). See the **Reuse from
+  poc-intelligence** section above for when to invoke it as an optional sub-skill, and which
+  of its reference docs to read directly (`sf-soql-patterns.md`, `persona-taxonomy.md`,
+  `play-templates.md`).

@@ -3,6 +3,13 @@
 All Salesforce queries go through `integration_proxy`, not Metabase. The Metabase
 `execute_query` tool returns "Illegal base64 character 20" intermittently and is unreliable.
 
+**Field-candidate taxonomy lives in the sibling skill:
+[`../../poc-intelligence/references/sf-soql-patterns.md`](../../poc-intelligence/references/sf-soql-patterns.md).**
+That doc maintains the canonical list of which SF custom fields stand for ARR / Amount / Stage
+/ Owner / Last Activity across different tenants (e.g. `Net_New_ARR__c` vs `ACV__c` vs `MRR__c`).
+This doc captures the *tested SOQL we know works through `integration_proxy`* + *the pitfalls we
+hit during the Torq run*; field-name discovery uses poc-intelligence's canonical list.
+
 ## The canonical call shape
 
 ```
