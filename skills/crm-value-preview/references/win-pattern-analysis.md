@@ -47,39 +47,56 @@ For Torq, this returned:
 In the report, render as a 7-row table sorted by ARR. Highlight the top-3 with `.tag.gr` green
 pills. Note "★" in any Open Pipeline tables next to deals in these industries.
 
-## Step 2 — Winning personas (filter to security titles)
+## Step 2 — Winning personas (always derive keywords from the tenant config)
 
-The raw query (no title filter) returns confusing roles like "Client Manager" (108), "Account
-Executive" (56), "Procurement" (16). These are not buyers. **Always filter to security
-titles**, taking the persona list from `account_research.queries_sections.organization`.
+The raw query (no title filter) returns confusing roles like "Client Manager", "Account
+Executive", "Procurement". These are not buyers. **Always filter to ICP-relevant titles**, and
+**always derive the keyword list from `tenant_settings.account_research.queries_sections.organization`** — never hardcode.
 
-For SOAR/SOC tenants (Torq's profile), the filter is:
+### Build the keyword filter dynamically from `queries_sections.organization`
+
+For each persona token in the tenant's `organization` array, expand to title-matching keywords
+using the canonical persona taxonomy from
+[`../../poc-intelligence/references/persona-taxonomy.md`](../../poc-intelligence/references/persona-taxonomy.md).
+
+Examples of the expansion per product category:
+
+| Tenant category | Tokens in `queries_sections.organization` | Title-match keywords for the SOQL `LIKE` filter |
+|---|---|---|
+| **SOAR / SOC** (e.g. Torq) | `CISO`, `secops`, `soc_specialist`, `detection_engineer`, `security architect`, `Cyber_Security`, `threat_intelligence` | `%CISO%`, `%Security%`, `%SOC%`, `%Cyber%`, `%DevSec%`, `%Detection%`, `%Threat%`, `%Information Security%` |
+| **DSPM / Data Security** | `CDO`, `data_governance`, `data_privacy_officer`, `compliance` | `%Data%`, `%Privacy%`, `%Compliance%`, `%CDO%`, `%Governance%`, `%DPO%` |
+| **IAM / IGA / PAM** | `IAM`, `identity_governance`, `pam_specialist`, `access_management` | `%Identity%`, `%Access%`, `%IAM%`, `%CIAM%`, `%PAM%`, `%IGA%` |
+| **CSPM / Cloud Security** | `cloud_security`, `cspm`, `devsecops`, `cloud_architect` | `%Cloud Security%`, `%CSPM%`, `%DevSecOps%`, `%Cloud Architect%` |
+| **CIEM / Entitlement** | `ciem`, `entitlement`, `privilege` | `%CIEM%`, `%Entitlement%`, `%Privilege%`, `%Permission%` |
+
+### The generalized SQL
 
 ```sql
+-- The keyword list is built dynamically per tenant
 SELECT Title, COUNT(Id)
 FROM Contact
 WHERE IsDeleted = false
   AND AccountId IN (SELECT AccountId FROM Opportunity WHERE IsWon = true AND IsClosed = true)
-  AND (Title LIKE '%CISO%' OR Title LIKE '%Security%' OR Title LIKE '%SOC%'
-       OR Title LIKE '%Cyber%' OR Title LIKE '%DevSec%'
-       OR Title LIKE '%Detection%' OR Title LIKE '%Threat%'
-       OR Title LIKE '%Information Security%')
+  AND (Title LIKE '%<kw1>%' OR Title LIKE '%<kw2>%' OR ... OR Title LIKE '%<kwN>%')
 GROUP BY Title ORDER BY COUNT(Id) DESC LIMIT 30
 ```
 
-Roll the raw title list into **5–6 persona buckets**. For Torq:
+### Roll into 4–6 persona buckets
 
-| Bucket | Raw titles included | Total |
-|---|---|---|
-| **CISO leadership** | CISO + Chief Information Security Officer + Deputy CISO | 143 |
-| **Security Engineers** | Security Engineer + Sr Sec Eng + Principal Sec Eng + Lead Sec Eng + Information Security Engineer + Cyber Security Engineer + Cybersecurity Engineer + Information Security Engineer + IT Security Engineer + SOC Engineer + Security Operations Engineer | 254 |
-| **Security Analysts** | Security Analyst + Cyber Security Analyst + Information Security Analyst + SOC Analyst + Senior Security Analyst + Cybersecurity Analyst | 133 |
-| **Security Ops leadership** | SOC Manager + Director Security Operations + Director of Security Operations + Manager Information Security | 53 |
-| **Security Architect** | Security Architect | 17 |
-| **DevSecOps / DevOps Engineer** | DevSecOps Manager + DevOps Engineer + etc | 16+ |
+Always present 4–6 buckets in the report — too few feels generic, too many feels noisy.
+Bucket structure also derives from the tenant taxonomy:
 
-For different tenant types (DSPM/CSPM/IAM/IGA/etc.), adjust the bucket list using the tenant's
-own `queries_sections.organization`. Don't hardcode SOAR/SOC personas.
+- **Decision-maker bucket** — the senior persona equivalent of CISO/CDO/CIO. Always present.
+- **Technical-champion bucket** — the engineer-level persona who drives integration evaluation.
+  Always present.
+- **Analyst / Operator bucket** — the day-to-day user.
+- **Architect bucket** — the strategic builder.
+- **Adjacent / supporting bucket** — DevOps / Platform / IT-Ops, if relevant to the tenant.
+
+For the SOAR/SOC reference run on Torq, this produced: CISO leadership / Security Engineers /
+Security Analysts / Security Ops leadership / Security Architect / DevSecOps. For a DSPM tenant
+the buckets would be: CDO / Data Engineers / Data Privacy Analysts / Data Architects /
+Compliance. The skill must adapt.
 
 ## Step 3 — The win-pattern *average*
 

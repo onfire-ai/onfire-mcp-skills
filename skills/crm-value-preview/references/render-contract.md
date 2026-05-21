@@ -204,13 +204,36 @@ Structure:
 3. Four full `.prospect-card`s with:
    - Name + linked LinkedIn URL + title + location
    - Meta tag pills: Authority · Warm-intro tier · Connector name + shared company · Budget management ✓
-   - Right-side score column: composite score, Buyer/Tech-champion breakdown, Receptiveness/Urgency
+   - Right-side score column: **4-axis breakdown only** (Buyer / Tech-champion / Receptiveness /
+     Urgency). **Do NOT display the headline composite score** (the big number like "472" /
+     "415" / "402" we used to render at the top of `.pc-tier`). It doesn't represent anything
+     meaningful to the customer — they have no anchor for what 472 vs 339 means. Drop the big
+     number; keep only the 4-axis breakdown lines that the glossary explains.
    - `.pc-reasoning` block with **Summary / Buyer signal / Technical fit / Warm intro**
      sub-headings, each followed by the verbatim AI Prospecting evidence in `<blockquote>`s
    - `.pc-howto` green callout: "How a rep would use this:" with a concrete next-action sentence
 4. A closing `.card` titled "After this preview — what changes on the [Account] deal" — concrete
    forward-looking statement. **Do not** include a "Same call runs for every account in your
    pipeline" generic block — replaced with the deal-specific forward statement.
+
+### `.pc-tier` markup (no composite score)
+
+```html
+<div class="pc-tier">
+  <div class="pc-score-label">Buyer 95 · Tech-champion 105</div>
+  <div class="pc-score-label">Receptiveness 80 · Urgency 60</div>
+</div>
+```
+
+Not:
+
+```html
+<div class="pc-tier">
+  <div class="pc-score">415</div>             <!-- REMOVED -->
+  <div class="pc-score-label">composite</div> <!-- REMOVED -->
+  ...
+</div>
+```
 
 ## Customer-facing copy guardrails
 

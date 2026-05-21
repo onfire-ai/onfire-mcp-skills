@@ -12,90 +12,93 @@ description: >
   account-level duplicates and enrichment, and intent signals from Onfire's data lake. The
   output is a single self-contained interactive HTML file the customer can hand to their
   manager as a value-prop deliverable.
-  Always trigger this skill when the user provides a tenant name and asks for any value-preview,
-  pre-sync, self-serve, or "show me what Onfire would do" analysis.
+  This skill is tenant-generic — invoke as "Run CRM Value Preview for <tenant>" and the report
+  adapts to that customer's CRM shape, ICP, and signal coverage. Always trigger when the user
+  provides a tenant name and asks for any value-preview, pre-sync, self-serve, or
+  "show me what Onfire would do" analysis.
 compatibility:
   tools:
     - Onfire MCP (get_tenant_settings, integration_proxy, match_company, match_person, contact_data_enrichment, ai_prospecting)
     - Salesforce via integration_proxy (SOQL — preferred path; Metabase execute_query is unreliable)
-    - Snowflake (sql_exec_tool — GOLD.ENTITIES.PEOPLE, GOLD.ENTITIES.COMPANIES.TECHNOLOGIES, SILVER.SIGNALS.ARTIFACTS, SILVER.SIGNALS.JOB_POST)
+    - Snowflake (sql_exec_tool — GOLD.ENTITIES.PEOPLE, GOLD.ENTITIES.COMPANIES.TECHNOLOGIES, SILVER.SIGNALS.ARTIFACTS, SILVER.COMMUNITY_MESSAGES.INT_MESSAGES_WITH_LINKEDIN, SILVER.JOB_POST.STG_JOB_POSTS)
   sibling_skills:
-    - poc-intelligence — sister skill that produces a deeper internal-facing CRM analysis with 4 named plays and a 6-phase POC playbook. This skill (crm-value-preview) is the customer-facing pre-sync version of the same idea. They share the win-pattern derivation pattern and the persona-coverage analysis; this skill borrows poc-intelligence's reference docs for persona taxonomy, SOQL patterns, and play structures (see "Reuse from poc-intelligence" section below).
+    - poc-intelligence — sister skill that produces a deeper internal-facing CRM analysis with 4 named plays and a 6-phase POC playbook. This skill (crm-value-preview) is the customer-facing pre-sync version of the same idea. They share the win-pattern derivation pattern, the persona-coverage analysis, and the field-candidate taxonomy; this skill borrows poc-intelligence's reference docs (see "Reuse from poc-intelligence" below).
 ---
 
 # CRM Value Preview Skill
 
 ## Overview
 
-This skill produces a customer-facing **CRM Value Preview** for a given tenant as a single
+This skill produces a customer-facing **CRM Value Preview** for any tenant as a single
 self-contained interactive HTML file. The audience is the customer's evaluator — not internal Onfire
 staff. The report is the deliverable they hand to their manager to close the buying decision.
 
-The report has five sections, all in one page (navigated via a sticky top nav):
+**Tenant-generic by design.** The user invokes the skill with a tenant name (e.g. *"Run CRM
+Value Preview for cerby"* / *"…for fortinet"* / *"…for torq"*). The skill discovers the
+customer's CRM shape, ICP, persona definitions, competitor list, and signal coverage from
+`get_tenant_settings` + live Salesforce describes — never hardcoded.
 
-1. **The Numbers** — funnel snapshot (3 hero ARR + win rate), CRM volume, the gap tiles
-   (each gap tile shows raw count + an "Onfire →" uplift line), plus a strip of live signal
-   examples across all six signal types.
-2. **Open Pipeline** — the section that ties everything to revenue. Derive the close-won
-   pattern (winning industries, winning personas, avg security contacts per won account),
-   measure each top open opp against the pattern, show per-account persona-coverage gaps
-   with named missing roles, show per-account contact-freshness gaps, then sum a concrete
+Five customer-facing sections:
+
+1. **The Numbers** — funnel snapshot, CRM volume, gap tiles each with an "Onfire →" uplift
+   line, plus a 6-card strip of diversified signal examples.
+2. **Open Pipeline** — the section that ties everything to revenue. Derived close-won pattern
+   (winning industries, winning personas, avg buying-committee contacts per won account),
+   per-opp gap measurement, named missing roles from live AI Prospecting, freshness cases,
    ARR uplift estimate.
 3. **Contact Data Gap** — freshness (job + company changes), completeness (empty / stale email
-   + phone), top intent signals on existing contacts (diverse types).
-4. **Accounts** — duplicates first (true cluster count, pure dups only), then a wide enrichment
-   table with real per-account persona counts from Snowflake + verified tech stack + competitor
-   detection, then specific gaps (close-lost trace-back, look-alike scoring, empty-field fills).
-5. **Buyers & Champions** — a live AI Prospecting drill on one open opp where the win-pattern
-   reveals a missing persona. Full prospect cards with reasoning, scores, warm-intro paths.
-
-The user provides only a **tenant name**. The skill resolves all integration details, samples,
-field mappings, and signal sources dynamically.
+   + phone), top diversified intent signals on existing contacts.
+4. **Accounts** — duplicates first, then a wide enrichment table with real per-account persona
+   counts + verified tech stack + competitor detection, then specific gaps.
+5. **Buyers & Champions** — live AI Prospecting drill on one open opp where the win-pattern
+   reveals a specific missing persona.
 
 ---
 
 ## Core Principles
 
-**Read-only — never writes.** No `POST` / `PATCH` to Salesforce. The customer trusts us because
-nothing changes in their CRM.
+**Read-only.** No `POST` / `PATCH` to Salesforce.
 
-**Customer-facing framing.** Plain language, no Onfire jargon in the body. Never say "Matchbox",
-"MCP", "ai_prospecting", "tenant_settings", "Snowflake", "integration_proxy", or any function
-name. Never write "on file" — say "in the record" or omit. No "Live MCP run" / no "SF integration #X"
-in the header.
+**Customer-facing framing.** Plain language, zero Onfire jargon in the body. Never say "MCP",
+"match_company", "ai_prospecting", "integration_proxy", "tenant_settings", "Snowflake",
+"Metabase", "SOQL". Never write "on file" — say "in the record" or omit. No internal IDs
+("SF integration #1131", "Live MCP run") in the header.
+
+**Tenant-generic.** Every persona keyword, every competitor name, every industry mention is
+derived at run time from `tenant_settings`. **No Torq-specific copy.** The same skill produces
+the same shape of report for any tenant — only the data differs.
+
+**Schema-discover first, query second.** Every CRM is configured differently. Some tenants
+don't have an Opportunity table at all (deal status lives on Account custom fields). Some use a
+custom `Deal__c` object. Some split renewals from new business. Always run schema discovery
+(Step 2) before any KPI query, build an in-memory field map, then route queries through Path A
+(Opportunity-based) or Path B (Account-based) per `sf-query-patterns.md`.
 
 **Learn the win pattern first.** Don't pitch generic "more contacts = more deals." Derive the
-customer's actual close-won industries and personas from their SF data, then frame every gap
+customer's actual close-won industries and personas from their data, then frame every gap
 analysis against that derived pattern.
 
-**Real numbers, not projections, wherever possible.** Persona counts per account come from
-Snowflake `GOLD.ENTITIES.PEOPLE`. Tech stack from `GOLD.ENTITIES.COMPANIES.TECHNOLOGIES`. Open-opp
-contact counts from live SOQL. Show the customer their actual data, not estimates.
+**Real numbers, not projections, wherever possible.** Persona counts per account from Snowflake
+`GOLD.ENTITIES.PEOPLE`. Tech stack from `GOLD.ENTITIES.COMPANIES.TECHNOLOGIES`. Signals from
+the three Snowflake signal tables (artifacts + community messages + job posts) filtered to the
+last 90 days.
 
-**Open pipeline is the headline.** That's where revenue lives. The Open Pipeline tab gets the
-deepest treatment: derived win pattern + per-account gap rows + named missing roles per deal +
-freshness cases + 2-lift uplift math.
+**Open pipeline is the headline.** Deepest treatment, the lift math lives here.
 
-**Salesforce queries go through `integration_proxy`, not Metabase.** The Metabase `execute_query`
-tool is unreliable in current MCP setups (frequently returns "Illegal base64 character 20").
-Use SOQL via `integration_proxy(integration_id, method=GET, relative_url='query', params={q: ...})`.
+**Salesforce queries go through `integration_proxy`, not Metabase.** Metabase `execute_query`
+returns "Illegal base64 character 20" intermittently and is unreliable.
 
-**Signals come from Snowflake `SILVER.SIGNALS.*`, not Metabase.** The platform `signals` table
-is only accessible via Metabase which is unreliable. Use Snowflake artifacts/job-post tables
-with `TENANT = '<tenant_id>'` filter. Different tenants have different signal-type coverage —
-Torq only has website-visitor artifacts; others have more.
+**Signals come from three Snowflake tables, last 90 days, never from a single table:**
+- `SILVER.SIGNALS.ARTIFACTS` (joined to `SILVER.SIGNALS.ARTIFACT_TYPES` for type names)
+- `SILVER.COMMUNITY_MESSAGES.INT_MESSAGES_WITH_LINKEDIN`
+- `SILVER.JOB_POST.STG_JOB_POSTS`
 
-**Six signal types to surface, diversified.** Website visit, product-page intent, event speaker
-mention, competitor mention, job-change on champion, hiring signal. Don't show only one type.
+The 11 canonical signal types live in `ARTIFACT_TYPES` — pull them at run time, don't hardcode.
+See [`signals-from-snowflake.md`](references/signals-from-snowflake.md).
 
-**Customer-facing copy guardrails.**
-- Never claim a specific count like "2,769 signals in 60 days" unless it's directly material —
-  prefer "live examples of the signal types Onfire tracks."
-- Never use the term "on file" — say "in the record" or omit.
-- Never include "Same role, different employer" or similar explanatory subtext for the
-  freshness column — let the data speak.
-- For competitor tools, always name them explicitly (Cortex XSOAR, Swimlane, IBM QRadar, Tines,
-  Splunk SOAR), not just "competitor tech."
+**Six diversified signal types in the Hero strip.** Competitor mention + product-page intent +
+website visit + event speaker + job change on champion + hiring signal. Never claim a specific
+total volume.
 
 ---
 
@@ -110,40 +113,22 @@ Both produce a CRM analysis for a tenant; the difference is audience and depth:
 | Length | 16+ sections, exhaustive | 5 sections, focused on the buying decision |
 | Framing | Internal field names OK in the appendix | Zero internal jargon anywhere |
 | Plays | 4 named plays with 3 examples each | One live AI-Prospecting drill on one open opp |
-| Runtime | 10+ min per tenant (heavier discovery) | 3–5 min per tenant |
-| Output | Self-contained A4 HTML with appendix | Self-contained 1280px interactive HTML |
+| Runtime | 10+ min per tenant | 3–5 min per tenant |
+| Output | A4 HTML with appendix | 1280px interactive HTML |
 
-**Reuse these references directly from poc-intelligence — do not duplicate their content:**
+**Reuse these references directly — do not duplicate their content:**
 
 - [`../poc-intelligence/references/sf-soql-patterns.md`](../poc-intelligence/references/sf-soql-patterns.md)
-  — the canonical Salesforce field-candidate tables (Amount / Stage / Owner / Last Activity / ARR
-  field aliases across tenants). Our [`sf-query-patterns.md`](references/sf-query-patterns.md)
-  layers tested SOQL on top of that taxonomy.
-
+  — canonical Salesforce field-candidate tables (Amount / Stage / Owner / Last Activity / ARR
+  field aliases across tenants).
 - [`../poc-intelligence/references/persona-taxonomy.md`](../poc-intelligence/references/persona-taxonomy.md)
-  — the canonical Onfire persona-bucket taxonomy. Our
-  [`win-pattern-analysis.md`](references/win-pattern-analysis.md) Step 2 derives buckets from
-  this same taxonomy; never invent ad-hoc buckets.
-
+  — canonical Onfire persona-bucket taxonomy.
 - [`../poc-intelligence/references/play-templates.md`](../poc-intelligence/references/play-templates.md)
-  — the canonical Onfire play structures (problem statement / Onfire action / warm-intro path /
-  outcome box). Our Buyers & Champions section is one live single-deal play; if a tenant has
-  the depth for it, you can extend with additional plays following these templates.
+  — canonical Onfire play structures.
 
-**Optional sub-skill invocation.** If the tenant has heavy CRM activity and the customer wants
-more depth, you may invoke `poc-intelligence` once at the start and consume two of its outputs:
-- Its **plays** can become additional Open Pipeline drill-downs (one per missing-persona type).
-- Its **persona distribution** can replace the inline win-pattern derivation in Step 4 if you
-  want the same numbers shown both internally and externally.
-
-When invoked as a sub-skill, **strip its internal-facing copy** before injecting into the
-customer-facing report. The poc-intelligence body intentionally uses field names like
-`Net_New_ARR__c` and concepts like "POC stage" / "Technical Validation" — those must be
-re-worded for the customer-facing report ("annual recurring revenue", "deal stage", etc.).
-
-The default behavior of this skill is **not** to call poc-intelligence — inline derivation is
-faster, cheaper, and easier to explain to the customer ("this came from one SOQL against your
-Salesforce"). Invoke poc-intelligence only when the customer specifically requests more depth.
+**Optional sub-skill invocation.** When the customer specifically requests more depth, invoke
+`poc-intelligence` once and consume its plays + persona distribution. Strip its internal-facing
+copy before injection. By default, derive inline — cheaper and easier to explain.
 
 ---
 
@@ -151,370 +136,323 @@ Salesforce"). Invoke poc-intelligence only when the customer specifically reques
 
 Call `get_tenant_settings(tenant_id='<tenant>')`. Extract and cache for the rest of the run:
 
-- `crm.type` — must be `salesforce`. If not, stop and tell the user v1 supports SF only.
-- `crm.integration_id` — used in every `integration_proxy` SOQL call.
-- `account_research.golden_persona` — the ICP persona name (e.g. `soc_specialist`).
-- `account_research.queries_sections.competitors` — competitor list to track in Onfire signals.
-- `account_research.queries_sections.technologies` — tech-stack list to track per account.
-- `account_research.queries_sections.organization` — the buying-committee personas.
-- `signals_settings.excluded_companies` — competitor domains to exclude from signal results.
-- `aifire.enabled` — flag for whether automatic CRM enrichment is already running.
+- `crm.type` — must be `salesforce` (v1). If not, stop and tell the user.
+- `crm.integration_id` — used in every `integration_proxy` call.
+- `account_research.golden_persona` — the ICP persona name.
+- `account_research.queries_sections.competitors` — competitor list (for signals + enrichment).
+- `account_research.queries_sections.technologies` — tech-stack list to track.
+- `account_research.queries_sections.organization` — the buying-committee personas (drives
+  win-pattern persona filtering).
+- `account_research.display_names_mapping` — friendly names for the personas in the customer-
+  facing report (e.g. `secops` → "SecOps", `soc_specialist` → "SOC Specialist").
+- `signals_settings.excluded_companies` — competitor domains to flag in signals.
+- `aifire.enabled` — whether automatic CRM enrichment is already running.
+- `email_domains` — the customer's own domain (used to filter self-visits out of signals).
 
-The tenant_id is also used as the `TENANT` column filter on Snowflake signals tables.
-
----
-
-## Step 2 — Funnel & Volume Snapshot (SOQL)
-
-All SOQL goes through `integration_proxy`. Use `relative_url='query'` (not `services/data/...`)
-because the integration_proxy prepends the API path. Bracket `IsDeleted = false` everywhere.
-
-```
-# Volume
-SELECT COUNT(Id) FROM Account WHERE IsDeleted = false
-SELECT COUNT(Id) FROM Contact WHERE IsDeleted = false
-SELECT COUNT(Id) FROM Lead WHERE IsDeleted = false AND IsConverted = false
-SELECT COUNT(Id) FROM Opportunity WHERE IsDeleted = false
-
-# Funnel ARR (open pipeline)
-SELECT COUNT(Id), SUM(Amount) FROM Opportunity WHERE IsDeleted = false AND IsClosed = false
-
-# Funnel ARR (closed last 12mo, split by won/lost)
-SELECT IsWon, COUNT(Id), SUM(Amount) FROM Opportunity
-  WHERE IsDeleted = false AND IsClosed = true AND CloseDate = LAST_N_DAYS:365
-  GROUP BY IsWon
-```
-
-Compute win rate by deal count and by $ ARR.
+The `tenant_id` is also the `TENANT` column filter on Snowflake signal tables.
 
 ---
 
-## Step 3 — Gap KPIs (SOQL)
+## Step 2 — CRM Schema Discovery (mandatory before any KPI query)
+
+Every CRM is different. Discover what the customer has, then route queries accordingly.
+
+### 2a. List available objects
 
 ```
-# Stale-90d accounts
-SELECT COUNT(Id) FROM Account
-  WHERE IsDeleted = false AND (LastActivityDate = null OR LastActivityDate < LAST_N_DAYS:90)
-
-# No-contact accounts
-SELECT COUNT(Id) FROM Account a WHERE IsDeleted = false
-  AND Id NOT IN (SELECT AccountId FROM Contact WHERE IsDeleted = false AND AccountId != null)
-
-# Stalled open opps
-SELECT COUNT(Id) FROM Opportunity
-  WHERE IsClosed = false AND IsDeleted = false
-  AND (LastActivityDate = null OR LastActivityDate < LAST_N_DAYS:30)
-
-# Missing-industry accounts
-SELECT COUNT(Id) FROM Account WHERE IsDeleted = false AND (Industry = null OR Industry = '')
-
-# Contacts missing email / phone
-SELECT COUNT(Id) FROM Contact WHERE IsDeleted = false AND (Email = null OR Email = '')
-SELECT COUNT(Id) FROM Contact WHERE IsDeleted = false
-  AND (Phone = null OR Phone = '') AND (MobilePhone = null OR MobilePhone = '')
-
-# True duplicate count (group by website)
-SELECT COUNT(Id), COUNT_DISTINCT(Website) FROM Account
-  WHERE IsDeleted = false AND Website != null AND Website != 'Unknown'
-# Redundant records = total - distinct
-
-# Top duplicate clusters (for examples)
-SELECT Website, COUNT(Id) FROM Account
-  WHERE IsDeleted = false AND Website != null AND Website != 'Unknown'
-  GROUP BY Website HAVING COUNT(Id) > 1 ORDER BY COUNT(Id) DESC LIMIT 200
+integration_proxy(method=GET, relative_url='sobjects/')
 ```
 
-**SOQL pitfalls to avoid:**
-- Subqueries inside aggregate-projection contexts ("only aggregate expressions use field aliasing"
-  / "only root queries support aggregate expressions") — split into multiple queries.
-- `NOT IN (SELECT field FROM SameObject)` — Salesforce requires inner+outer on different objects.
-- Field aliases in non-aggregate queries — not supported.
+Confirm whether `Opportunity` exists. If absent, check for `Deal__c`, `Pipeline__c`,
+`Engagement__c`, `Booking__c`. If none of those, drop to Path B (Account-based).
 
-When filtering duplicates for **display examples**, exclude legitimate parent/subsidiary
-structures: Accenture (regional offices), NBA (team subsidiaries), MLB (team subsidiaries),
-EY (regional service lines), BT (regional units). Keep only pure-name dupes:
-HCA Florida, Infinigate, AdventHealth, Auburn School District, Washington College of Law,
-Quadax, Elite Technology, Cardinal Health, KPMG, PwC, Marriott, Hilton, U.S. Bank, plus the
-UnitedHealth Group "United Health Group" + "UnitedHealth Group" pair.
+### 2b. Describe core objects
+
+```
+integration_proxy(method=GET, relative_url='sobjects/Account/describe')
+integration_proxy(method=GET, relative_url='sobjects/Opportunity/describe')   # if exists
+integration_proxy(method=GET, relative_url='sobjects/Contact/describe')
+integration_proxy(method=GET, relative_url='sobjects/Lead/describe')
+```
+
+Build an in-memory **field map** keyed by concept. Use poc-intelligence's
+[`sf-soql-patterns.md`](../poc-intelligence/references/sf-soql-patterns.md) field-candidate
+table as the lookup. The concepts to resolve:
+
+| Concept | Standard | Common custom |
+|---|---|---|
+| Deal stage | `Opportunity.StageName` | `Stage__c`, `Deal_Stage__c`, `Sales_Stage__c` |
+| ARR / deal value | `Opportunity.Amount` | `ARR__c`, `Net_New_ARR__c`, `ACV__c`, `TCV__c`, `MRR__c` |
+| Won flag | `Opportunity.IsWon` | `Status__c`, `Won__c` |
+| Closed flag | `Opportunity.IsClosed` | `Final_Status__c` |
+| Last activity | `LastActivityDate` | `Last_Touch__c`, `Last_Contact_Date__c` |
+| Loss reason | — | `Loss_Reason__c`, `Closed_Lost_Reason__c` |
+| Industry | `Account.Industry` | `Industry__c`, `Vertical__c`, `Sector__c` |
+| Account-level deal status (Path B fallback) | — | `Account.Customer_Status__c`, `Account.Tier__c`, `Account.Lifecycle_Stage__c` |
+| Account-level ARR (Path B fallback) | — | `Account.ARR__c`, `Account.MRR__c`, `Account.Booking_Amount__c` |
+
+### 2c. Decide the funnel path
+
+- **Path A — Opportunity-based.** Default. Most SF-using customers.
+- **Path B — Account-based.** When `Opportunity` is absent or empty. Funnel KPIs come from
+  `Account.Customer_Status__c` (or equivalent) + `Account.ARR__c` (or equivalent).
+- **Path C — Hybrid.** Some customers track net-new on `Opportunity` and renewals on `Account`.
+  Sum across both sources.
+
+**Surface the choice in the report.** Add a small-print footnote on the Hero: "Your CRM tracks
+deal status [at the account level / on the Opportunity object / across both] — the funnel
+figures below come from [field names]." Customers want to trust the numbers.
+
+See [`sf-query-patterns.md`](references/sf-query-patterns.md) for full SOQL templates per path.
 
 ---
 
-## Step 4 — Win-Pattern Analysis (the load-bearing section)
+## Step 3 — Funnel & Volume KPIs
 
-This is the section the customer cares most about. Three derived constants drive the entire
-Open Pipeline tab.
+Execute via `integration_proxy` SOQL, branching on the Step 2 path decision. All SOQL templates
+in [`sf-query-patterns.md`](references/sf-query-patterns.md).
 
-### 4a. Winning industries
-
-```
-SELECT Account.Industry, COUNT(Id), SUM(Amount)
-FROM Opportunity
-WHERE IsDeleted = false AND IsClosed = true AND IsWon = true
-GROUP BY Account.Industry
-ORDER BY SUM(Amount) DESC NULLS LAST LIMIT 10
-```
-
-Identify the **top-3 industries by won ARR**. Almost universally they'll sum to ~60–75% of
-total closed-won ARR. That's the customer's ICP signature.
-
-### 4b. Winning personas
-
-```
-SELECT Title, COUNT(Id)
-FROM Contact
-WHERE IsDeleted = false
-  AND AccountId IN (SELECT AccountId FROM Opportunity WHERE IsWon = true AND IsClosed = true)
-  AND (Title LIKE '%CISO%' OR Title LIKE '%Security%' OR Title LIKE '%SOC%'
-       OR Title LIKE '%Cyber%' OR Title LIKE '%DevSec%'
-       OR Title LIKE '%Detection%' OR Title LIKE '%Threat%'
-       OR Title LIKE '%Information Security%')
-GROUP BY Title ORDER BY COUNT(Id) DESC LIMIT 30
-```
-
-The persona filter list above is for SOAR/SOC customers (Torq's profile). For other tenants,
-adjust based on `account_research.queries_sections.organization`. The query intentionally
-filters to ICP-relevant titles only — generic titles like "Account Executive" or
-"Client Manager" show up in raw won-account contacts but aren't the buyers.
-
-Roll up into 4–5 persona buckets:
-- **CISO leadership** (CISO + Chief Information Security Officer + Deputy CISO)
-- **Security Engineers** (Sr / Principal / Lead / Information Security / Cyber Security Engineer)
-- **Security Analysts** (Cyber / Info Sec / SOC / Senior)
-- **Security Ops leadership** (SOC Manager / Security Ops Director / Information Security Manager)
-- **DevSecOps / Architects** (DevSecOps / DevOps Engineer / Security Architect)
-
-### 4c. Win-pattern average
-
-```
-SELECT AccountId, COUNT(Id)
-FROM Contact
-WHERE IsDeleted = false
-  AND AccountId IN (SELECT AccountId FROM Opportunity WHERE IsWon = true AND IsClosed = true)
-GROUP BY AccountId ORDER BY COUNT(Id) DESC LIMIT 200
-```
-
-Compute the median + mean count of security-persona contacts per won account. The median is
-the right "win-pattern target" to compare open opps against (mean is distorted by outliers like
-Accenture / consulting firms with hundreds of contacts).
-
-For most tenants in Onfire's profile, this lands around **~5 security contacts per won account**:
-CISO + 2 Sec Engineers + 1–2 SOC + 1 supporting. Treat the **minimum** as `CISO + at least one
-Security Engineer or DevSecOps`.
+Compute and cache:
+- Open pipeline ARR + count
+- Closed-won / closed-lost ARR + count for the last 12 months
+- Win rate by deal count and by $ ARR
+- Avg deal size (won)
+- Account / Contact / Lead / Opp (or alt) counts
 
 ---
 
-## Step 5 — Open Pipeline Gap Analysis (the load-bearing section)
+## Step 4 — Gap KPIs
 
-Pull the top 15 open opps by ARR with their contact counts:
+Single batched pass via SOQL:
+- Stale-90d accounts
+- No-contact accounts
+- Stalled 30d+ opps (or stalled accounts if Path B)
+- Missing-industry accounts
+- Contacts missing email
+- Contacts missing both phone fields
+- True duplicate count: `COUNT(Id) - COUNT_DISTINCT(Website)` from Account
+- Top duplicate clusters (LIMIT 200, ORDER BY count DESC) — for display examples
 
-```
-SELECT Id, Name, Amount, StageName, CloseDate, AccountId,
-       Account.Name, Account.Website, Account.Industry
-FROM Opportunity
-WHERE IsClosed = false AND IsDeleted = false AND Amount > 200000
-ORDER BY Amount DESC LIMIT 30
-```
-
-Then for each opp's AccountId, pull both total and security-only contact counts (batch the
-AccountIds into a single `IN (...)` query for each metric):
-
-```
-# Total contacts per account
-SELECT AccountId, COUNT(Id) FROM Contact
-WHERE IsDeleted = false AND AccountId IN ('<id1>', '<id2>', ...)
-GROUP BY AccountId
-
-# Security-persona contacts per account
-SELECT AccountId, COUNT(Id) FROM Contact
-WHERE IsDeleted = false AND AccountId IN ('<id1>', ...)
-  AND (Title LIKE '%CISO%' OR Title LIKE '%Security%' OR Title LIKE '%SOC%'
-       OR Title LIKE '%Cyber%' OR Title LIKE '%DevSec%' OR Title LIKE '%Detection%'
-       OR Title LIKE '%Threat%' OR Title LIKE '%Information Security%')
-GROUP BY AccountId
-```
-
-For each opp, flag the gap:
-- **covered** — security contacts ≥ win-pattern avg
-- **thin coverage** — security contacts < win-pattern avg but ≥ minimum (CISO + Eng)
-- **below minimum** — missing CISO or Security Engineer
-- **outside top-3 won industries** — orthogonal flag, may co-exist
-
-The 5–6 lowest-coverage open opps become the table rows in the "Persona coverage — who's missing
-on each open deal" section. For each one, run `ai_prospecting(action='run', company_linkedin_url=...)`
-to return real named missing-role candidates (cache results — these calls are expensive).
-
-For contact-freshness on open pipeline, run `match_person` on a small sample (3–5 contacts) per
-top-5 opp and check for `company_name` mismatch or `job_title` change. Surface 5 specific stale
-contacts across the top open deals.
+Filter the duplicate-display examples to pure dups only — exclude legitimate regional
+structures (Accenture regional offices, NBA team subsidiaries, MLB teams, EY regional service
+lines, BT regional units). Keep identical-name dupes + same-domain dupes.
 
 ---
 
-## Step 6 — Account Enrichment with Real Per-Account Numbers (Snowflake)
+## Step 5 — Win-Pattern Analysis (load-bearing)
 
-The Accounts tab's enrichment table is the single biggest credibility moment. Every number must
-be real — not projections.
+See [`win-pattern-analysis.md`](references/win-pattern-analysis.md) for the full method. Three
+sub-queries:
 
-### 6a. Per-account persona counts from Snowflake
+### 5a. Winning industries (top-3 by ARR)
+
+Adapt the SQL to Path A or Path B. Identify the top-3 industries by summed won ARR — they'll
+usually cluster to 60–75% of total.
+
+### 5b. Winning personas (filtered to ICP titles)
+
+**The persona-keyword filter comes from `tenant_settings.account_research.queries_sections.organization`** — NOT hardcoded. Build the SOQL `LIKE` clauses dynamically from the tenant's own ICP definition.
+
+For a SOAR/SOC tenant the keywords map to: `%CISO%`, `%Security%`, `%SOC%`, `%Cyber%`,
+`%DevSec%`, `%Detection%`, `%Threat%`, `%Information Security%`.
+
+For a DSPM tenant the keywords would be: `%Data%`, `%Privacy%`, `%Compliance%`, `%CDO%`,
+`%Governance%`, `%DPO%`.
+
+For an IAM/IGA tenant: `%Identity%`, `%Access%`, `%IAM%`, `%CIAM%`, `%PAM%`.
+
+Roll the raw titles into 4–6 persona buckets, using the canonical taxonomy from
+[`../poc-intelligence/references/persona-taxonomy.md`](../poc-intelligence/references/persona-taxonomy.md).
+
+### 5c. Win-pattern average
+
+Pull the contacts-per-won-account distribution. Use the **median**, not the mean. The number
+represents "buying-committee contacts per won account, filtered to ICP titles only."
+
+---
+
+## Step 6 — Open Pipeline Gap Analysis (load-bearing)
+
+Top 15 open opps by ARR (Path A) or top 15 active accounts (Path B). For each, pull total
+contacts + ICP-persona contacts in two batched IN-clause queries.
+
+Flag each opp:
+- **covered** — ICP contacts ≥ win-pattern avg
+- **thin coverage** — < avg but ≥ minimum (golden_persona + at least one supporting role)
+- **below minimum** — missing the golden persona or a technical champion
+- **outside top-3 won industries** — orthogonal flag
+
+The 5–6 lowest-coverage opps become the table rows in the persona-coverage sub-section. For
+each, run `ai_prospecting(action='run', company_linkedin_url=<url>)` to return real named
+missing-role candidates with warm-intro paths. Cache results — these calls are expensive.
+
+For contact-freshness on open pipeline, run `match_person` on 3–5 contacts per top-5 opp and
+check for `company_name` mismatch or title change. Surface 5 specific stale contacts across
+the top opps.
+
+---
+
+## Step 7 — Account Enrichment with Real Per-Account Data (Snowflake)
+
+The Accounts tab's enrichment table is the credibility moment.
+
+### 7a. Per-account persona counts
+
+Build the regex from the tenant's ICP keywords (Step 5b). Bucket into 4–6 categories matching
+the persona taxonomy.
 
 ```sql
-SELECT JOB_COMPANY_LINKEDIN_URL AS co,
-       COUNT_IF(REGEXP_LIKE(JOB_TITLE, '.*(ciso|chief information security officer|chief security officer).*', 'i')) AS cisos,
-       COUNT_IF(REGEXP_LIKE(JOB_TITLE, '.*(security engineer|cyber security engineer|cybersecurity engineer|information security engineer).*', 'i')) AS sec_engs,
-       COUNT_IF(REGEXP_LIKE(JOB_TITLE, '.*(soc analyst|security analyst|cyber security analyst|cybersecurity analyst|information security analyst).*', 'i')) AS sec_analysts,
-       COUNT_IF(REGEXP_LIKE(JOB_TITLE, '.*(devsecops|devops engineer).*', 'i')) AS devsecops,
-       COUNT_IF(REGEXP_LIKE(JOB_TITLE, '.*(security architect).*', 'i')) AS sec_archs
+SELECT JOB_COMPANY_LINKEDIN_URL,
+       COUNT_IF(REGEXP_LIKE(JOB_TITLE, '.*<bucket1_pattern>.*', 'i')) AS bucket1,
+       COUNT_IF(REGEXP_LIKE(JOB_TITLE, '.*<bucket2_pattern>.*', 'i')) AS bucket2,
+       ...
 FROM GOLD.ENTITIES.PEOPLE
-WHERE JOB_COMPANY_LINKEDIN_URL IN ('linkedin.com/company/walmart', ...)
+WHERE JOB_COMPANY_LINKEDIN_URL IN ('linkedin.com/company/<co1>', ...)
 GROUP BY 1
 ```
 
-**Snowflake REGEXP_LIKE pitfalls:**
-- The `(?i)` inline flag is rejected. Pass `'i'` as the 3rd argument instead.
-- Pattern must start with `.*` and end with `.*` to match anywhere — `REGEXP_LIKE` is
-  anchored by default.
+Snowflake REGEXP_LIKE: use `'i'` as the 3rd arg (the inline `(?i)` flag is rejected). Patterns
+must start with `.*` and end with `.*`.
 
-### 6b. Per-account tech stack from Snowflake
+### 7b. Per-account tech stack
 
 ```sql
 SELECT LINKEDIN_URL, NAME,
        FILTER(TECHNOLOGIES, t -> REGEXP_LIKE(t:technology::STRING,
-         '.*(splunk|crowdstrike|sentinelone|microsoft sentinel|qradar|chronicle|cortex xsoar|tines|swimlane|elastic security|sumo logic|exabeam).*', 'i')) AS sec_tech
+         '.*(<tech1>|<tech2>|<competitor1>|<competitor2>).*', 'i')) AS sec_tech
 FROM GOLD.ENTITIES.COMPANIES
 WHERE LINKEDIN_URL IN (...)
 ```
 
-Parse the result and split each row into:
-- **Detected security stack** (Splunk, SentinelOne, CrowdStrike, Microsoft Sentinel, Exabeam, etc.)
-- **Competitor tool detected** (Cortex XSOAR, Swimlane, Tines, IBM QRadar, Splunk SOAR — these are
-  the ones in the tenant's `account_research.queries_sections.competitors` list)
+The tech/competitor keyword list comes from `tenant_settings.account_research.queries_sections.technologies`
++ `.competitors`. Split detected tools into:
+- **Detected security stack** (the customer's tracked technologies)
+- **Competitor tool detected** (the customer's tracked competitors)
 
-Tag each account row in the enrichment table with explicit competitor names — never just
-"competitor tech."
+### 7c. Sample composition
 
-### 6c. Picking the sample of 12–15 accounts to display
+Pick 12–15 accounts that tell a story:
+- 3–4 brand-name accounts (for credibility)
+- 3–4 from your closed-lost top 5 (re-opening candidates)
+- 3–4 from open-pipeline accounts
+- 1–2 no-contact ICP accounts
+- 1–2 parent/subsidiary cases (to show linking)
 
-Pick a mix that tells a story:
-- 3–4 brand-name big accounts (Walmart / Amazon / Apple equivalents)
-- 3–4 from your closed-lost top-5 (re-opening candidates)
-- 3–4 from open-pipeline accounts where the deal is live
-- 1–2 no-contact ICP accounts (look-alike to wins)
-- 1–2 parent/subsidiary cases (to show the linking story)
+Required columns:
+- Account in your CRM
+- Employees (CRM → Onfire)
+- Persona-bucket counts (one column per bucket; right-aligned)
+- Detected security stack (comma-separated, real verified tools)
+- Competitor tool detected (explicit names with ⚠ icon)
 
-The columns to display (right-aligned headers + values for numeric):
-
-| Account | Employees CRM→Onfire | CISO | Sec Eng | SOC Analyst | DevSecOps | Detected security stack | Competitor tool detected |
-
-Do **not** include an "Onfire match" column — it carries no information for the customer.
-Drop the "Size band" column — it's redundant given the employee count.
-
----
-
-## Step 7 — Signals from Snowflake (six diversified types)
-
-Metabase access to the platform `signals` table is unreliable. Use Snowflake instead:
-
-```sql
-SELECT a.ARTIFACT_TIME::DATE AS day, a.COMPANY_LINKEDIN_URL,
-       a.CONTACT_LINKEDIN_URL, t.ARTIFACT_TYPE_DISPLAY_NAME, t.ARTIFACT_TYPE,
-       SUBSTR(a.ARTIFACT_TEXT, 1, 500) AS artifact_text, a.SOURCE_LINK
-FROM SILVER.SIGNALS.ARTIFACTS a
-LEFT JOIN SILVER.SIGNALS.ARTIFACT_TYPES t ON a.ARTIFACT_TYPE_ID = t.ARTIFACT_TYPE_ID
-WHERE a.TENANT = '<tenant>'
-  AND a.ARTIFACT_TIME >= DATEADD(day, -60, CURRENT_DATE())
-  AND a.ARTIFACT_TEXT IS NOT NULL
-  AND a.COMPANY_LINKEDIN_URL IS NOT NULL
-ORDER BY a.ARTIFACT_TIME DESC LIMIT 25
-```
-
-**Important:** `SUMMARY` is often NULL — use `ARTIFACT_TEXT` instead.
-
-Different tenants have different signal-type coverage. For Torq, only `account_website_visitor`
-and `contact_website_visitor` artifacts exist. Other signal types come from:
-
-- **Event speaker mentions** — surface from `ai_prospecting` output's `events` field (per-prospect
-  event attendance / speaking).
-- **Job changes on champions** — surface from `match_person` results where `company_name` ≠ CRM
-  account name.
-- **Hiring signals** — query `SILVER.SIGNALS.JOB_POST` filtered by company LinkedIn URL + role
-  keywords from the tenant's win-pattern personas.
-- **Competitor mentions** — within website visitors, flag any visit from a contact whose
-  `company_linkedin_url` matches the tenant's competitor exclude-list.
-
-The Hero signal strip should show **6 cards across 2 rows** with diversified types:
-website visit, product-page intent, event speaker, competitor mention, job change, hiring signal.
-Never claim a specific total count like "2,769 signals" — say "live examples of the signal
-types Onfire tracks."
-
-The Contact Data Gap tab's signal strip shows **3 cards** with 1 visit + 1 product-page intent +
-1 event. Don't repeat the same Hero signals.
+Drop: "Onfire match" column, "Size band" column.
 
 ---
 
-## Step 8 — Buyers & Champions (the live AI Prospecting drill)
+## Step 8 — Signals from Snowflake (last 90 days)
 
-Pick **one** open opportunity from Step 5 where the win-pattern reveals a *specific* missing
-persona — not just "no contacts." The most compelling story is: "your CRM has the CISO and SOC
-team, but you're missing the DevSecOps / Platform Engineering champion who actually drives
-Technical Validation."
+Three signal sources, all filtered `>= DATEADD(day, -90, CURRENT_DATE())`. See
+[`signals-from-snowflake.md`](references/signals-from-snowflake.md) for full queries.
+
+### 8a. `SILVER.SIGNALS.ARTIFACTS` joined to `ARTIFACT_TYPES`
+
+Pulls 11 canonical signal types: change_company, new_hire, promotion, role_change,
+hiring_manager, account_website_visitor, contact_website_visitor, event_attendee,
+github_repo_activity, plus any tenant-specific types (e.g. `customer_champion_island`).
+
+### 8b. `SILVER.COMMUNITY_MESSAGES.INT_MESSAGES_WITH_LINKEDIN`
+
+LinkedIn-identified messages from Reddit / HN / Stack Overflow / community forums. Filter
+`MESSAGE_TEXT` by the tenant's ICP keywords (competitors + technologies + organization). This is
+gold for high-intent + competitor-mention signals.
+
+### 8c. `SILVER.JOB_POST.STG_JOB_POSTS`
+
+Job postings. Filter `JOB_POST_TITLE` against the tenant's win-pattern persona keywords. When
+a company in the customer's CRM is hiring for an ICP-relevant role, that's a buying-intent
+signal.
+
+### 8d. Pick 6 diversified signals for the Hero strip
+
+Across all three sources, pick one example per type for the 6-card hero strip:
+1. Competitor mention (artifacts where visitor company ∈ excluded_companies)
+2. Product-page intent (artifacts mentioning specific URL paths)
+3. Generic website visit
+4. Event speaker / attendee (artifacts type 9, or from AI Prospecting `events` field)
+5. Job change / promotion on a champion (artifacts type 2/3/4/5)
+6. Hiring signal (stg_job_posts row OR artifacts type 6)
+
+Never claim a specific total volume ("X signals in last N days"). Say "Live examples of the
+signal types Onfire tracks for you."
+
+---
+
+## Step 9 — Buyers & Champions (live AI Prospecting drill)
+
+Pick **one** open opportunity from Step 6 where the win-pattern reveals a *specific* missing
+persona — not just "no contacts." The most compelling story is: "your CRM has the buyer and
+the operations team, but you're missing the technical champion who actually drives Technical
+Validation."
 
 Steps:
-1. From the top-15 open opps, find one in Technical Validation or Business Validation stage
-   with strong total coverage but a clear persona-type gap. (For Torq, this was Deutsche Bank.)
-2. Pull the existing CRM security contacts on that account.
+1. From the top-15 open opps, find one in Technical Validation / Business Validation stage
+   with strong total coverage but a clear persona-type gap.
+2. Pull the existing CRM contacts on that account.
 3. Run `ai_prospecting(action='run', company_linkedin_url=...)` and consume the top 4–5 prospects.
-4. Render 4 full prospect cards (white background, NOT light grey — use `.prospect-card` from
-   the template). Each card: composite score, score breakdown (Buyer/Tech-champion/Receptiveness/
-   Urgency), warm-intro tier (GOLD/SILVER/COLD), named connector, then the AI reasoning with
-   block-quoted evidence verbatim, then a "How a rep would use this" green-callout box.
-5. Add a header card showing 3 columns: "Already in your CRM" (list the security contacts),
-   "Win-pattern check" (✓/✗ per persona role), "What Onfire returned" (summary of the AI
-   Prospecting output).
+4. Render 4 full prospect cards (white background, `.prospect-card` class). Each card:
+   - Name, title, location, LinkedIn link
+   - Authority tag (1–5 → C-Level / VP/Director / Manager / Specialist / IC)
+   - Warm-intro tier (GOLD / SILVER / COLD) + connector name + shared company
+   - Score breakdown axes (Buyer · Tech-champion · Receptiveness · Urgency)
+   - `.pc-reasoning` block with Summary / Buyer signal / Technical fit / Warm intro
+     sub-headings, each followed by verbatim AI Prospecting evidence in `<blockquote>`s
+   - `.pc-howto` green callout with a concrete "How a rep would use this" sentence
 
-**Score glossary** (must include as an inline alert at the top of the section):
-- Authority 1–5 (5 = C-Level, 4 = VP/Director, 3 = Manager, 2 = Specialist, 1 = IC)
-- Warm-intro: GOLD = direct overlap with current Onfire colleague; SILVER = shared past company;
-  COLD = no path yet.
-- Buyer / Tech-champion / Receptiveness / Urgency: scoring dimensions from AI Prospecting,
-  each 0–250-ish.
+**Do not display the composite score.** Earlier versions showed a large headline number
+(e.g. "472" / "415" / "402") at the top-right of each card. It's not meaningful to the
+customer — they don't have context for what 472 vs 339 means. Remove the big number; keep the
+4-axis breakdown (Buyer / Tech-champion / Receptiveness / Urgency) which the alert glossary
+at the top explains.
 
-Drop the "Same call runs for every account..." copy. Replace with a concrete forward-looking
-card: "After this preview — what changes on the [Account] deal. With 4 named [persona]
-champions added, the [industry] win-pattern committee is complete. Same shape ready for every
-account in your $XM open pipeline the same day you sync."
+Add a header card showing 3 columns: "Already in your CRM", "Win-pattern check" (✓/✗ per
+persona role), "What Onfire returned" (summary).
+
+Close with a forward-looking card: "After this preview — what changes on the [Account] deal."
+Concrete next-step framing, not generic "same call runs for every account."
 
 ---
 
-## Step 9 — Render
+## Step 10 — Render
 
 Output filename: `<tenant>_preview_<YYYYMMDD>.html`. Single self-contained file. All CSS
 inlined. No external assets except Google Fonts (Plus Jakarta Sans). See
 [`references/render-contract.md`](references/render-contract.md) for the full HTML structure,
-brand tokens, and per-section rendering rules. The skeleton is in
-[`assets/template.html`](assets/template.html).
+brand tokens, and per-section rendering rules. The template is in
+[`assets/template.html`](assets/template.html). Worked examples for the Torq tenant are in
+[`output/`](output/) — use them as reference for what a real run looks like, not as a template
+to copy literally.
 
 Open the file in the user's default browser at the end (`open ~/Downloads/<filename>.html`).
 
 ---
 
-## Verification (run after every change)
+## Verification per tenant
 
-End-to-end against Torq (the reference tenant):
+Each tenant run must satisfy:
 
-1. Invoke this skill: *"Run CRM Value Preview for Torq"*.
-2. The Numbers tab confirms: $182.1M open pipeline, 12.1% win rate, 28,203 accounts,
-   34,541 contacts, 21,062 no-contact accounts (74.7%), 937 redundant records (3.3%), 877
-   missing emails, 5,297 missing phones. Hero signal strip shows 6 diversified cards.
-3. The Open Pipeline tab shows: 3 win-pattern industries summing to ~70% of won ARR, ~5 avg
-   security contacts per won account, top-15 open opps with live coverage flags, persona-coverage
-   table with 5–6 named missing roles, freshness table with stale contacts on top opps,
-   ~$4.5M–$6.5M uplift math.
-4. The Accounts tab shows: 937 dup records framed correctly, pure-dup examples only (no Accenture
-   /NBA /MLB), enrichment table with real per-account persona counts and tech stacks.
-5. The Buyers & Champions tab shows: Deutsche Bank live drill with 4 named DevSecOps prospects,
-   each with reasoning + warm-intro path + green "how a rep would use this" callout.
-6. Print the page → PDF. Confirm sections break cleanly.
-7. Confirm zero internal jargon in the customer-visible body. No "MCP", no "match_company",
-   no "integration_proxy", no "Snowflake", no "tenant_settings", no "on file."
+1. **Zero hardcoded tenant references.** No "Torq" / "Fortinet" / etc. literals in the
+   template or code paths — all from `tenant_settings`.
+2. **Schema-discovered field map.** Funnel KPIs labeled with their actual source: "from your
+   Opportunity table" or "from your Account.Customer_Status__c field," whichever applies.
+3. **Tenant-specific persona keywords.** The win-pattern title regex was built from the
+   customer's own `queries_sections.organization`, not the SOC/SOAR default.
+4. **Three signal sources hit.** Artifacts + community messages + job posts all queried, all
+   filtered to last 90 days, all surfaced in the report.
+5. **Hero signal strip has 6 diversified types.** Not 6 website visits.
+6. **No composite scores on Buyers & Champions cards.** Big headline number removed; only the
+   4-axis breakdown remains.
+7. **Customer-facing copy clean.** No "MCP", "match_person", "integration_proxy", "Snowflake",
+   "Metabase", "on file", "Live MCP run", or any specific signal-volume count.
 
 ---
 
@@ -524,8 +462,7 @@ End-to-end against Torq (the reference tenant):
 - Does not write back to the CRM.
 - Does not run server-side PDF rendering — browser print is the v1 export path.
 - Does not host the HTML — the operator emails / shares the file directly.
-- Does not invoke `poc-intelligence` by default — the close-won pattern is derived inline from
-  raw Salesforce queries (cheaper, faster, easier to explain). See the **Reuse from
-  poc-intelligence** section above for when to invoke it as an optional sub-skill, and which
-  of its reference docs to read directly (`sf-soql-patterns.md`, `persona-taxonomy.md`,
-  `play-templates.md`).
+- Does not invoke `poc-intelligence` by default — close-won pattern derived inline. See
+  "Reuse from poc-intelligence" for when to invoke it as an optional sub-skill.
+- Does not hardcode any tenant-specific data — the entire report adapts to whichever tenant
+  the user provides at invocation.
