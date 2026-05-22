@@ -1,11 +1,11 @@
 ---
 name: event-attendance-signals
-description: Find people who attended conferences, summits, webinars, or industry events using the `query_onfire` tool against GOLD.EVENTS.EVENTS_CONTACTS. Use when the user wants to know who went to a specific event, find attendees from a target company, discover which events a person attended, or filter prospects by event participation — phrases like "who attended Dreamforce 2025", "find people from Salesforce at RSA", "which events did people from our target accounts go to", "show me Gartner IT Symposium attendees", or any event attendance lookup.
+description: Find people who attended conferences, summits, webinars, or industry events using the `query_onfire` tool against ONFIRE.EVENTS_CONTACTS. Use when the user wants to know who went to a specific event, find attendees from a target company, discover which events a person attended, or filter prospects by event participation — phrases like "who attended Dreamforce 2025", "find people from Salesforce at RSA", "which events did people from our target accounts go to", "show me Gartner IT Symposium attendees", or any event attendance lookup.
 ---
 
 # event-attendance-signals
 
-SQL lookup against `GOLD.EVENTS.EVENTS_CONTACTS` via `query_onfire`. This
+SQL lookup against `ONFIRE.EVENTS_CONTACTS` via `query_onfire`. This
 table records every tracked event attendance signal — who attended which
 conference or industry gathering, their employer, and their location.
 
@@ -63,7 +63,7 @@ SELECT
     contact_country,
     contact_region,
     insight_name
-FROM GOLD.EVENTS.EVENTS_CONTACTS
+FROM ONFIRE.EVENTS_CONTACTS
 WHERE deleted_at IS NULL
   AND insight_name ILIKE '%Dreamforce 2025%'
 ORDER BY company_website NULLS LAST
@@ -77,7 +77,7 @@ SELECT
     insight_name,
     contact_country,
     active_employment
-FROM GOLD.EVENTS.EVENTS_CONTACTS
+FROM ONFIRE.EVENTS_CONTACTS
 WHERE deleted_at IS NULL
   AND company_linkedin_url ILIKE '%/company/capital-one%'
 ORDER BY insight_name
@@ -91,7 +91,7 @@ SELECT
     insight_name,
     company_website,
     contact_country
-FROM GOLD.EVENTS.EVENTS_CONTACTS
+FROM ONFIRE.EVENTS_CONTACTS
 WHERE deleted_at IS NULL
   AND contact_linkedin_url IN (
       'https://www.linkedin.com/in/alice-smith',
@@ -106,7 +106,7 @@ LIMIT 200
 SELECT
     insight_name,
     COUNT(DISTINCT contact_linkedin_url) AS unique_attendees
-FROM GOLD.EVENTS.EVENTS_CONTACTS
+FROM ONFIRE.EVENTS_CONTACTS
 WHERE deleted_at IS NULL
   AND LOWER(contact_country) = 'germany'
 GROUP BY insight_name
@@ -120,7 +120,7 @@ SELECT
     insight_name,
     COUNT(DISTINCT contact_linkedin_url) AS unique_attendees,
     COUNT(DISTINCT company_linkedin_url) AS unique_companies
-FROM GOLD.EVENTS.EVENTS_CONTACTS
+FROM ONFIRE.EVENTS_CONTACTS
 WHERE deleted_at IS NULL
   AND company_linkedin_url IN (
       'https://www.linkedin.com/company/stripe',
@@ -139,7 +139,7 @@ SELECT
     company_linkedin_url,
     company_website,
     contact_region
-FROM GOLD.EVENTS.EVENTS_CONTACTS
+FROM ONFIRE.EVENTS_CONTACTS
 WHERE deleted_at IS NULL
   AND insight_name ILIKE '%RSA%'
   AND LOWER(contact_country) = 'united states'

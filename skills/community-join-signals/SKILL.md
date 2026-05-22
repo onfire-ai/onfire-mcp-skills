@@ -1,11 +1,11 @@
 ---
 name: community-join-signals
-description: Find people who joined specific online communities (Slack workspaces, Discord servers, Reddit communities, LinkedIn groups, GitHub orgs) using the `query_onfire` tool against GOLD.EVIDENCES.EVIDENCES. Use when the user asks who joined a community, who is a member of a specific Slack/Discord/Reddit/LinkedIn group, or wants to find community presence signals for accounts or individuals — phrases like "who joined the JFrog Slack", "members of the DevSecOps Discord", "find everyone from Stripe who's in any Kubernetes community", "who joined any security Slack since January", or any community-membership lookup.
+description: Find people who joined specific online communities (Slack workspaces, Discord servers, Reddit communities, LinkedIn groups, GitHub orgs) using the `query_onfire` tool against ONFIRE.EVIDENCES. Use when the user asks who joined a community, who is a member of a specific Slack/Discord/Reddit/LinkedIn group, or wants to find community presence signals for accounts or individuals — phrases like "who joined the JFrog Slack", "members of the DevSecOps Discord", "find everyone from Stripe who's in any Kubernetes community", "who joined any security Slack since January", or any community-membership lookup.
 ---
 
 # community-join-signals
 
-SQL lookup against `GOLD.EVIDENCES.EVIDENCES` (evidence_type_id = 7) via
+SQL lookup against `ONFIRE.EVIDENCES` (evidence_type_id = 7) via
 `query_onfire`. This table captures every recorded community-join event —
 person joins Slack workspace, Discord server, Reddit community, LinkedIn
 group, or GitHub org. It's the primary source for community intent signals.
@@ -68,7 +68,7 @@ SELECT
     PAYLOAD:COMMUNITY_NAME::VARCHAR   AS community_name,
     PAYLOAD:COMMUNITY_TYPE::VARCHAR   AS community_type,
     PAYLOAD:COMMUNITY_URL::VARCHAR    AS community_url
-FROM GOLD.EVIDENCES.EVIDENCES
+FROM ONFIRE.EVIDENCES
 WHERE evidence_type_id = 7
   AND deleted_at IS NULL
   AND PAYLOAD:COMMUNITY_NAME::VARCHAR ILIKE '%jfrog%'
@@ -84,7 +84,7 @@ SELECT
     start_date,
     PAYLOAD:COMMUNITY_NAME::VARCHAR   AS community_name,
     PAYLOAD:COMMUNITY_URL::VARCHAR    AS community_url
-FROM GOLD.EVIDENCES.EVIDENCES
+FROM ONFIRE.EVIDENCES
 WHERE evidence_type_id = 7
   AND deleted_at IS NULL
   AND PAYLOAD:COMMUNITY_TYPE::VARCHAR = 'Slack'
@@ -100,7 +100,7 @@ SELECT
     start_date,
     PAYLOAD:COMMUNITY_NAME::VARCHAR   AS community_name,
     PAYLOAD:COMMUNITY_TYPE::VARCHAR   AS community_type
-FROM GOLD.EVIDENCES.EVIDENCES
+FROM ONFIRE.EVIDENCES
 WHERE evidence_type_id = 7
   AND deleted_at IS NULL
   AND company_linkedin_url ILIKE '%/company/capital-one%'
@@ -115,7 +115,7 @@ SELECT
     start_date,
     PAYLOAD:COMMUNITY_NAME::VARCHAR   AS community_name,
     PAYLOAD:COMMUNITY_TYPE::VARCHAR   AS community_type
-FROM GOLD.EVIDENCES.EVIDENCES
+FROM ONFIRE.EVIDENCES
 WHERE evidence_type_id = 7
   AND deleted_at IS NULL
   AND person_linkedin_url IN (
@@ -133,7 +133,7 @@ SELECT
     start_date,
     PAYLOAD:COMMUNITY_NAME::VARCHAR   AS community_name,
     PAYLOAD:COMMUNITY_TYPE::VARCHAR   AS community_type
-FROM GOLD.EVIDENCES.EVIDENCES
+FROM ONFIRE.EVIDENCES
 WHERE evidence_type_id = 7
   AND deleted_at IS NULL
   AND PAYLOAD:COMMUNITY_NAME::VARCHAR ILIKE '%kubernetes%'
@@ -149,7 +149,7 @@ SELECT
     PAYLOAD:COMMUNITY_TYPE::VARCHAR   AS community_type,
     PAYLOAD:COMMUNITY_URL::VARCHAR    AS community_url,
     COUNT(DISTINCT person_linkedin_url) AS member_count
-FROM GOLD.EVIDENCES.EVIDENCES
+FROM ONFIRE.EVIDENCES
 WHERE evidence_type_id = 7
   AND deleted_at IS NULL
   AND company_linkedin_url ILIKE '%/company/stripe%'

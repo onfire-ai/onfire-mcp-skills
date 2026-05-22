@@ -410,7 +410,7 @@ relevant narrow typed tool. **Never write raw SQL.**
 |---------------|------|
 | Signals on a topic outside the tenant's keyword set (e.g. NIS2, DORA) | `query_intent_signals(tenant_id, account_website, keyword_match=[...])` |
 | A 10-K section the report didn't surface (e.g. a specific exec name) | `query_company_filings(website, keywords=[...])` |
-| Employees mentioning a different product / competitor set | `query_onfire` — query `GOLD.ENTITIES.PEOPLE` with ILIKE filters on `JOB_SUMMARY`, `SUMMARY`, `JOB_TITLE` for the new keywords, filtered by `JOB_COMPANY_LINKEDIN_URL ILIKE '%/<slug>%'` |
+| Employees mentioning a different product / competitor set | `query_onfire` — query `ONFIRE.PEOPLE` with ILIKE filters on `JOB_SUMMARY`, `SUMMARY`, `JOB_TITLE` for the new keywords, filtered by `JOB_COMPANY_LINKEDIN_URL ILIKE '%/<slug>%'` |
 
 Each typed tool returns its own dataset, so its output is also further
 sliceable via `query_datasets`.

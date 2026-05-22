@@ -28,7 +28,7 @@ This skill produces a full POC Intelligence Report for a given customer tenant a
 It is customer-facing: clean language, no internal field names in the body, all raw data in the Appendix.
 
 The report has two layers:
-- **Plays layer (top):** Three hero numbers + four Onfire plays that move those numbers. Each play contains 3 real account examples sourced from Snowflake — named contacts with persona signals confirmed, SIEM stacks verified from GOLD.ENTITIES.COMPANIES.TECHNOLOGIES.
+- **Plays layer (top):** Three hero numbers + four Onfire plays that move those numbers. Each play contains 3 real account examples sourced from Snowflake — named contacts with persona signals confirmed, SIEM stacks verified from ONFIRE.COMPANIES.TECHNOLOGIES.
 - **Detail layer (below):** Full CRM analysis — funnel, competitive, velocity, personas, contact quality, stalled deals, wins, losses, POC playbook, data appendix.
 
 The user provides a tenant name. The skill resolves all integration details dynamically. Never assume CRM field names.
@@ -41,7 +41,7 @@ The user provides a tenant name. The skill resolves all integration details dyna
 
 **Customer-facing framing.** Play descriptions reference data from the customer's own CRM. Do not frame problems as comparisons between CRM state and what Onfire knows — the report describes their situation using their own data, and Onfire is the solution.
 
-**Snowflake before AI Prospecting.** Always query GOLD.ENTITIES.PEOPLE and GOLD.ENTITIES.COMPANIES first. The Snowflake entity data is usually sufficient to find real named contacts with persona signals for every example in the report. Fall back to AI Prospecting only when Snowflake returns no usable result for a specific account.
+**Snowflake before AI Prospecting.** Always query ONFIRE.PEOPLE and ONFIRE.COMPANIES first. The Snowflake entity data is usually sufficient to find real named contacts with persona signals for every example in the report. Fall back to AI Prospecting only when Snowflake returns no usable result for a specific account.
 
 **Plays use AI Prospecting in copy, Snowflake in examples.** The play body text says "Onfire AI Prospecting" — but the inline examples section inside each play card must show real contacts sourced from Snowflake with confirmed persona signals and SIEM stack data.
 
@@ -145,9 +145,9 @@ Then `DESCRIBE TABLE` each table for columns — also works without a warehouse.
 
 | Table | Rows | Key fields |
 |---|---|---|
-| GOLD.ENTITIES.COMPANIES | 12.9M | NAME, WEBSITE, LINKEDIN_URL, TECHNOLOGIES (array — JSON objects with `technology` and `last_verified_at`), FUNDING_ROUNDS_LAST_ROUND_DATE, EMPLOYEE_COUNT, COMPANY_UPDATES (array) |
-| GOLD.ENTITIES.PEOPLE | 93.7M | FULL_NAME, LINKEDIN_URL, JOB_TITLE, JOB_COMPANY_NAME, JOB_COMPANY_LINKEDIN_URL, JOB_TITLE_LEVELS (array), JOB_TITLE_ROLE, JOB_LAST_CHANGED, EMAILS (array), SKILLS (array), LOCATION_COUNTRY |
-| GOLD.ENTITIES.PEOPLE_EXPERIENCES | 415M | Full work history — role change detection |
+| ONFIRE.COMPANIES | 12.9M | NAME, WEBSITE, LINKEDIN_URL, TECHNOLOGIES (array — JSON objects with `technology` and `last_verified_at`), FUNDING_ROUNDS_LAST_ROUND_DATE, EMPLOYEE_COUNT, COMPANY_UPDATES (array) |
+| ONFIRE.PEOPLE | 93.7M | FULL_NAME, LINKEDIN_URL, JOB_TITLE, JOB_COMPANY_NAME, JOB_COMPANY_LINKEDIN_URL, JOB_TITLE_LEVELS (array), JOB_TITLE_ROLE, JOB_LAST_CHANGED, EMAILS (array), SKILLS (array), LOCATION_COUNTRY |
+| ONFIRE.PEOPLE_EXPERIENCES | 415M | Full work history — role change detection |
 | GOLD.INSIGHTS.PERSONA_INSIGHTS | 115 rows | INSIGHT_ID, INSIGHT_NAME, INSIGHT_DEFINITION (full regex — not a join key) |
 | GOLD.INSIGHTS.QUERIES_MVIEW | ~3,500 rows | INSIGHT_NAME only — used to check which insights are active, not to join to contacts |
 
@@ -158,14 +158,14 @@ Then `DESCRIBE TABLE` each table for columns — also works without a warehouse.
 -- (NEVER query PEOPLE directly by website domain — they don't have it)
 -- (ALWAYS go through COMPANIES first to get JOB_COMPANY_LINKEDIN_URL)
 SELECT NAME, LINKEDIN_URL, WEBSITE, TECHNOLOGIES
-FROM GOLD.ENTITIES.COMPANIES
+FROM ONFIRE.COMPANIES
 WHERE WEBSITE IN ('company1.com', 'company2.com', ...)
 AND LINKEDIN_URL IS NOT NULL
 
 -- Step 2: Query PEOPLE using JOB_COMPANY_LINKEDIN_URL (the correct join key)
 SELECT FULL_NAME, LINKEDIN_URL, JOB_TITLE, JOB_COMPANY_NAME,
        JOB_COMPANY_LINKEDIN_URL, JOB_TITLE_LEVELS, JOB_TITLE_ROLE, LOCATION_COUNTRY
-FROM GOLD.ENTITIES.PEOPLE
+FROM ONFIRE.PEOPLE
 WHERE JOB_COMPANY_LINKEDIN_URL IN (
   'linkedin.com/company/company-a', 'linkedin.com/company/company-b', ...
 )
@@ -189,7 +189,7 @@ SELECT NAME, WEBSITE,
         1, 'i') > 0
     ), ', '
   ) AS siem_stack
-FROM GOLD.ENTITIES.COMPANIES
+FROM ONFIRE.COMPANIES
 WHERE WEBSITE IN (...)
 ```
 
@@ -383,7 +383,7 @@ This step finds the real named contacts and SIEM stacks shown inside each play c
 
 ```sql
 SELECT NAME, LINKEDIN_URL, WEBSITE
-FROM GOLD.ENTITIES.COMPANIES
+FROM ONFIRE.COMPANIES
 WHERE WEBSITE IN ('domain1.com', 'domain2.com', ...)
 AND LINKEDIN_URL IS NOT NULL
 ```
@@ -395,7 +395,7 @@ Use the `Account.Website` values from Step 7. Batch all domains in one query. So
 ```sql
 SELECT FULL_NAME, LINKEDIN_URL, JOB_TITLE, JOB_COMPANY_NAME,
        JOB_COMPANY_LINKEDIN_URL, JOB_TITLE_LEVELS, JOB_TITLE_ROLE, LOCATION_COUNTRY
-FROM GOLD.ENTITIES.PEOPLE
+FROM ONFIRE.PEOPLE
 WHERE JOB_COMPANY_LINKEDIN_URL IN (
   -- Use the LINKEDIN_URL values returned from Query 1
   'linkedin.com/company/company-a', ...
@@ -424,7 +424,7 @@ SELECT NAME, WEBSITE,
         1, 'i') > 0
     ), ', '
   ) AS siem_stack
-FROM GOLD.ENTITIES.COMPANIES
+FROM ONFIRE.COMPANIES
 WHERE WEBSITE IN (...)
 ORDER BY NAME
 ```

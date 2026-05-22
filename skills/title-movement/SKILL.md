@@ -1,7 +1,7 @@
 ---
 name: title-movement
 description: >
-  Detect month-by-month title movement (new hires and departures by job title) at any target company using `gold.entities.people_experiences` via the `sql_exec_tool`.
+  Detect month-by-month title movement (new hires and departures by job title) at any target company using `ONFIRE.PEOPLE_EXPERIENCES` via `query_onfire`.
 
   Use this skill whenever the user asks about:
   - "title movement" or "role movement" at a company
@@ -15,12 +15,12 @@ description: >
   Trigger even if the user just pastes a LinkedIn company URL and asks "what's happening there?" or "show me movement." Works for any company — just needs a `company_linkedin_url` slug.
 compatibility:
   tools:
-    - Snowflake (sql_exec_tool)
+    - query_onfire
 ---
 
 # Title Movement Skill
 
-Detect which job titles are newly entering or permanently leaving a company, month by month. Data source: `gold.entities.people_experiences` via `sql_exec_tool`.
+Detect which job titles are newly entering or permanently leaving a company, month by month. Data source: `ONFIRE.PEOPLE_EXPERIENCES` via `query_onfire`.
 
 ---
 
@@ -44,7 +44,7 @@ WITH exp AS (
     LOWER(TRIM(TITLE_NAME)) AS title,
     TRY_TO_DATE(START_DATE || '-01') AS start_dt,
     TRY_TO_DATE(END_DATE   || '-01') AS end_dt
-  FROM gold.entities.people_experiences
+  FROM ONFIRE.PEOPLE_EXPERIENCES
   WHERE company_linkedin_url = '<company_linkedin_url>'
     AND TITLE_NAME IS NOT NULL
     AND START_DATE IS NOT NULL
@@ -123,7 +123,7 @@ If `show_all=true`, append: ` · [Z] total move events`
 
 ### No results
 If the query returns 0 rows, say:
-> "No title movement found for `[url]` in this window. The LinkedIn URL slug may not match — check `gold.entities.people_experiences` for the exact value, or try a variant (e.g. `linkedin.com/company/salesforce` vs `linkedin.com/company/salesforcecom`)."
+> "No title movement found for `[url]` in this window. The LinkedIn URL slug may not match — try a variant (e.g. `linkedin.com/company/salesforce` vs `linkedin.com/company/salesforcecom`)."
 
 ---
 

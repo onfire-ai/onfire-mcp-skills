@@ -1,11 +1,11 @@
 ---
 name: entity-people-search
-description: Search for people/prospects directly from Onfire's LinkedIn people entity table (GOLD.ENTITIES.PEOPLE) using the `query_onfire` tool. Use when the user wants to find prospects by job title, company, location, seniority, skills, or keywords in their profile — phrases like "find engineers at Stripe", "who are the VPs of Security at banks in the US", "show me people with 'Splunk' in their job summary", "look up this LinkedIn URL", or any people search that doesn't require Forschung's cross-database scoring.
+description: Search for people/prospects directly from Onfire's LinkedIn people entity table (ONFIRE.PEOPLE) using the `query_onfire` tool. Use when the user wants to find prospects by job title, company, location, seniority, skills, or keywords in their profile — phrases like "find engineers at Stripe", "who are the VPs of Security at banks in the US", "show me people with 'Splunk' in their job summary", "look up this LinkedIn URL", or any people search that doesn't require Forschung's cross-database scoring.
 ---
 
 # entity-people-search
 
-Direct SQL lookup against `GOLD.ENTITIES.PEOPLE` via `query_onfire`.
+Direct SQL lookup against `ONFIRE.PEOPLE` via `query_onfire`.
 No external API hop — query the canonical LinkedIn people entity table straight.
 
 ## When to use this
@@ -58,7 +58,7 @@ business filter. Bare table scans are blocked.
 SELECT
     LINKEDIN_URL, FULL_NAME, JOB_TITLE, JOB_TITLE_LEVELS,
     JOB_SUMMARY, LOCATION_NAME, JOB_START_DATE
-FROM GOLD.ENTITIES.PEOPLE
+FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
   AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/company/capital-one%'
 ORDER BY JOB_START_DATE DESC NULLS LAST
@@ -70,7 +70,7 @@ LIMIT 50
 SELECT
     LINKEDIN_URL, FULL_NAME, JOB_TITLE, JOB_TITLE_LEVELS,
     JOB_COMPANY_NAME, JOB_COMPANY_LINKEDIN_URL, LOCATION_COUNTRY
-FROM GOLD.ENTITIES.PEOPLE
+FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
   AND JOB_TITLE ILIKE '%security engineer%'
   AND LOCATION_COUNTRY = 'United States'
@@ -83,7 +83,7 @@ SELECT
     LINKEDIN_URL, FULL_NAME, JOB_TITLE,
     JOB_COMPANY_LINKEDIN_URL, JOB_COMPANY_NAME,
     JOB_SUMMARY
-FROM GOLD.ENTITIES.PEOPLE
+FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
   AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/company/stripe%'
   AND (LOWER(JOB_SUMMARY) LIKE '%crowdstrike%'
@@ -96,7 +96,7 @@ LIMIT 30
 SELECT
     LINKEDIN_URL, FULL_NAME, JOB_TITLE, JOB_TITLE_LEVELS,
     JOB_COMPANY_NAME, JOB_COMPANY_INDUSTRY, LOCATION_COUNTRY
-FROM GOLD.ENTITIES.PEOPLE
+FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
   AND ARRAY_CONTAINS('vp'::VARIANT, JOB_TITLE_LEVELS)
   AND JOB_COMPANY_INDUSTRY ILIKE '%financial%'
@@ -106,7 +106,7 @@ LIMIT 100
 ### By LinkedIn URL (single person lookup)
 ```sql
 SELECT *
-FROM GOLD.ENTITIES.PEOPLE
+FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
   AND LINKEDIN_URL = 'https://www.linkedin.com/in/johndoe'
 LIMIT 1

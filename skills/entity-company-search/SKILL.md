@@ -1,11 +1,11 @@
 ---
 name: entity-company-search
-description: Search for companies directly from Onfire's LinkedIn company entity table (GOLD.ENTITIES.COMPANIES) using the `query_onfire` tool. Use when the user wants company firmographics, technology stacks, funding data, or social URLs — phrases like "find fintech companies in Israel with 50-200 employees", "look up Stripe's company data", "which companies in our list are publicly traded", "get the Discord URL for JFrog", or any company lookup that can be answered with SQL filters on LinkedIn company data.
+description: Search for companies directly from Onfire's LinkedIn company entity table (ONFIRE.COMPANIES) using the `query_onfire` tool. Use when the user wants company firmographics, technology stacks, funding data, or social URLs — phrases like "find fintech companies in Israel with 50-200 employees", "look up Stripe's company data", "which companies in our list are publicly traded", "get the Discord URL for JFrog", or any company lookup that can be answered with SQL filters on LinkedIn company data.
 ---
 
 # entity-company-search
 
-Direct SQL lookup against `GOLD.ENTITIES.COMPANIES` via `query_onfire`.
+Direct SQL lookup against `ONFIRE.COMPANIES` via `query_onfire`.
 The canonical LinkedIn company entity table — firmographics, technologies,
 funding, social channels, and enriched metadata in one place.
 
@@ -70,7 +70,7 @@ SELECT
     LINKEDIN_URL, NAME, WEBSITE, SIZE, INDUSTRY,
     EMPLOYEE_COUNT, LOCATION_COUNTRY, COMPANY_TYPE,
     FUNDING_ROUNDS_LAST_ROUND_TYPE, FUNDING_ROUNDS_LAST_ROUND_DATE
-FROM GOLD.ENTITIES.COMPANIES
+FROM ONFIRE.COMPANIES
 WHERE DELETED_AT IS NULL
   AND DOMAIN = 'stripe.com'
 LIMIT 1
@@ -81,7 +81,7 @@ LIMIT 1
 SELECT
     LINKEDIN_URL, NAME, WEBSITE, SIZE, EMPLOYEE_COUNT,
     LOCATION_COUNTRY, LOCATION_NAME, IS_B2B
-FROM GOLD.ENTITIES.COMPANIES
+FROM ONFIRE.COMPANIES
 WHERE DELETED_AT IS NULL
   AND INDUSTRY ILIKE '%cybersecurity%'
   AND SIZE IN ('201-500', '501-1000')
@@ -95,7 +95,7 @@ LIMIT 100
 SELECT
     LINKEDIN_URL, NAME, WEBSITE, SIZE, INDUSTRY,
     TECHNOLOGIES, LOCATION_COUNTRY
-FROM GOLD.ENTITIES.COMPANIES
+FROM ONFIRE.COMPANIES
 WHERE DELETED_AT IS NULL
   AND ARRAY_CONTAINS('Kubernetes'::VARIANT, TECHNOLOGIES)
   AND IS_B2B = TRUE
@@ -110,7 +110,7 @@ SELECT
     FUNDING_ROUNDS_LAST_ROUND_DATE,
     FUNDING_ROUNDS_LAST_ROUND_MONEY_RAISED,
     LOCATION_COUNTRY
-FROM GOLD.ENTITIES.COMPANIES
+FROM ONFIRE.COMPANIES
 WHERE DELETED_AT IS NULL
   AND FUNDING_ROUNDS_LAST_ROUND_TYPE = 'Series B'
   AND FUNDING_ROUNDS_LAST_ROUND_DATE >= '2025-01-01'
@@ -124,7 +124,7 @@ LIMIT 50
 SELECT
     LINKEDIN_URL, NAME, DOMAIN, SIZE, INDUSTRY,
     EMPLOYEE_COUNT, IS_B2B, COMPANY_TYPE
-FROM GOLD.ENTITIES.COMPANIES
+FROM ONFIRE.COMPANIES
 WHERE DELETED_AT IS NULL
   AND DOMAIN IN ('stripe.com', 'twilio.com', 'datadog.com', 'snowflake.com')
 LIMIT 50
@@ -135,7 +135,7 @@ LIMIT 50
 SELECT
     NAME, LINKEDIN_URL, GITHUB_URL, DISCORD_URL,
     REDDIT_URL, WEBSITE
-FROM GOLD.ENTITIES.COMPANIES
+FROM ONFIRE.COMPANIES
 WHERE DELETED_AT IS NULL
   AND DOMAIN = 'jfrog.com'
 LIMIT 1

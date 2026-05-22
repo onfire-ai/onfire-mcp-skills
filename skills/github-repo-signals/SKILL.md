@@ -1,11 +1,11 @@
 ---
 name: github-repo-signals
-description: Find people who starred or forked GitHub repositories using the `query_onfire` tool against GOLD.EVIDENCES.EVIDENCES (evidence_type_id = 6). Use when the user wants to know who interacted with a GitHub repo, find developers who starred repos related to a technology or vendor, or check if people from a specific company engaged with a repo — phrases like "who starred any JFrog repo", "engineers who forked a Kubernetes repo", "did anyone from Stripe interact with our GitHub", "find developers in India interested in open-source security tools", or any GitHub repo engagement lookup.
+description: Find people who starred or forked GitHub repositories using the `query_onfire` tool against ONFIRE.EVIDENCES (evidence_type_id = 6). Use when the user wants to know who interacted with a GitHub repo, find developers who starred repos related to a technology or vendor, or check if people from a specific company engaged with a repo — phrases like "who starred any JFrog repo", "engineers who forked a Kubernetes repo", "did anyone from Stripe interact with our GitHub", "find developers in India interested in open-source security tools", or any GitHub repo engagement lookup.
 ---
 
 # github-repo-signals
 
-SQL lookup against `GOLD.EVIDENCES.EVIDENCES` (evidence_type_id = 6) via
+SQL lookup against `ONFIRE.EVIDENCES` (evidence_type_id = 6) via
 `query_onfire`. This table captures every recorded GitHub star/fork event —
 who interacted with a repo, their job title, company, and location at the
 time of the interaction.
@@ -34,8 +34,10 @@ Same `EVIDENCES` table as community-join-signals, different `evidence_type_id`.
 | `EVIDENCE_ID` | TEXT | Unique event ID |
 | `PERSON_LINKEDIN_URL` | TEXT | Person who starred/forked |
 | `COMPANY_LINKEDIN_URL` | TEXT | Their employer at time of activity |
-| `START_DATE` | DATE | Date of the GitHub interaction |
+| `START_DATE` | DATE | **Actual date of the GitHub interaction** (star/fork) — use this for date filtering |
 | `EVIDENCE_TYPE_ID` | NUMBER | Always **6** for GitHub activity |
+| `CREATED_AT` | TIMESTAMP | When Onfire **collected** this record — not when the star/fork happened |
+| `UPDATED_AT` | TIMESTAMP | When Onfire **last refreshed** this record — not when the star/fork happened |
 | `DELETED_AT` | TEXT | Always filter `IS NULL` |
 
 ### PAYLOAD fields (use `::VARCHAR` cast)
@@ -70,7 +72,7 @@ SELECT
     PAYLOAD:JOB_TITLE::VARCHAR         AS job_title,
     PAYLOAD:JOB_COMPANY_NAME::VARCHAR  AS job_company_name,
     PAYLOAD:LOCATION_COUNTRY::VARCHAR  AS location_country
-FROM GOLD.EVIDENCES.EVIDENCES
+FROM ONFIRE.EVIDENCES
 WHERE evidence_type_id = 6
   AND deleted_at IS NULL
   AND PAYLOAD:REPO_NAME::VARCHAR ILIKE '%sonatype%'
@@ -87,7 +89,7 @@ SELECT
     PAYLOAD:REPO_NAME::VARCHAR         AS repo_name,
     PAYLOAD:JOB_TITLE::VARCHAR         AS job_title,
     PAYLOAD:LOCATION_COUNTRY::VARCHAR  AS location_country
-FROM GOLD.EVIDENCES.EVIDENCES
+FROM ONFIRE.EVIDENCES
 WHERE evidence_type_id = 6
   AND deleted_at IS NULL
   AND PAYLOAD:REPO_NAME::VARCHAR ILIKE '%kubernetes%'
@@ -103,7 +105,7 @@ SELECT
     start_date,
     PAYLOAD:REPO_NAME::VARCHAR         AS repo_name,
     PAYLOAD:JOB_TITLE::VARCHAR         AS job_title
-FROM GOLD.EVIDENCES.EVIDENCES
+FROM ONFIRE.EVIDENCES
 WHERE evidence_type_id = 6
   AND deleted_at IS NULL
   AND company_linkedin_url ILIKE '%/company/capital-one%'
@@ -120,7 +122,7 @@ SELECT
     PAYLOAD:REPO_NAME::VARCHAR         AS repo_name,
     PAYLOAD:JOB_TITLE::VARCHAR         AS job_title,
     PAYLOAD:JOB_COMPANY_NAME::VARCHAR  AS job_company_name
-FROM GOLD.EVIDENCES.EVIDENCES
+FROM ONFIRE.EVIDENCES
 WHERE evidence_type_id = 6
   AND deleted_at IS NULL
   AND PAYLOAD:REPO_NAME::VARCHAR ILIKE '%security%'
@@ -134,7 +136,7 @@ LIMIT 200
 SELECT
     PAYLOAD:REPO_NAME::VARCHAR         AS repo_name,
     COUNT(DISTINCT person_linkedin_url) AS unique_people
-FROM GOLD.EVIDENCES.EVIDENCES
+FROM ONFIRE.EVIDENCES
 WHERE evidence_type_id = 6
   AND deleted_at IS NULL
   AND person_linkedin_url IN (
@@ -154,7 +156,7 @@ SELECT
     start_date,
     PAYLOAD:REPO_NAME::VARCHAR         AS repo_name,
     PAYLOAD:JOB_COMPANY_NAME::VARCHAR  AS job_company_name
-FROM GOLD.EVIDENCES.EVIDENCES
+FROM ONFIRE.EVIDENCES
 WHERE evidence_type_id = 6
   AND deleted_at IS NULL
   AND PAYLOAD:REPO_NAME::VARCHAR ILIKE '%jfrog%'
@@ -175,6 +177,7 @@ LIMIT 500
 ## Common pitfalls
 
 - **Wrong `evidence_type_id`** — GitHub activity is **6**; community joins are 7. Don't mix them.
+- **`CREATED_AT` / `UPDATED_AT` are NOT the interaction date** — they reflect when Onfire collected or refreshed the record. For "when did this person star/fork", always use `START_DATE`.
 - **PAYLOAD fields without cast** — always `::VARCHAR`, otherwise you get a VARIANT.
 - **`LOCATION_COUNTRY` is lowercase** in PAYLOAD — use lowercase values: `'india'` not `'India'`.
 - **Re-running for follow-ups** — slice the existing dataset with `query_datasets`.

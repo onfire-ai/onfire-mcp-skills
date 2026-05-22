@@ -1,6 +1,6 @@
 ---
 name: company-growth-trends
-description: Query monthly headcount growth and technology/persona adoption trends for companies using the `query_onfire` tool against SILVER.INSIGHTS.GROWTH_INSIGHT_MONTHLY and SILVER.INSIGHTS.GROWTH_TOTAL_HEADCOUNT_MONTHLY. Use when the user wants to know if a company is hiring or contracting, whether a specific technology is spreading within a company, or how headcount growth compares to tech adoption — phrases like "is Acme growing?", "is EDR adoption growing at these accounts?", "compare CrowdStrike vs total headcount trend at Palo Alto Networks", "which accounts are shrinking?", "is the data engineering team at Snowflake expanding?", or any month-over-month growth question.
+description: Query monthly headcount growth and technology/persona adoption trends for companies using the `query_onfire` tool against ONFIRE.GROWTH_INSIGHT_MONTHLY and ONFIRE.GROWTH_TOTAL_HEADCOUNT_MONTHLY. Use when the user wants to know if a company is hiring or contracting, whether a specific technology is spreading within a company, or how headcount growth compares to tech adoption — phrases like "is Acme growing?", "is EDR adoption growing at these accounts?", "compare CrowdStrike vs total headcount trend at Palo Alto Networks", "which accounts are shrinking?", "is the data engineering team at Snowflake expanding?", or any month-over-month growth question.
 ---
 
 # company-growth-trends
@@ -9,8 +9,8 @@ SQL queries against two sibling Silver tables via `query_onfire`:
 
 | Table | What it measures |
 |-------|-----------------|
-| `SILVER.INSIGHTS.GROWTH_INSIGHT_MONTHLY` | Month-over-month % change in employees evidencing a specific technology or persona (e.g. CrowdStrike, data engineer) |
-| `SILVER.INSIGHTS.GROWTH_TOTAL_HEADCOUNT_MONTHLY` | Month-over-month % change in the company's *total* headcount |
+| `ONFIRE.GROWTH_INSIGHT_MONTHLY` | Month-over-month % change in employees evidencing a specific technology or persona (e.g. CrowdStrike, data engineer) |
+| `ONFIRE.GROWTH_TOTAL_HEADCOUNT_MONTHLY` | Month-over-month % change in the company's *total* headcount |
 
 Both tables have the same column shape and are often UNION'd together so
 you can see whether a tech is growing faster than the overall company.
@@ -25,7 +25,7 @@ you can see whether a tech is growing faster than the overall company.
 - Any month-over-month growth / trend question for companies
 
 Skip this for:
-- Current headcount or employee count → query `GOLD.ENTITIES.COMPANIES.EMPLOYEE_COUNT`
+- Current headcount or employee count → query `ONFIRE.COMPANIES.EMPLOYEE_COUNT`
 - Employees *using* a technology right now → use `employee-footprint` skill
 
 ## Table structure (same for both tables)
@@ -60,7 +60,7 @@ SELECT
     company_website,
     time_period,
     TRY_CAST(str_value AS FLOAT) AS growth_pct
-FROM SILVER.INSIGHTS.GROWTH_TOTAL_HEADCOUNT_MONTHLY
+FROM ONFIRE.GROWTH_TOTAL_HEADCOUNT_MONTHLY
 WHERE deleted_at IS NULL
   AND str_value IS NOT NULL
   AND company_linkedin_url ILIKE '%/company/capital-one%'
@@ -75,7 +75,7 @@ SELECT
     insight_name,
     time_period,
     TRY_CAST(str_value AS FLOAT) AS growth_pct
-FROM SILVER.INSIGHTS.GROWTH_INSIGHT_MONTHLY
+FROM ONFIRE.GROWTH_INSIGHT_MONTHLY
 WHERE deleted_at IS NULL
   AND str_value IS NOT NULL
   AND company_linkedin_url ILIKE '%/company/capital-one%'
@@ -92,7 +92,7 @@ SELECT
     insight_name,
     time_period,
     TRY_CAST(str_value AS FLOAT)        AS growth_pct
-FROM SILVER.INSIGHTS.GROWTH_INSIGHT_MONTHLY
+FROM ONFIRE.GROWTH_INSIGHT_MONTHLY
 WHERE deleted_at IS NULL
   AND str_value IS NOT NULL
   AND company_linkedin_url ILIKE '%/company/palo-alto-networks%'
@@ -106,7 +106,7 @@ SELECT
     insight_name,
     time_period,
     TRY_CAST(str_value AS FLOAT)        AS growth_pct
-FROM SILVER.INSIGHTS.GROWTH_TOTAL_HEADCOUNT_MONTHLY
+FROM ONFIRE.GROWTH_TOTAL_HEADCOUNT_MONTHLY
 WHERE deleted_at IS NULL
   AND str_value IS NOT NULL
   AND company_linkedin_url ILIKE '%/company/palo-alto-networks%'
@@ -121,7 +121,7 @@ SELECT
     insight_name,
     time_period,
     TRY_CAST(str_value AS FLOAT) AS growth_pct
-FROM SILVER.INSIGHTS.GROWTH_INSIGHT_MONTHLY
+FROM ONFIRE.GROWTH_INSIGHT_MONTHLY
 WHERE deleted_at IS NULL
   AND str_value IS NOT NULL
   AND company_linkedin_url ILIKE '%/company/snowflake%'
@@ -137,7 +137,7 @@ SELECT
     company_website,
     time_period,
     TRY_CAST(str_value AS FLOAT) AS growth_pct
-FROM SILVER.INSIGHTS.GROWTH_TOTAL_HEADCOUNT_MONTHLY
+FROM ONFIRE.GROWTH_TOTAL_HEADCOUNT_MONTHLY
 WHERE deleted_at IS NULL
   AND str_value IS NOT NULL
   AND company_linkedin_url IN (
@@ -147,7 +147,7 @@ WHERE deleted_at IS NULL
   )
   AND time_period = (
       SELECT MAX(time_period)
-      FROM SILVER.INSIGHTS.GROWTH_TOTAL_HEADCOUNT_MONTHLY
+      FROM ONFIRE.GROWTH_TOTAL_HEADCOUNT_MONTHLY
       WHERE deleted_at IS NULL
   )
 ORDER BY growth_pct DESC NULLS LAST

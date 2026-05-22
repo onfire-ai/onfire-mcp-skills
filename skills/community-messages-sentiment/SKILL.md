@@ -115,7 +115,7 @@ Only re-run `community_messages_sentiment` when the user genuinely changes the i
 - Always offer `download_dataset` after a successful call. The user shouldn't have to ask.
 - When `truncated_to_limit` is true, **lead with the sampling caveat** before quoting numbers.
 - For drill-downs, use `query_datasets` against the existing `dataset_id` — never re-run for slicing.
-- Don't quote the `message_text` field as gospel — it's truncated to 500 chars in the dataset. If the user wants full text, query the source row by `message_id` in Snowflake (`silver.community_messages.int_messages_with_linkedin`).
+- Don't quote the `message_text` field as gospel — it's truncated to 500 chars in the dataset. If the user wants the full text of a specific message, let them know it isn't available through the MCP tools.
 - Don't conflate "the keyword appeared" with "the community has an opinion." That's exactly what `irrelevant` exists to separate.
 - The LinkedIn URLs in the dataset are the **message authors**, not the topic. If the user asks "who at Sonatype is being talked about", that's a different question — say so.
 

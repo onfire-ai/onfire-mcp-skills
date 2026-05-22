@@ -1,11 +1,11 @@
 ---
 name: employee-footprint
-description: Find employees at a target company whose LinkedIn profiles mention specific technology or competitor keywords using the `query_onfire` tool against GOLD.ENTITIES.PEOPLE. Use when the user wants proof a product is deployed at an account, wants a competitor footprint cut, or needs evidence sentences from employee profiles — phrases like "who at Capital One mentions CrowdStrike", "find FortiGate users at Cisco", "do any Stripe engineers mention Kubernetes in their profile", "show me the CrowdStrike footprint at Palo Alto Networks", or any keyword-based employee profile lookup at a specific company.
+description: Find employees at a target company whose LinkedIn profiles mention specific technology or competitor keywords using the `query_onfire` tool against ONFIRE.PEOPLE. Use when the user wants proof a product is deployed at an account, wants a competitor footprint cut, or needs evidence sentences from employee profiles — phrases like "who at Capital One mentions CrowdStrike", "find FortiGate users at Cisco", "do any Stripe engineers mention Kubernetes in their profile", "show me the CrowdStrike footprint at Palo Alto Networks", or any keyword-based employee profile lookup at a specific company.
 ---
 
 # employee-footprint
 
-SQL lookup against `GOLD.ENTITIES.PEOPLE` via `query_onfire`. Match
+SQL lookup against `ONFIRE.PEOPLE` via `query_onfire`. Match
 employees whose `JOB_SUMMARY` (current role description), `SUMMARY`
 (career bio), or `JOB_TITLE` contains a product or competitor keyword —
 the strongest signal of in-production deployment at an account.
@@ -60,7 +60,7 @@ SELECT
     JOB_SUMMARY,
     LOCATION_NAME,
     JOB_START_DATE
-FROM GOLD.ENTITIES.PEOPLE
+FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
   AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/capital-one%'
   AND (
@@ -80,7 +80,7 @@ SELECT
     JOB_TITLE,
     JOB_SUMMARY,
     LOCATION_NAME
-FROM GOLD.ENTITIES.PEOPLE
+FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
   AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/cisco%'
   AND (
@@ -102,7 +102,7 @@ SELECT
         ELSE 'other'
     END                                    AS matched_keyword,
     COUNT(DISTINCT LINKEDIN_URL)           AS employee_count
-FROM GOLD.ENTITIES.PEOPLE
+FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
   AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/capital-one%'
   AND (
@@ -119,7 +119,7 @@ ORDER BY employee_count DESC
 SELECT
     JOB_COMPANY_LINKEDIN_URL,
     COUNT(DISTINCT LINKEDIN_URL) AS employees_mentioning_keyword
-FROM GOLD.ENTITIES.PEOPLE
+FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
   AND JOB_COMPANY_LINKEDIN_URL IN (
       'https://www.linkedin.com/company/stripe',
@@ -142,7 +142,7 @@ SELECT
     JOB_TITLE,
     JOB_SUMMARY,
     LOCATION_NAME
-FROM GOLD.ENTITIES.PEOPLE
+FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
   AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/capital-one%'
   AND (
