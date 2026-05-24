@@ -1,29 +1,26 @@
 ---
 name: hiring-signals
-description: Find open job posts and their hiring managers at target companies using the `query_onfire` tool against ONFIRE.HIRING_MANAGER_SIGNAL. Use when the user wants to know what roles a company is actively hiring for, who the hiring manager is, which companies are hiring for a technology or skill, what open positions signal budget or expansion, or who to reach out to at an account — phrases like "what is Stripe hiring for?", "who is the hiring manager for the DevOps role at Cisco?", "find VP-level hiring managers at my target accounts", "which accounts are expanding their security team?", "who should I reach out to about our Kubernetes tool?", "find buyers at companies hiring AI engineers", or any job posting or hiring signal lookup.
+description: Find open job postings at target companies using the `query_onfire` tool against SILVER.JOB_POST.STG_JOB_POSTS. Use when the user wants to know what roles a company is actively hiring for, where they're hiring, what seniority they're posting, which companies are hiring for a technology or skill, what open positions signal budget or expansion - phrases like "what is Stripe hiring for?", "find VP-level roles at my target accounts", "which accounts are expanding their security team?", "find buyers at companies hiring AI engineers", "show open data engineer roles in EMEA", or any job posting / hiring signal lookup.
 compatibility:
   tools:
     - query_onfire
-    - contact_data_enrichment
 ---
 
 # hiring-signals
 
-SQL lookup against `ONFIRE.HIRING_MANAGER_SIGNAL` via `query_onfire`.
-Each row = one job posting paired with the LinkedIn profile of the hiring manager —
-the person responsible for filling the role. Useful for identifying budget signals,
-expansion areas, and warm contacts at target accounts.
+SQL lookup against `SILVER.JOB_POST.STG_JOB_POSTS` via `query_onfire`.
+Each row = one job posting captured from LinkedIn Jobs. Use this to identify
+budget signals, expansion areas, and the geographic / seniority shape of a
+company's open requisitions.
 
 ## When to use this
 
 - "What is Capital One actively hiring for right now?"
-- "Who is the hiring manager for the Data Engineer role at Scry AI?"
 - "Find companies hiring Kubernetes or Python engineers"
 - "Which of our target accounts are expanding their security team?"
-- "Find VP/Director-level hiring managers at my target accounts"
-- "Who's the right person to reach out to about our DevOps tool at Stripe?"
-- "Which companies have a senior buyer actively hiring for AI/ML?"
 - "Show me all open DevSecOps roles posted in the last 30 days"
+- "What's the geographic shape of Cloudsmith's open postings?"
+- "Which accounts have the most active postings in EMEA right now?"
 - Any job posting lookup or hiring signal question
 
 Skip this for:
@@ -33,274 +30,217 @@ Skip this for:
 
 ## Table structure
 
-Each row = one job posting paired with the person who posted it.
+`SILVER.JOB_POST.STG_JOB_POSTS` - each row = one job posting captured from
+LinkedIn Jobs.
 
 | Column | Type | Notes |
-|--------|------|-------|
-| `ID` | TEXT | Unique job post ID (e.g. `"LinkedinJobs_3681433407"`) |
-| `NAME` | TEXT | Hiring manager's full name (lowercase) |
-| `CONTACT_LINKEDIN_URL` | TEXT | Hiring manager's LinkedIn profile — primary outreach target |
-| `COMPANY_LINKEDIN_URL` | TEXT | Company LinkedIn URL — use for account filtering |
+|---|---|---|
+| `ID` | TEXT | Unique job post ID (e.g. `"LinkedinJobs_4068734982"`) |
+| `DATE_POSTED` | TIMESTAMP | Original posting date on LinkedIn. **Use this for date filtering.** |
+| `COMPANY_LINKEDIN_URL` | TEXT | Company LinkedIn URL - use for account filtering. Format `linkedin.com/company/<slug>` (no `https://www.`). |
 | `COMPANY_NAME` | TEXT | Company display name |
-| `SHORT_SUMMARY` | TEXT | AI-generated one-liner: "[Name] is the hiring manager for [role] at [company]" |
-| `JOB_POST_JOB_TITLE` | TEXT | Title of the open role |
-| `JOB_POST_SENIORITY` | TEXT | Seniority of the open role (see values below) |
-| `PERSON_JOB_TITLE` | TEXT | **Hiring manager's own current job title** |
-| `PERSON_SENIORITY` | TEXT | **Hiring manager's seniority slug** (see values below) |
-| `SIGNAL_TYPE` | TEXT | Always `"hiring_manager"` |
-| `PERSONA_INSIGHTS` | TEXT | Comma-separated tech keywords and persona tags extracted from the job post text |
-| `JOB_POST_TEXT` | TEXT | Full job description — very long, avoid selecting unless explicitly needed |
-| `DATE` | TIMESTAMP | Date the job was posted |
-| `SOURCE_LINK` | TEXT | Direct URL to the job posting |
-| `SOURCE_NAME` | TEXT | Source platform (always `"LinkedIn Jobs"`) |
-| `CREATED_AT` | TIMESTAMP | When Onfire ingested this record — not the post date |
-| `LAST_RUN_AT` | TIMESTAMP | When Onfire last refreshed this record — not the post date |
-| `DELETED_AT` | TIMESTAMP | Soft-delete marker — **always filter `IS NULL`** |
-| `PAYLOAD` | VARIANT | Reserved — typically null |
+| `COMPANY_ID` | TEXT | Internal company ID |
+| `COUNTRY` | TEXT | Country of the role (e.g. `"United Kingdom"`, `"United States"`, `"Ireland"`, `"India"`) |
+| `LOCATION` | TEXT | Lowercased city / region / country string (e.g. `"belfast, northern ireland, united kingdom"`) |
+| `JOB_TEXT` | TEXT | Full job description. **Very long - avoid selecting unless explicitly needed.** |
+| `JOB_POST_TITLE` | TEXT | Title of the open role (e.g. `"Senior Application Security Engineer"`) |
+| `JOB_FUNCTION` | TEXT | LinkedIn job-function classification (e.g. `"information technology"`, `"engineering and information technology"`, `"management and manufacturing"`) |
+| `SENIORITY_JOB` | TEXT | Seniority level (see values below) |
+| `JOB_POST_SENIORITY_SCORE` | NUMBER | Numeric seniority score (0 = lower, higher = more senior) |
+| `EMPLOYMENT_TYPE` | TEXT | `"Full-time"`, `"Part-time"`, `"Contract"`, `"Internship"` |
+| `EXTERNAL_URL` | TEXT | The company's own careers-page URL when present (e.g. `careers.cloudsmith.com/...`); often null |
+| `REDIRECTED_URL` | TEXT | The LinkedIn Jobs URL for the posting |
+| `APPLICATION_ACTIVE` | NUMBER | `1` if the posting is currently active, `0` if closed / filled |
+| `PAYLOAD_LAST_UPDATED` | TIMESTAMP | When the source payload was last updated |
+| `LAST_UPDATED_TIME` | TIMESTAMP | When Onfire last refreshed this record |
+| `LAST_UPDATED_SRC` | TIMESTAMP | When the source last touched this record |
 
-### `PERSON_SENIORITY` values (hiring manager's level)
-`seniority_executive`, `seniority_director`, `seniority_manager`,
-`seniority_teamlead`, `seniority_senior`, `seniority_mid`, `seniority_junior`
+### `SENIORITY_JOB` values
+LinkedIn-standard strings: `"Entry level"`, `"Associate"`, `"Mid-Senior level"`,
+`"Director"`, `"Executive"`, `"Internship"`, `"Not Applicable"` (when LinkedIn
+did not classify the role).
 
-### `JOB_POST_SENIORITY` values (level of the open role)
-`"Entry level"`, `"Associate"`, `"Mid-Senior level"`, `"Director"`, `"Executive"`, `"Internship"`
+### No `DELETED_AT` column
+This table does NOT have a soft-delete column. Do NOT include
+`DELETED_AT IS NULL` - the query will fail.
 
-### Key distinction: `PERSON_*` vs `JOB_POST_*`
-
-| Field group | What it describes |
-|---|---|
-| `PERSON_JOB_TITLE`, `PERSON_SENIORITY` | The **hiring manager** — who you want to talk to |
-| `JOB_POST_JOB_TITLE`, `JOB_POST_SENIORITY` | The **open role** — what they're expanding |
-
-A `seniority_director` posting a `"Mid-Senior level"` role = a director-level buyer expanding their team.
-Filter on `PERSON_SENIORITY` to target buyers; filter on `JOB_POST_SENIORITY` to understand what they're building.
-
-## Required WHERE clause
-
-```sql
-WHERE deleted_at IS NULL
-```
+Use `APPLICATION_ACTIVE = 1` to scope to currently open roles.
 
 ## SQL templates
 
-### What is a company actively hiring for?
+### What is a company actively hiring for right now?
 ```sql
-SELECT
-    JOB_POST_JOB_TITLE,
-    JOB_POST_SENIORITY,
-    NAME                AS hiring_manager,
-    PERSON_JOB_TITLE,
-    PERSON_SENIORITY,
-    CONTACT_LINKEDIN_URL,
-    SHORT_SUMMARY,
-    DATE,
-    SOURCE_LINK
-FROM ONFIRE.HIRING_MANAGER_SIGNAL
-WHERE deleted_at IS NULL
-  AND COMPANY_LINKEDIN_URL ILIKE '%/company/capital-one%'
-ORDER BY DATE DESC NULLS LAST
+SELECT JOB_POST_TITLE,
+       SENIORITY_JOB,
+       JOB_FUNCTION,
+       COUNTRY,
+       LOCATION,
+       DATE_POSTED,
+       REDIRECTED_URL
+FROM SILVER.JOB_POST.STG_JOB_POSTS
+WHERE LOWER(COMPANY_LINKEDIN_URL) = 'linkedin.com/company/capital-one'
+  AND APPLICATION_ACTIVE = 1
+ORDER BY DATE_POSTED DESC NULLS LAST
 LIMIT 50
 ```
 
-### Find roles by keyword (title or job post text)
+### Postings dated in a specific window (e.g. last quarter)
 ```sql
-SELECT
-    COMPANY_NAME,
-    COMPANY_LINKEDIN_URL,
-    JOB_POST_JOB_TITLE,
-    JOB_POST_SENIORITY,
-    NAME                AS hiring_manager,
-    PERSON_JOB_TITLE,
-    PERSON_SENIORITY,
-    CONTACT_LINKEDIN_URL,
-    DATE,
-    SOURCE_LINK
-FROM ONFIRE.HIRING_MANAGER_SIGNAL
-WHERE deleted_at IS NULL
+SELECT JOB_POST_TITLE,
+       SENIORITY_JOB,
+       COUNTRY,
+       LOCATION,
+       DATE_POSTED,
+       APPLICATION_ACTIVE,
+       REDIRECTED_URL
+FROM SILVER.JOB_POST.STG_JOB_POSTS
+WHERE LOWER(COMPANY_LINKEDIN_URL) = 'linkedin.com/company/cloudsmith'
+  AND DATE_POSTED BETWEEN '2026-01-01' AND '2026-03-31'
+ORDER BY DATE_POSTED
+```
+
+### Find roles by keyword (title or full job text)
+```sql
+SELECT COMPANY_NAME,
+       COMPANY_LINKEDIN_URL,
+       JOB_POST_TITLE,
+       SENIORITY_JOB,
+       COUNTRY,
+       LOCATION,
+       DATE_POSTED,
+       REDIRECTED_URL
+FROM SILVER.JOB_POST.STG_JOB_POSTS
+WHERE APPLICATION_ACTIVE = 1
   AND (
-      JOB_POST_JOB_TITLE ILIKE '%kubernetes%'
-   OR PERSONA_INSIGHTS   ILIKE '%kubernetes%'
+        JOB_POST_TITLE ILIKE '%kubernetes%'
+     OR JOB_TEXT       ILIKE '%kubernetes%'
   )
-ORDER BY DATE DESC NULLS LAST
+ORDER BY DATE_POSTED DESC NULLS LAST
 LIMIT 100
 ```
 
-### Target accounts hiring for a technology — who is doing the hiring?
+### Target accounts hiring for a technology
 ```sql
-SELECT
-    COMPANY_NAME,
-    NAME                AS hiring_manager,
-    PERSON_JOB_TITLE,
-    PERSON_SENIORITY,
-    CONTACT_LINKEDIN_URL,
-    JOB_POST_JOB_TITLE,
-    DATE
-FROM ONFIRE.HIRING_MANAGER_SIGNAL
-WHERE deleted_at IS NULL
-  AND COMPANY_LINKEDIN_URL IN (
-      'https://www.linkedin.com/company/stripe',
-      'https://www.linkedin.com/company/twilio',
-      'https://www.linkedin.com/company/datadog'
-  )
+SELECT COMPANY_NAME,
+       JOB_POST_TITLE,
+       SENIORITY_JOB,
+       COUNTRY,
+       LOCATION,
+       DATE_POSTED
+FROM SILVER.JOB_POST.STG_JOB_POSTS
+WHERE APPLICATION_ACTIVE = 1
+  AND LOWER(COMPANY_LINKEDIN_URL) IN (
+        'linkedin.com/company/stripe',
+        'linkedin.com/company/twilio',
+        'linkedin.com/company/datadog'
+      )
   AND (
-      JOB_POST_JOB_TITLE ILIKE '%security%'
-   OR PERSONA_INSIGHTS   ILIKE '%security%'
+        JOB_POST_TITLE ILIKE '%security%'
+     OR JOB_TEXT       ILIKE '%security%'
   )
-ORDER BY DATE DESC NULLS LAST
+ORDER BY DATE_POSTED DESC NULLS LAST
 LIMIT 100
 ```
 
-### Senior buyers (director+) at target accounts — budget owners expanding their team
+### Senior roles only (Director / Executive) at target accounts
 ```sql
-SELECT
-    COMPANY_NAME,
-    NAME                AS hiring_manager,
-    PERSON_JOB_TITLE,
-    PERSON_SENIORITY,
-    CONTACT_LINKEDIN_URL,
-    JOB_POST_JOB_TITLE,
-    PERSONA_INSIGHTS,
-    DATE
-FROM ONFIRE.HIRING_MANAGER_SIGNAL
-WHERE deleted_at IS NULL
-  AND PERSON_SENIORITY IN ('seniority_executive', 'seniority_director')
-  AND COMPANY_LINKEDIN_URL ILIKE '%/company/cisco%'
-ORDER BY DATE DESC NULLS LAST
+SELECT COMPANY_NAME,
+       JOB_POST_TITLE,
+       SENIORITY_JOB,
+       COUNTRY,
+       LOCATION,
+       DATE_POSTED
+FROM SILVER.JOB_POST.STG_JOB_POSTS
+WHERE APPLICATION_ACTIVE = 1
+  AND SENIORITY_JOB IN ('Director','Executive')
+  AND LOWER(COMPANY_LINKEDIN_URL) = 'linkedin.com/company/cisco'
+ORDER BY DATE_POSTED DESC NULLS LAST
 LIMIT 50
 ```
 
-### Unique hiring managers at an account (one row per person, not per job post)
+### Hiring volume as a growth signal - which target accounts are expanding fastest?
 ```sql
-SELECT
-    NAME                AS hiring_manager,
-    PERSON_JOB_TITLE,
-    PERSON_SENIORITY,
-    CONTACT_LINKEDIN_URL,
-    COUNT(*)            AS roles_posted,
-    MAX(DATE)           AS most_recent_post
-FROM ONFIRE.HIRING_MANAGER_SIGNAL
-WHERE deleted_at IS NULL
-  AND COMPANY_LINKEDIN_URL ILIKE '%/company/cisco%'
-GROUP BY NAME, PERSON_JOB_TITLE, PERSON_SENIORITY, CONTACT_LINKEDIN_URL
-ORDER BY roles_posted DESC, most_recent_post DESC
-LIMIT 30
-```
-
-### Hiring volume as a growth signal — which accounts are expanding fastest?
-```sql
-SELECT
-    COMPANY_NAME,
-    COMPANY_LINKEDIN_URL,
-    COUNT(*) AS open_roles
-FROM ONFIRE.HIRING_MANAGER_SIGNAL
-WHERE deleted_at IS NULL
-  AND COMPANY_LINKEDIN_URL IN (
-      'https://www.linkedin.com/company/stripe',
-      'https://www.linkedin.com/company/twilio',
-      'https://www.linkedin.com/company/datadog'
-  )
-  AND DATE >= DATEADD(day, -30, CURRENT_DATE())
+SELECT COMPANY_NAME,
+       COMPANY_LINKEDIN_URL,
+       COUNT(*) AS open_roles
+FROM SILVER.JOB_POST.STG_JOB_POSTS
+WHERE APPLICATION_ACTIVE = 1
+  AND LOWER(COMPANY_LINKEDIN_URL) IN (
+        'linkedin.com/company/stripe',
+        'linkedin.com/company/twilio',
+        'linkedin.com/company/datadog'
+      )
 GROUP BY COMPANY_NAME, COMPANY_LINKEDIN_URL
 ORDER BY open_roles DESC
 LIMIT 20
 ```
 
-### Rank accounts by number of senior hiring managers active recently
+### Geographic shape of a company's open postings
 ```sql
-SELECT
-    COMPANY_NAME,
-    COMPANY_LINKEDIN_URL,
-    COUNT(DISTINCT CONTACT_LINKEDIN_URL) AS senior_hiring_managers
-FROM ONFIRE.HIRING_MANAGER_SIGNAL
-WHERE deleted_at IS NULL
-  AND PERSON_SENIORITY IN ('seniority_executive', 'seniority_director', 'seniority_manager')
-  AND DATE >= DATEADD(day, -90, CURRENT_DATE())
-GROUP BY COMPANY_NAME, COMPANY_LINKEDIN_URL
-ORDER BY senior_hiring_managers DESC
-LIMIT 25
+SELECT COUNTRY,
+       COUNT(*) AS open_roles
+FROM SILVER.JOB_POST.STG_JOB_POSTS
+WHERE APPLICATION_ACTIVE = 1
+  AND LOWER(COMPANY_LINKEDIN_URL) = 'linkedin.com/company/cloudsmith'
+GROUP BY COUNTRY
+ORDER BY open_roles DESC
 ```
 
-### Recent postings in a date window
+### Functional / seniority breakdown of open roles
 ```sql
-SELECT
-    COMPANY_NAME,
-    JOB_POST_JOB_TITLE,
-    JOB_POST_SENIORITY,
-    NAME                AS hiring_manager,
-    CONTACT_LINKEDIN_URL,
-    DATE,
-    SOURCE_LINK
-FROM ONFIRE.HIRING_MANAGER_SIGNAL
-WHERE deleted_at IS NULL
-  AND DATE >= DATEADD(day, -14, CURRENT_DATE())
+SELECT JOB_FUNCTION,
+       SENIORITY_JOB,
+       COUNT(*) AS n
+FROM SILVER.JOB_POST.STG_JOB_POSTS
+WHERE APPLICATION_ACTIVE = 1
+  AND LOWER(COMPANY_LINKEDIN_URL) = 'linkedin.com/company/cloudsmith'
+GROUP BY JOB_FUNCTION, SENIORITY_JOB
+ORDER BY n DESC
+```
+
+### Recent postings in a date window (across accounts)
+```sql
+SELECT COMPANY_NAME,
+       JOB_POST_TITLE,
+       SENIORITY_JOB,
+       COUNTRY,
+       DATE_POSTED,
+       REDIRECTED_URL
+FROM SILVER.JOB_POST.STG_JOB_POSTS
+WHERE DATE_POSTED >= DATEADD(day, -14, CURRENT_DATE())
+  AND APPLICATION_ACTIVE = 1
   AND (
-      JOB_POST_JOB_TITLE ILIKE '%devops%'
-   OR JOB_POST_JOB_TITLE ILIKE '%platform engineer%'
+        JOB_POST_TITLE ILIKE '%devops%'
+     OR JOB_POST_TITLE ILIKE '%platform engineer%'
   )
-ORDER BY DATE DESC
+ORDER BY DATE_POSTED DESC
 LIMIT 200
-```
-
-### Technology-specific hiring — use PERSONA_INSIGHTS for fuzzy tech matching
-```sql
-SELECT
-    COMPANY_NAME,
-    COMPANY_LINKEDIN_URL,
-    JOB_POST_JOB_TITLE,
-    PERSONA_INSIGHTS,
-    NAME                AS hiring_manager,
-    PERSON_JOB_TITLE,
-    PERSON_SENIORITY,
-    CONTACT_LINKEDIN_URL,
-    DATE
-FROM ONFIRE.HIRING_MANAGER_SIGNAL
-WHERE deleted_at IS NULL
-  AND PERSONA_INSIGHTS ILIKE '%crowdstrike%'
-ORDER BY DATE DESC NULLS LAST
-LIMIT 100
-```
-
-## Follow-up: enrich hiring managers with email / phone
-
-Once you have `CONTACT_LINKEDIN_URL` values, pass them to `contact_data_enrichment`
-to get verified emails and phone numbers. Use the two-phase consent flow for > 10 contacts.
-
-```
-contact_data_enrichment(
-    contacts=[...rows from query_onfire...],
-    linkedin_url_column="contact_linkedin_url",
-    account_website_column="company_linkedin_url",
-    person_name_column="hiring_manager",
-    include_email=True,
-    include_phone=True
-)
 ```
 
 ## Output handling
 
 `query_onfire` returns `dataset` handle + `preview_rows` (first 20).
 
-1. Lead the table with: `JOB_POST_JOB_TITLE`, `COMPANY_NAME`, `DATE`, `hiring_manager`, `PERSON_SENIORITY`, `CONTACT_LINKEDIN_URL`.
+1. Lead the table with: `JOB_POST_TITLE`, `COMPANY_NAME`, `DATE_POSTED`, `SENIORITY_JOB`, `COUNTRY`, `LOCATION`, `APPLICATION_ACTIVE`.
 2. State `total_count`; offer `download_dataset` for the full CSV.
-3. Follow-up slices ("only director-level", "group by company", "last 7 days only") → use `query_datasets` on the `dataset_id` — **do not re-run** `query_onfire`.
+3. Follow-up slices ("only Director-level", "group by country", "last 7 days only") - use `query_datasets` on the `dataset_id`. **Do not re-run** `query_onfire`.
 
 ## Reading the signals
 
-- **`CONTACT_LINKEDIN_URL`** is the hiring manager's personal LinkedIn — the warm outreach target.
-- **`PERSON_SENIORITY = seniority_executive / seniority_director`** = economic buyer who almost certainly owns budget.
-- **`PERSON_SENIORITY = seniority_teamlead / seniority_senior`** = technical champion — influential but may not own budget; good for bottom-up motion.
-- **Multiple roles posted by the same person** (use the deduplication template) = actively building a team — high-urgency contact.
-- **`PERSONA_INSIGHTS`** is your tech filter proxy — parsed from the full job text, so it captures technologies mentioned anywhere in the description, not just the title.
-- **`SHORT_SUMMARY`** gives a concise human-readable description; show this instead of `JOB_POST_TEXT` unless the user explicitly asks for the full description.
-- **High hiring volume** at an account = active expansion = budget signal. Use the volume template to rank accounts.
+- **`APPLICATION_ACTIVE = 1`** = the posting is currently open; the strongest budget signal.
+- **`APPLICATION_ACTIVE = 0`** with a recent `DATE_POSTED` = role likely filled - a hire that may not yet show in our employment-history index.
+- **`SENIORITY_JOB = "Director" / "Executive"`** = leadership build; expensive seats.
+- **Multiple active postings in one country/region** = geographic concentration; reads as a deliberate location strategy (Belfast HQ, EMEA build, US East-coast GTM, India delivery tier, etc.).
+- **`JOB_FUNCTION` patterns** - "engineering and information technology" dominating = platform / product build; "management and manufacturing" or sales-flavoured functions = GTM expansion.
+- **High active-role count** = active expansion = budget signal. Use the volume template to rank accounts.
+- **`JOB_TEXT` keyword search** captures stack mentions anywhere in the description, including the "Familiarity with our stack" or "Nice to have" sections.
 
 ## Common pitfalls
 
-- **`DELETED_AT IS NULL`** — always include.
-- **`CREATED_AT` / `LAST_RUN_AT` are NOT the post date** — they reflect when Onfire ingested/refreshed the record. Use `DATE` for when the job was posted.
-- **`PERSONA_INSIGHTS` is plain text**, not an array — use `ILIKE '%keyword%'`, not `ARRAY_CONTAINS`.
-- **`CONTACT_LINKEDIN_URL` is not unique per company** — the same person can post multiple roles. Use the deduplication template (`GROUP BY CONTACT_LINKEDIN_URL`) when you want a headcount of people, not posts.
-- **`DATE` is a TIMESTAMP** — use `DATEADD(day, -N, CURRENT_DATE())` for relative date windows.
-- **`NAME` is lowercase** — use it for display only. Match people by `CONTACT_LINKEDIN_URL`, not `NAME`.
-- **`JOB_POST_TEXT` is very long** — avoid selecting it by default; use `SHORT_SUMMARY` and `PERSONA_INSIGHTS` for summaries.
-- **Re-running for follow-ups** — slice the existing dataset with `query_datasets`.
+- **No `DELETED_AT` column** - do NOT include `DELETED_AT IS NULL` (query will fail). Use `APPLICATION_ACTIVE = 1` for the active-only cut.
+- **`COMPANY_LINKEDIN_URL` is the slug form** `linkedin.com/company/<slug>` (no `https://www.` prefix). Always lower-case both sides of the comparison.
+- **`DATE_POSTED` vs `PAYLOAD_LAST_UPDATED` vs `LAST_UPDATED_TIME`** - `DATE_POSTED` is when LinkedIn shows the role as posted; the other two reflect refresh activity in our pipeline. Use `DATE_POSTED` for date filtering and the others for freshness checks.
+- **No hiring-manager fields** - this table is posting-level only. If you need the person who posted the role, you'll need a separate signal (or pair the posting with `entity-people-search` on the company's recruiters / department heads).
+- **`JOB_TEXT` is very long** - avoid selecting it by default; use `JOB_POST_TITLE` plus `JOB_FUNCTION` for summaries.
+- **`SENIORITY_JOB = "Not Applicable"`** is a real value for roles LinkedIn did not classify - don't filter these out blindly.
+- **Re-running for follow-ups** - slice the existing dataset with `query_datasets`.

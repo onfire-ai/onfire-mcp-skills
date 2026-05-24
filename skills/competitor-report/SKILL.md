@@ -148,11 +148,12 @@ as `ds_q_hires`.
 
 See `references/snowflake-queries.md` → query 04.
 
-`HIRING_MANAGER_SIGNAL` rows where the posting's first-seen date falls
-in the target quarter. Persists as `ds_open_jobs`.
+`SILVER.JOB_POST.STG_JOB_POSTS` rows for the target quarter and currently-active
+postings. Persists as `ds_open_jobs_quarter` (in-quarter) and `ds_open_jobs_active`
+(currently open snapshot).
 
-Pitfall: `HIRING_MANAGER_SIGNAL` does not have a `DELETED_AT` column -
-do not include that filter. (We hit this on Sonatype.)
+Pitfall: `SILVER.JOB_POST.STG_JOB_POSTS` does not have a `DELETED_AT`
+column. Use `APPLICATION_ACTIVE = 1` to scope to currently open roles.
 
 ### 1.5 Persona / department trends
 
@@ -402,7 +403,7 @@ These come from the canonical Sonatype brief. Violate at peril:
 | Org reshape A | `ds_title_movement` + Phase 2 buckets | IN / OUT / NET-DELTA cards + leadership-vs-dept ledger |
 | Org reshape B | Phase-2 buckets + threads | 3 movement-type cards + 3 strategic threads |
 | Geo + GTM | `ds_q_hires` + `ds_headcount` | continent bars + headcount % bars |
-| Open jobs | `ds_open_jobs` | hiring-manager-grouped table |
+| Open jobs | `ds_open_jobs_quarter` + `ds_open_jobs_active` | Q-window postings table + active-set grouped by function |
 | Acquisition | `ds_acquisition` ⨝ `ds_acq_firmo` ⨝ `ds_geo_fallback` | monthly stacked bar SVG + size + region cards |
 | Sentiment | `ds_sentiment` ⨝ `ds_authors_resolved` | three hero %, continent / size bars, owned-vs-external infographic |
 | GitHub | `ds_github` | top countries bar + notable engagers table |
