@@ -17,23 +17,62 @@ Template variables:
 
 ---
 
-## Query 01 — Headcount trend (12 months)
+## Query 01 — Headcount trend + employee roster (single MCP call)
 
-```sql
-SELECT TIME_PERIOD,
-       STR_VALUE AS pct_change
-FROM ONFIRE.GROWTH_TOTAL_HEADCOUNT_MONTHLY
-WHERE LOWER(COMPANY_LINKEDIN_URL) = '{company_linkedin_url}'
-  AND DELETED_AT IS NULL
-  AND STR_VALUE IS NOT NULL
-  AND TIME_PERIOD BETWEEN DATEADD(MONTH, -12, '{q_end}') AND '{q_end}'
-ORDER BY TIME_PERIOD
+**Not a `query_onfire` SQL** — this slice now lands via the dedicated
+`get_company_headcount` tool, which reads from
+`SILVER.EXPLORIUM.PEOPLE_EXPERIENCES` (tenure intervals) and
+`SILVER.EXPLORIUM.EXPLORIUM_PEOPLE_FULL` (profile enrichment) and
+self-joins for the person's prior company.
+
+```
+get_company_headcount(
+    company_linkedin_urls=["{company_linkedin_url}"],
+    months=12,
+    include_employees=True,
+)
 ```
 
-**Persists as `ds_headcount`.**
+The response carries two datasets:
 
-Used in: exec summary "+1.4% Q net" stat, Complication 1B headcount %
+```json
+{
+  "headcount": {"dataset": {...}, "total_count": N, "preview_rows": [...]},
+  "employees": {"dataset": {...}, "total_count": M, "preview_rows": [...]}
+}
+```
+
+### `ds_headcount`
+
+Per-month rows, most-recent first. Columns:
+
+| Column | Notes |
+|---|---|
+| `company_linkedin_url` | `linkedin.com/company/<slug>` |
+| `time_period` | First day of the month |
+| `employee_count` | Distinct people whose tenure covers that month |
+| `growth_pct` | MoM % change (NULL for the oldest row) |
+
+Used in: exec-summary "+X% Q net" stat, Complication 1B headcount %
 bar chart.
+
+### `ds_employees`
+
+One row per (person × stint) for tenures that either started in the
+12-month window or are still active. Columns include:
+
+| Column | Source | Notes |
+|---|---|---|
+| `person_linkedin_url`, `person_linkedin_id`, `is_primary` | `PEOPLE_EXPERIENCES` | Identity |
+| `start_date`, `end_date` | `PEOPLE_EXPERIENCES` | `YYYY-MM` strings; NULL end = still in role |
+| `title_name`, `title_role`, `title_sub_role`, `title_levels` | `PEOPLE_EXPERIENCES` | Title classification at the company |
+| `full_name`, `headline` | `EXPLORIUM_PEOPLE_FULL` | Latest snapshot |
+| `location_country`, `location_region`, `location_continent`, `location_name` | `EXPLORIUM_PEOPLE_FULL` | Geo |
+| `current_job_title`, `current_company_name`, `current_company_linkedin_url` | `EXPLORIUM_PEOPLE_FULL` | What they're doing *now* |
+| `prior_company_name`, `prior_company_linkedin_url`, `prior_title`, `prior_start_date`, `prior_end_date` | self-join on `PEOPLE_EXPERIENCES` | The stint immediately before the target one |
+
+Used in: Phase 1.3 Q-hires filter, talent-flow strategic-thread
+synthesis, Complication 1B function/region breakdown.
 
 ---
 
@@ -88,28 +127,48 @@ Used in: Complication 1A.
 
 ---
 
-## Query 03 — Quarter hires with geo
+## Query 03 — Quarter hires with geo + function (derived from `ds_employees`)
+
+**Not a `query_onfire` SQL** — `ds_employees` from Query 01 already
+contains the full 12-month roster with geo, title, and prior-company
+fields. Filter it via `query_datasets`:
 
 ```sql
-SELECT pe.PERSON_LINKEDIN_URL,
-       pe.JOB_TITLE,
-       pe.START_DATE,
-       p.LOCATION_COUNTRY,
-       p.LOCATION_NAME
-FROM ONFIRE.PEOPLE_EXPERIENCES pe
-LEFT JOIN ONFIRE.PEOPLE p
-  ON LOWER(p.LINKEDIN_URL) = LOWER(pe.PERSON_LINKEDIN_URL)
-  AND p.DELETED_AT IS NULL
-WHERE LOWER(pe.COMPANY_LINKEDIN_URL) = '{company_linkedin_url}'
-  AND pe.DELETED_AT IS NULL
-  AND pe.START_DATE BETWEEN '{q_start}' AND '{q_end}'
-  AND pe.END_DATE IS NULL
-ORDER BY pe.START_DATE, p.LOCATION_COUNTRY
+-- datasets: {"e": "ds_employees"}
+SELECT
+    person_linkedin_url,
+    full_name,
+    start_date,
+    title_name,
+    title_role,
+    title_sub_role,
+    title_levels,
+    location_country,
+    location_region,
+    location_continent,
+    prior_company_name,
+    prior_company_linkedin_url,
+    prior_title
+FROM e
+WHERE start_date >= '{rolling_12mo_start_yyyymm}'   -- e.g. '2025-04'
+  AND start_date <= '{q_end_yyyymm}'                -- e.g. '2026-03'
+  AND end_date IS NULL                              -- still in role
+ORDER BY start_date, location_country
 ```
+
+`start_date` / `end_date` are stored as `YYYY-MM` strings, not full
+dates — compare against `YYYY-MM` literals, never against `YYYY-MM-DD`.
 
 **Persists as `ds_q_hires`.**
 
-Used in: Complication 1B continent breakdown of in-quarter hires.
+Used in:
+
+- Complication 1B continent breakdown (group by `location_continent`)
+- Complication 1B function breakdown (classify `title_role` /
+  `title_sub_role` / `title_name` into 5-6 coarse buckets — Engineering,
+  Customer service, Design, Sales, Operations/Finance, Unclassified)
+- Phase 2 strategic-thread synthesis on `prior_company_name` (talent
+  pools the competitor is pulling from)
 
 ---
 

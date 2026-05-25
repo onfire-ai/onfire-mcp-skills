@@ -110,22 +110,37 @@ dataset. Track the dataset IDs - the analysis phase joins them.
 **Important:** all `query_onfire` calls must use 3-part `ONFIRE.*` table
 names and include a `DELETED_AT IS NULL` filter where applicable.
 
-### 1.1 Headcount trend (12 months)
+### 1.1 Headcount trend + employee roster (single call)
 
 See `references/snowflake-queries.md` → query 01.
 
-```sql
-SELECT TIME_PERIOD, STR_VALUE AS pct_change
-FROM ONFIRE.GROWTH_TOTAL_HEADCOUNT_MONTHLY
-WHERE LOWER(COMPANY_LINKEDIN_URL) = '{company_linkedin_url}'
-  AND DELETED_AT IS NULL
-  AND STR_VALUE IS NOT NULL
-  AND TIME_PERIOD BETWEEN DATEADD(MONTH, -12, '{q_end}') AND '{q_end}'
-ORDER BY TIME_PERIOD
+A single `get_company_headcount` call now powers Phase 1.1 (headcount
+trend) **and** Phase 1.3 (Q-hires with geo + function). Headcount is
+derived from tenure intervals in
+`SILVER.EXPLORIUM.PEOPLE_EXPERIENCES`; the employee roster joins each
+tenure to `SILVER.EXPLORIUM.EXPLORIUM_PEOPLE_FULL` for location and to a
+self-join on `PEOPLE_EXPERIENCES` for the person's immediately-prior
+company.
+
+```
+Onfire MCP: get_company_headcount(
+  company_linkedin_urls=["{company_linkedin_url}"],
+  months=12,
+  include_employees=True,
+  telemetry={intent: "Competitor brief headcount + Q-hires"}
+)
 ```
 
-Persists as `ds_headcount`. Pull in-quarter month rows for the
-exec-summary "+1.4% Q1 net" callout.
+Persist the two datasets returned:
+
+| Dataset | From | Used by |
+|---|---|---|
+| `ds_headcount` | `response.headcount.dataset` | Complication 1B headcount % bars; exec-summary "Q net" callout |
+| `ds_employees` | `response.employees.dataset` | Phase 1.3 (in-quarter hires filter) and the talent-flow strategic-thread synthesis |
+
+Pull in-quarter rows from `ds_headcount` for the exec-summary "+X% Q1
+net" callout. Each row carries `time_period` (first day of month),
+`employee_count`, and `growth_pct` (MoM %; NULL for the oldest row).
 
 ### 1.2 Title movement (target quarter only)
 
@@ -138,13 +153,39 @@ Classify every Q-event into:
 Persists as `ds_title_movement`. **Strictly bounded to the target
 quarter** - any event outside is excluded.
 
-### 1.3 Quarter hires with geo
+### 1.3 Quarter hires with geo + function (derived from `ds_employees`)
 
-See `references/snowflake-queries.md` → query 03.
+No second tool call — Phase 1.1 already pulled the employee roster.
+Derive `ds_q_hires` from `ds_employees` via `query_datasets`:
 
-`PEOPLE_EXPERIENCES` rows with `START_DATE` in the quarter and
-`END_DATE IS NULL`, joined to `PEOPLE` for `LOCATION_COUNTRY`. Persists
-as `ds_q_hires`.
+```sql
+-- datasets: {"e": "ds_employees"}
+SELECT
+    person_linkedin_url,
+    full_name,
+    start_date,
+    title_name,
+    title_role,
+    title_sub_role,
+    title_levels,
+    location_country,
+    location_region,
+    location_continent,
+    prior_company_name,
+    prior_company_linkedin_url,
+    prior_title
+FROM e
+WHERE start_date >= '{rolling_12mo_start_yyyymm}'   -- '2025-04', match the YYYY-MM form
+  AND start_date <= '{q_end_yyyymm}'                -- '2026-03'
+  AND end_date IS NULL                              -- still in role
+```
+
+Persists as `ds_q_hires`.
+
+The roster also carries `prior_company_name` / `prior_company_linkedin_url`
+for every row — feed this into the Phase 2 strategic-thread synthesis
+("which talent pools are they pulling from"). Persist it as
+`ds_q_hires_priors` if you intend to surface it as its own exhibit.
 
 ### 1.4 Open job postings
 
