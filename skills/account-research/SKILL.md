@@ -181,8 +181,8 @@ tenant-driven content in the header bar is the display name and logo:
 
 | Render value | Source | Fallback when absent |
 |---|---|---|
-| Tenant display name (header + footer) | `tenant_config.brand.display_name` | `tenant_config.tenant_id`, title-cased |
-| Tenant logo (header + footer) | `tenant_config.brand.logo_data_uri` | omit logo; render text wordmark only |
+| Tenant display name (header + footer) | `tenant_config.tenant_id`, title-cased | always apply — no display_name field exists |
+| Tenant logo (header + footer) | not available in tenant config | always omit logo; render text wordmark only |
 
 If `render_spec` is missing or empty (older orchestrator version), use
 the defaults documented in `references/report-structure.md` as a fallback,
@@ -388,7 +388,8 @@ attendees", "give me all the prospects, not just the top 10":
 
 ```
 query_datasets(
-  dataset_id="<envelope.datasets.signals | filings_10k | linkedin_footprint
+  dataset_id="<envelope.datasets.intent_signals | envelope.datasets.filings_10k
+               | envelope.datasets.linkedin_footprint
                | ai_prospecting_response.dataset.id>",
   sql="SELECT ... FROM dataset WHERE ..."
 )

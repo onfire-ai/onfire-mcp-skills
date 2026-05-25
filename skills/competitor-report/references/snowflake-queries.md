@@ -13,6 +13,7 @@ Template variables:
 | `{q_start}` | `2026-01-01` | Phase 0 quarter math |
 | `{q_end}` | `2026-03-31` | Phase 0 quarter math |
 | `{rolling_12mo_start}` | `2025-04-01` | `DATEADD(MONTH, -12, '{q_end}')` |
+| `{tenant_linkedin_url}` | `linkedin.com/company/jfrog` | Phase 0 `get_current_tenant` |
 
 ---
 
@@ -385,6 +386,25 @@ Tagging in the join:
 - `resolved` — `PEOPLE` row exists AND `JOB_COMPANY_NAME IS NOT NULL`
 - `unresolved-no-employer` — `PEOPLE` row exists, `JOB_COMPANY_NAME IS NULL`
 - `unresolved-no-profile` — `PEOPLE` row does not exist
+
+**Bias exclusion (mandatory).** After the join, discard any author row
+where `JOB_COMPANY_LINKEDIN_URL` matches either of the two biased parties:
+
+```sql
+-- via query_datasets (run against the just-built PEOPLE lookup result)
+-- datasets: {"r": "<people-lookup-result>"}
+SELECT *
+FROM r
+WHERE LOWER(JOB_COMPANY_LINKEDIN_URL) NOT IN (
+    '{company_linkedin_url}',   -- competitor employees: direct stake in the outcome
+    '{tenant_linkedin_url}'     -- origin-tenant employees: our own people
+)
+```
+
+Authors removed by this step are **silently dropped** - they are not
+surfaced in unresolved buckets, not quoted in the evidence wall, and not
+counted in the sentiment cross-tabs. They are biased, not merely
+unresolvable.
 
 ---
 

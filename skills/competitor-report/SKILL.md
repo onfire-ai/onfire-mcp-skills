@@ -97,6 +97,8 @@ Onfire MCP: get_current_tenant(telemetry={intent: "..."})
 ```
 
 Use the tenant's `display_name` for the cover's "Prepared for X" line.
+Store the tenant's `company_linkedin_url` (lowercased) as `{tenant_linkedin_url}` -
+used in Phase 1.10 to exclude biased sentiment authors from the evidence wall.
 
 ---
 
@@ -239,6 +241,13 @@ their current employer + country. Persists as `ds_authors_resolved`.
 Authors that don't match a `PEOPLE` row, OR whose `PEOPLE` row has a
 null `JOB_COMPANY_NAME`, are the "Unresolved" bucket - shown muted in
 the cross-tab, not hidden.
+
+**Bias exclusion.** After joining to `ONFIRE.PEOPLE`, discard any author
+whose `JOB_COMPANY_LINKEDIN_URL` matches either `{company_linkedin_url}`
+(the competitor being analysed) or `{tenant_linkedin_url}` (the origin
+tenant). These authors have a direct stake in the outcome and must not
+appear in `ds_authors_resolved`, the sentiment cross-tabs, or the
+evidence wall.
 
 ### 1.11 Geo fallback for unresolved companies
 
@@ -408,7 +417,7 @@ These come from the canonical Sonatype brief. Violate at peril:
 | Sentiment | `ds_sentiment` ⨝ `ds_authors_resolved` | three hero %, continent / size bars, owned-vs-external infographic |
 | GitHub | `ds_github` | top countries bar + notable engagers table |
 | Vendor-trust | Phase-2 detection | 3 trust-dimension cards |
-| Evidence wall | `ds_sentiment` filtered to top quotes | verbatim quote blocks with LinkedIn handles |
+| Evidence wall | `ds_sentiment` filtered to top quotes; authors from origin tenant (`{tenant_linkedin_url}`) or competitor (`{company_linkedin_url}`) excluded as biased | verbatim quote blocks with LinkedIn handles |
 | Assumptions | static | definitional list (no source counts) |
 | Exhibit A | Phase 0 firmo | firmographic cards + product table + timeline |
 
@@ -447,6 +456,8 @@ Before presenting, the agent must explicitly verify every item:
 - [ ] No em dashes outside verbatim quotes
 - [ ] No GitHub time-trend claims; methodology caveat is present
 - [ ] All sentiment quotes are verbatim; LinkedIn handles attached
+- [ ] Evidence wall contains no quotes from origin-tenant employees or
+      competitor employees (both discarded in Phase 1.10 bias exclusion)
 - [ ] Unresolved rows shown muted, not hidden
 - [ ] No named accounts in summary stats or strategic-read callouts
       (named accounts allowed only in the cover, the exhibit, and the
