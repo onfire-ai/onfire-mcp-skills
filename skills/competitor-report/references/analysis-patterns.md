@@ -22,16 +22,22 @@ Input: `ds_title_movement` (one row per Q-event:
 Note: "Senior", "Principal", and "Staff" alone are senior-IC levels,
 NOT management. Only `manager` and higher count as leadership.
 
-### 1.2 Pair Q-events into movement-type buckets
+### 1.2 Pair events into movement-type buckets
 
 | Bucket | Rule |
 |---|---|
-| **Paired swap** | A `now_gone` title + a `net_new` title in the same broad function area in the same quarter. Function area = first 1-2 meaningful tokens (e.g. "Federal Sales" ↔ "Public Sector" → both GTM-public-sector) |
-| **Departed-no-backfill** | A `now_gone` title with no `net_new` Q-pair |
-| **Net-new function** | A `net_new` title with no `now_gone` Q-pair |
+| **Paired swap** | A `now_gone` title + a `net_new` title in the same broad function area in the same window. Function area = first 1-2 meaningful tokens (e.g. "Federal Sales" ↔ "Public Sector" → both GTM-public-sector) |
+| **Departed-no-backfill** | A `now_gone` title with no `net_new` in-window pair → triggers the Phase 1.13 recoverability check |
+| **Net-new function** | A `net_new` title with no `now_gone` in-window pair |
 
 A swap is by definition a single old→new pair. Track them as
 `(old_title, new_title, function_area)`.
+
+**Important.** "Departed-no-backfill" is a *title* observation, not a
+*function* observation. Most departed-no-backfill titles continue to
+have the function performed under a different (often broader) title.
+Always run the Phase 1.13 SUMMARY scan before characterising a
+function as lost. See §9 for the function-still-held pattern.
 
 ### 1.3 Generate 3-5 strategic threads
 
@@ -229,21 +235,30 @@ Foundation" and "Annex Security" - both folded into North America.
 
 ---
 
-## 6. Q-window math
+## 6. Window math (quarter vs 12-month modes)
 
-Today's date determines the brief's quarter unless overridden.
+Today's date determines the **most recent completed quarter** unless
+overridden. From there the window is bounded by `window_mode`.
 
-| Today is in | Last completed quarter | Q-start | Q-end |
+| Today is in | Most recent completed quarter | Q-start | Q-end |
 |---|---|---|---|
 | Q1 (Jan-Mar) | Q4 previous year | `{prev_year}-10-01` | `{prev_year}-12-31` |
 | Q2 (Apr-Jun) | Q1 current year | `{year}-01-01` | `{year}-03-31` |
 | Q3 (Jul-Sep) | Q2 current year | `{year}-04-01` | `{year}-06-30` |
 | Q4 (Oct-Dec) | Q3 current year | `{year}-07-01` | `{year}-09-30` |
 
-Brief label: `Q{N} {year}`. E.g. `Q1 2026`.
+### Window per mode
 
-Rolling 12-month window for the customer-acquisition motion:
-`DATEADD(MONTH, -12, q_end)` to `q_end`.
+| `window_mode` | `window_start` | `window_end` | `window_label` |
+|---|---|---|---|
+| `quarter` (default) | Q-start | Q-end | `Q{N} {year}` (e.g. `Q1 2026`) |
+| `12_month` | `DATEADD(MONTH, -12, q_end)` | Q-end | `12 months ending {Mon} {year}` (e.g. `12 months ending Mar 2026`) |
+
+The customer-acquisition motion **always** spans the trailing 12
+months ending `q_end` regardless of `window_mode`. The acquisition
+chart still brackets the most-recent-quarter as the latest cohort -
+just label the bracket "Last 3 months" instead of "Q1 2026" when
+running in 12-month mode to keep the page voice consistent.
 
 ---
 
@@ -283,7 +298,63 @@ Bad:
 
 ---
 
-## 9. Sowhat synthesis blocks
+## 9. Function-still-held check (Departed-no-backfill recoverability)
+
+Triggered when Phase 2.1 classifies any title as `departed-no-backfill`.
+For each such title, run the Phase 1.13 SUMMARY scan and decide between
+three reads.
+
+### 10.1 Pick function keywords
+
+For each departed title, write 4-8 keywords that describe the function
+in plain language. Examples:
+
+| Departed title | Function keywords |
+|---|---|
+| Head of Technology Partnerships | partnership, alliance, ecosystem, integration partner, channel, business development |
+| Technical Content Director | content, technical writing, documentation, editorial, blog |
+| Web Developer (marketing site) | web, front-end, frontend, react, next.js, website, marketing site |
+| VP Customer Success | customer success, account management, csm, customer experience |
+| Head of Data | data engineering, analytics, data platform, data science |
+
+Title-keyword search misses people doing the function under a
+different title - the SUMMARY scan catches them.
+
+### 10.2 Run the two-pass scan (see Query 13)
+
+- **13a current-holder scan** against `pe.SUMMARY`, `p.HEADLINE`,
+  `p.JOB_SUMMARY` on current employees
+- **13b open-posting scan** against `ds_open_jobs_active.JOB_POST_TITLE`
+  and `JOB_TEXT`
+
+### 10.3 Read the result
+
+| 13a result | 13b result | Read | Page-4 pill |
+|---|---|---|---|
+| 1+ rows | any | **Parallel hold by [title].** Often the parallel holder pre-existed the departed person's tenure - which means the dedicated seat experiment ended but the function never left. | `Parallel hold by ...` (warn) |
+| 0 rows | 1+ active | **Open posting in flight.** The function is being actively backfilled. | `Open posting in flight` (warn) |
+| 0 rows | 0 active | **Function lapsed.** The only true "lost capability" outcome - flag in the page 4 sowhat. | `Function lapsed` (neg) |
+
+### 10.4 Be precise about same-person vs different-person
+
+When writing the table row, distinguish:
+
+- **Same person, internal promotion.** The departing title is the same
+  person, internally promoted. (E.g. front-end developer → Principal
+  UX Prototyping.) Note the promotion path.
+- **Different person, parallel coverage.** A different employee was
+  already doing the function when the departing person arrived. Note
+  the parallel-holder's start date relative to the departing person's
+  tenure.
+- **Different person, hired after.** A different employee was hired
+  for the function only after the departing person left. Note the gap.
+
+The most common pattern on a real brief is the second - parallel
+coverage that pre-existed. Be explicit about that.
+
+---
+
+## 10. Sowhat synthesis blocks
 
 Every page closes with a `.sowhat` callout that synthesises the page
 into one paragraph. The convention:

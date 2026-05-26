@@ -9,7 +9,7 @@ Two complementary data sources accessed via separate tools:
 
 | What you need | Tool to use | Source |
 |---|---|---|
-| **Total company headcount** over time + (optional) employee roster with prior-company | `get_company_headcount` | `SILVER.EXPLORIUM.PEOPLE_EXPERIENCES` (tenure-based) + `SILVER.EXPLORIUM.EXPLORIUM_PEOPLE_FULL` (profile enrichment). Internal; never queried directly. |
+| **Total company headcount** over time + (optional) employee roster with prior-company | `get_company_headcount` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` (tenure-based) + `ONFIRE.PEOPLE_GRAND` (profile enrichment). Tool-managed; never exposed via `query_onfire`. |
 | **Technology / persona growth** (e.g. CrowdStrike, data engineer) | `query_onfire` → `ONFIRE.GROWTH_INSIGHT_MONTHLY` | Pre-computed monthly % change |
 
 > **Rule:** Never use `query_onfire` for total headcount questions. Always use `get_company_headcount`.
@@ -22,7 +22,8 @@ Two complementary data sources accessed via separate tools:
 - "Compare EDR adoption to total headcount at these 5 accounts" → both tools, then compare
 - "Which of our target accounts are shrinking overall?" → `get_company_headcount`
 - "Is the data engineering persona expanding at Snowflake?" → `query_onfire` (insight)
-- "Who joined Stripe in the last 12 months and where did they come from?" → `get_company_headcount(..., include_employees=True)`
+- "Who joined Stripe in the last 12 months and where did they come from?" → `get_company_headcount` (roster is always returned)
+- "Who left Stripe in the last quarter and where did they go?" → `get_company_headcount` (roster includes leavers + next-company)
 - Any month-over-month growth / trend question for companies
 
 Skip this for:
@@ -31,29 +32,38 @@ Skip this for:
 
 ---
 
-## `get_company_headcount` — total headcount and (optional) roster
+## `get_company_headcount` — total headcount + employee roster
 
-Headcount is **derived from tenure rows** in `SILVER.EXPLORIUM.PEOPLE_EXPERIENCES`:
+Headcount is **derived from tenure rows** in `ONFIRE.PEOPLE_GRAND_EXPERIENCES`:
 for each month M in the window, the tool counts distinct people whose tenure
 covers M (`START_DATE <= last-day-of-M` AND `END_DATE IS NULL OR END_DATE >=
 first-day-of-M`). MoM growth % is computed from those counts.
 
-When `include_employees=True`, the tool also returns an enriched roster — one
-row per (person × stint) for tenures that either started in the lookback
-window or are still active. Each row is joined to
-`EXPLORIUM_PEOPLE_FULL` for profile fields (name, country, region, current
-title) and self-joined to `PEOPLE_EXPERIENCES` for the person's
-immediately-prior company.
+The roster is **always returned** alongside the monthly counts (no opt-in
+flag). One row per (person × stint) where any of these hold:
+
+- `start_date` falls in the lookback window → **joiner**
+- `end_date IS NULL` → **still active**
+- `end_date` falls in the lookback window → **leaver** (covers long-tenured
+  departures whose start is outside the window)
+
+Each row is joined to `ONFIRE.PEOPLE_GRAND` for profile fields (name,
+country, region, current title) and self-joined to
+`ONFIRE.PEOPLE_GRAND_EXPERIENCES` for the person's immediately-prior AND
+immediately-next company. `next_*` is only populated for stints that
+ended (`end_date IS NOT NULL`). Both tables are tool-managed —
+`query_onfire` cannot read them.
 
 ### Parameters
 
 | Parameter | Type | Notes |
 |---|---|---|
 | `company_linkedin_urls` | `List[str]` | Required. Up to 50 URLs. Any variant accepted; normalized to `linkedin.com/company/<slug>`. |
-| `months` | `int` | Optional. Months of history (default 13, max 36). Doubles as the roster cutoff when `include_employees=True`. |
-| `include_employees` | `bool` | Optional. Default False. When True, also return the enriched employee roster. |
+| `months` | `int` | Optional. Months of history (default 13, max 36). Also the roster cutoff — joiners with `start_date` in the window, leavers with `end_date` in the window, plus all still-active employees. |
 
 ### Response shape
+
+Both keys are always present.
 
 ```json
 {
@@ -62,7 +72,7 @@ immediately-prior company.
     "total_count": N,
     "preview_rows": [first 20 rows]
   },
-  "employees": null | {
+  "employees": {
     "dataset":     {dataset handle},
     "total_count": M,
     "preview_rows": [first 20 rows]
@@ -85,31 +95,35 @@ The **first row per company** is the current month's count.
 
 | Column | Source | Notes |
 |---|---|---|
-| `company_linkedin_url` | `PEOPLE_EXPERIENCES` | Target company |
-| `person_linkedin_url`, `person_linkedin_id` | `PEOPLE_EXPERIENCES` | The employee |
-| `is_primary` | `PEOPLE_EXPERIENCES` | LinkedIn's "current primary role" flag |
-| `start_date`, `end_date` | `PEOPLE_EXPERIENCES` | `YYYY-MM` strings (NULL end = still there) |
-| `title_name`, `title_role`, `title_sub_role`, `title_levels` | `PEOPLE_EXPERIENCES` | Title classification at the company |
-| `full_name`, `headline` | `EXPLORIUM_PEOPLE_FULL` | Latest snapshot |
-| `location_country`, `location_region`, `location_continent`, `location_name` | `EXPLORIUM_PEOPLE_FULL` | Person's location |
-| `current_job_title`, `current_company_name`, `current_company_linkedin_url` | `EXPLORIUM_PEOPLE_FULL` | What they're doing *now* (may differ from the target stint if `end_date IS NOT NULL`) |
-| `prior_company_name`, `prior_company_linkedin_url`, `prior_title` | self-join on `PEOPLE_EXPERIENCES` | Where they came from before the target stint |
-| `prior_start_date`, `prior_end_date` | self-join on `PEOPLE_EXPERIENCES` | Prior stint's window |
+| `company_linkedin_url` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Target company |
+| `person_linkedin_url`, `person_linkedin_id` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | The employee |
+| `is_primary` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | LinkedIn's "current primary role" flag |
+| `start_date`, `end_date` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | `YYYY-MM` strings (NULL end = still there) |
+| `title_name`, `title_role`, `title_sub_role`, `title_levels` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Title classification at the company |
+| `full_name`, `headline` | `ONFIRE.PEOPLE_GRAND` | Latest snapshot |
+| `location_country`, `location_region`, `location_continent`, `location_name` | `ONFIRE.PEOPLE_GRAND` | Person's location |
+| `current_job_title`, `current_company_name`, `current_company_linkedin_url` | `ONFIRE.PEOPLE_GRAND` | What they're doing *now* (may differ from the target stint if `end_date IS NOT NULL`) |
+| `prior_company_name`, `prior_company_linkedin_url`, `prior_title` | self-join on `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Where they came from before the target stint |
+| `prior_start_date`, `prior_end_date` | self-join on `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Prior stint's window |
+| `next_company_name`, `next_company_linkedin_url`, `next_title` | self-join on `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Where they went after the target stint. **NULL when `end_date IS NULL`** (still active) |
+| `next_start_date`, `next_end_date` | self-join on `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Next stint's window |
+
+### Deriving joiners / leavers from the roster
+
+The roster is one source of truth for both directions:
+
+- **Joiners** — `WHERE start_date IN window AND end_date IS NULL` (or include short-stint leavers with `end_date IN window` if you want all arrivals)
+- **Joiner origins** — `prior_company_name` is already attached
+- **Leavers** — `WHERE end_date IN window`
+- **Leaver destinations** — `next_company_name` is already attached
 
 ### Example calls
 
 ```python
-# Just the monthly series
-get_company_headcount(
-    company_linkedin_urls=["linkedin.com/company/sonatype"],
-    months=13,
-)
-
-# Series + enriched roster — for competitor briefs, BDR research, etc.
+# Default — monthly series + full roster (joiners, leavers, still-active)
 get_company_headcount(
     company_linkedin_urls=["linkedin.com/company/cloudsmith"],
     months=12,
-    include_employees=True,
 )
 ```
 
@@ -119,7 +133,8 @@ get_company_headcount(
 - `growth_pct: null` → oldest month in the window (no prior month to diff against)
 - `growth_pct: -1.5` → headcount contracted 1.5% MoM
 - An employee row with `end_date IS NULL` is currently at the company
-- `prior_company_name = "Microsoft"` → the person was at Microsoft right before this stint; useful for talent-flow analysis
+- `prior_company_name = "Microsoft"` → the person was at Microsoft right before this stint; useful for joiner-origin / talent-flow analysis
+- `next_company_name = "Snowflake"` → after leaving the target company they went to Snowflake; useful for leaver-destination analysis (only set when `end_date IS NOT NULL`)
 
 ---
 
@@ -259,7 +274,7 @@ Both tools return a `dataset` handle + `preview_rows` (first 20).
 ## Common pitfalls
 
 - **Using `query_onfire` for total headcount** — always use `get_company_headcount` instead.
-- **Forgetting `include_employees=True`** when the caller asks for a roster, talent flow, or who joined.
+- **Treating `next_company_name` as "current employer"** — it's the *next* stint after this one. For still-active people (`end_date IS NULL`) it's NULL. Use `current_company_name` for "where they work now".
 - **`str_value` is TEXT** in GROWTH_INSIGHT_MONTHLY — always use `TRY_CAST(str_value AS FLOAT)` for arithmetic.
 - **Forgetting `str_value IS NOT NULL`** — NULL rows are baseline-only and distort averages.
 - **`insight_name` must have the `growth-` prefix** — use `ILIKE 'growth-%edr%'` for fuzzy matching.

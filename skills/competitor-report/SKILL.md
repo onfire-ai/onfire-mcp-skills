@@ -1,6 +1,6 @@
 ---
 name: competitor-report
-description: Generate a full client-grade Competitor Intelligence Brief for a single competitor company, scoped strictly to the last completed quarter. Produces an A4 HTML and an optional PDF using a McKinsey-style consulting layout (Pyramid Principle lead, SCR narrative arc, action titles). The brief covers org reshape (title movement by leadership vs department, paired swaps vs net-new functions), Q-hires with geo, open job postings, customer acquisition motion (last 12 months, monthly stacked by industry), market sentiment split (owned brand surfaces vs external developer communities), GitHub footprint snapshot, vendor-trust events, an evidence wall of verbatim quotes, an Assumptions and Definitions back matter, and a Company Reference Card exhibit. Use this skill whenever the user asks to "build a competitor brief", "competitive intelligence on X", "deep dive on competitor X", "Sonatype-style report on X", "scan competitor X for the last quarter", "what's happening at competitor Y", or any phrasing that mixes a vendor name with a request for an analytical multi-section report on their org and market posture.
+description: Generate a full client-grade Competitor Intelligence Brief for a single competitor company. The window is configurable: either the last completed calendar quarter (default) or the trailing 12 months ending the last completed quarter. Produces an A4 HTML and an optional PDF using a McKinsey-style consulting layout (Pyramid Principle lead, SCR narrative arc, action titles). The brief covers org reshape (title movement by leadership vs department, paired swaps vs net-new functions, departed-no-backfill recoverability check), hires with geo + function + origin-company size, leavers with destinations, open job postings, customer acquisition motion (12-month measured motion from the insights pipeline, monthly stacked by industry), market sentiment split (owned brand surfaces vs external developer communities), GitHub footprint snapshot, vendor-trust events, an evidence wall of verbatim third-party-only quotes (target competitor and prepared-for tenant employees both excluded), an Assumptions and Definitions back matter, and a Company Reference Card exhibit. Use this skill whenever the user asks to "build a competitor brief", "competitive intelligence on X", "deep dive on competitor X", "Sonatype-style report on X", "scan competitor X for the last quarter", "12-month view of competitor Y", "what's happening at competitor Y", or any phrasing that mixes a vendor name with a request for an analytical multi-section report on their org and market posture.
 ---
 
 # Competitor Intelligence Brief
@@ -8,14 +8,29 @@ description: Generate a full client-grade Competitor Intelligence Brief for a si
 ## What this skill does
 
 Given a **competitor company name** (e.g. `Sonatype`, `Snyk`, `JFrog`),
-this skill produces a 12-13 page A4 PDF analytical brief covering the
-competitor's last completed quarter. The deliverable is internal-facing
-(prepared FOR the caller's tenant, ABOUT a non-customer vendor) and
-written in a consulting-firm idiom - Pyramid Principle, SCR (Situation /
-Complication / Resolution) narrative arc, McKinsey-style action titles.
+this skill produces a 12-13 page A4 PDF analytical brief. The deliverable
+is internal-facing (prepared FOR the caller's tenant, ABOUT a non-customer
+vendor) and written in a consulting-firm idiom - Pyramid Principle, SCR
+(Situation / Complication / Resolution) narrative arc, McKinsey-style
+action titles.
 
 The brief is **analytical only**. No GTM plays, no recommendations, no
 revenue estimates. The reader synthesises the implications themselves.
+
+### Editorial policy: how the tenant appears
+
+The brief is prepared for the **requesting tenant** (the company who
+ran the report) and is about the **target competitor**. They are
+treated asymmetrically in the deliverable:
+
+| Subject | Appears named | Does not appear named |
+|---|---|---|
+| **Target competitor** | Cover, Exhibit A, action titles, findings, all analytical sections. The target is the subject. | The evidence wall — verbatim quotes from target employees are excluded (a competitor founder's rebuttal of a public critique is still a target voice). |
+| **Prepared-for tenant** | Internal-only file metadata. The default cover line reads "Prepared for the requesting tenant" - explicitly opt in via `brand_cover: true` to name them. | Anywhere in the customer-facing copy. If a tenant CEO or employee publicly engaged with the target in-window, describe the event by category descriptor ("a category-incumbent CEO", "a public artifact-management vendor") - never by name. |
+
+The rule formalises that the artefact stays distributable even if it
+ends up outside the requesting tenant. The target is the subject; the
+tenant is the reader.
 
 ---
 
@@ -25,11 +40,26 @@ revenue estimates. The reader synthesises the implications themselves.
 |-------|----------|---------|---------|
 | `competitor_name` | Yes | `Sonatype` | - |
 | `company_linkedin_url` | Optional | `linkedin.com/company/sonatype` | resolved via `match_company` |
+| `window_mode` | Optional | `quarter` or `12_month` | `quarter` |
 | `quarter` | Optional | `Q1 2026` | the last fully completed calendar quarter |
 | `prepared_for_tenant` | Optional | `jfrog` | from `get_current_tenant` |
+| `brand_cover` | Optional | `true` | `false` - cover line reads "Prepared for the requesting tenant" by default; opt in to name the tenant on the cover |
 
 If `quarter` is not supplied, the skill computes it from today's date.
 Today is in Q2 2026 → last completed quarter is Q1 2026 (Jan 1 - Mar 31).
+
+### Window modes
+
+| Mode | Window | Use when |
+|---|---|---|
+| `quarter` (default) | The single calendar quarter chosen (e.g. Q1 2026 = Jan 1 - Mar 31). Acquisition motion still uses a trailing 12-month series for context but every other section is bound to the quarter. | Quarterly tracking brief; what changed in the last 90 days. |
+| `12_month` | The trailing 12 months ending at the last completed calendar quarter (e.g. Apr 1, 2025 - Mar 31, 2026). Every section - org reshape, hires, leavers, sentiment, vendor-trust - is bound to the full window. | Annual review brief; deeper analytical read; capturing a leadership-rebuild story that a single quarter would miss. |
+
+The data slices are largely the same shape under either window - the
+difference is the time predicate and the headline language. Switching
+mode propagates to every page footer, the running headers, the
+Assumptions block, and all action titles ("Q1 hiring tilt" vs
+"12-month hiring tilt").
 
 ---
 
@@ -51,22 +81,26 @@ Phase 4  Pre-delivery checklist         (~1 minute)
 
 ## Phase 0 - Scope and identity
 
-### 0.1 Compute the quarter window
+### 0.1 Compute the window
 
 In bash:
 ```bash
 TODAY=$(date +%Y-%m-%d)
-# Default = last completed full quarter
-# Example: today 2026-05-24 → window 2026-01-01 .. 2026-03-31 (Q1 2026)
+# Compute last completed full quarter from today.
+# Example: today 2026-05-24 → Q1 2026 = 2026-01-01 .. 2026-03-31
 ```
 
-Persist three values for the rest of the run:
-- `q_start` (e.g. `2026-01-01`)
-- `q_end` (e.g. `2026-03-31`)
-- `q_label` (e.g. `Q1 2026`)
+Persist these values for the rest of the run:
 
-The rolling 12-month window for the customer-acquisition motion is
-`q_end - 12 months .. q_end` (e.g. `2025-04-01 .. 2026-03-31`).
+| Value | `quarter` mode | `12_month` mode |
+|---|---|---|
+| `window_start` | First day of the chosen quarter (e.g. `2026-01-01`) | `q_end - 12 months` (e.g. `2025-04-01`) |
+| `window_end` | Last day of the chosen quarter (e.g. `2026-03-31`) | Last day of the most recent completed quarter (e.g. `2026-03-31`) |
+| `window_label` | `Q1 2026` | `12 months ending Mar 2026` |
+| `q_start` / `q_end` | Same as `window_start` / `window_end` | Used only for the recent-quarter bracket in the acquisition chart |
+
+The customer-acquisition motion **always** uses a trailing 12-month
+series ending at `q_end`. The other sections honour `window_mode`.
 
 ### 0.2 Resolve the competitor identity
 
@@ -96,9 +130,17 @@ Confirm the verified LinkedIn URL with the user before proceeding.
 Onfire MCP: get_current_tenant(telemetry={intent: "..."})
 ```
 
-Use the tenant's `display_name` for the cover's "Prepared for X" line.
-Store the tenant's `company_linkedin_url` (lowercased) as `{tenant_linkedin_url}` -
-used in Phase 1.10 to exclude biased sentiment authors from the evidence wall.
+The cover line by default reads **"Prepared for the requesting
+tenant"**. The tenant's brand name only lands on the cover when the
+caller passes `brand_cover: true`.
+
+Resolve the tenant's `company_linkedin_url` via `match_company` and
+store it (lowercased) as `{tenant_linkedin_url}`. Two downstream
+exclusions use it:
+
+1. Phase 1.10 - exclude biased sentiment authors from `ds_authors_resolved`
+2. Phase 3 - scrub any analytical mention of the tenant in customer-facing
+   copy; replace with the category descriptor (see editorial policy above)
 
 ---
 
@@ -110,48 +152,69 @@ dataset. Track the dataset IDs - the analysis phase joins them.
 **Important:** all `query_onfire` calls must use 3-part `ONFIRE.*` table
 names and include a `DELETED_AT IS NULL` filter where applicable.
 
-### 1.1 Headcount trend + employee roster (single call)
+### 1.1 Headcount trend + employee roster (single call — primary source for org-growth changes)
 
 See `references/snowflake-queries.md` → query 01.
 
-A single `get_company_headcount` call now powers Phase 1.1 (headcount
-trend) **and** Phase 1.3 (Q-hires with geo + function). Headcount is
-derived from tenure intervals in
-`SILVER.EXPLORIUM.PEOPLE_EXPERIENCES`; the employee roster joins each
-tenure to `SILVER.EXPLORIUM.EXPLORIUM_PEOPLE_FULL` for location and to a
-self-join on `PEOPLE_EXPERIENCES` for the person's immediately-prior
-company.
+A single `get_company_headcount` call is the **primary source for all
+org-growth changes** in the brief — monthly headcount trend, joiners,
+leavers, joiner origins, and leaver destinations. It powers Phase 1.1
+(headcount), Phase 1.3 (Q-hires), and Phase 1.12 (leavers + their
+destinations). No separate `query_onfire` is needed for any of those.
+
+Headcount is derived from tenure intervals in
+`ONFIRE.PEOPLE_GRAND_EXPERIENCES`; the employee roster joins each
+tenure to `ONFIRE.PEOPLE_GRAND` for location and to **symmetric
+self-joins** on `ONFIRE.PEOPLE_GRAND_EXPERIENCES` for both the
+immediately-prior company (joiner origin) and the immediately-next
+company (leaver destination). Both tables are tool-managed —
+do **not** attempt to query them via `query_onfire`.
 
 ```
 Onfire MCP: get_company_headcount(
   company_linkedin_urls=["{company_linkedin_url}"],
   months=12,
-  include_employees=True,
-  telemetry={intent: "Competitor brief headcount + Q-hires"}
+  telemetry={intent: "Competitor brief headcount + joiners + leavers"}
 )
 ```
+
+The roster is always returned alongside the monthly counts — no opt-in
+flag needed. Each roster row covers joiners (`start_date IN window`),
+still-active (`end_date IS NULL`), **and** leavers (`end_date IN
+window` — incl. long-tenured departures whose start is outside the
+window). `prior_*` columns are on every row; `next_*` columns are
+populated for stints that ended.
 
 Persist the two datasets returned:
 
 | Dataset | From | Used by |
 |---|---|---|
 | `ds_headcount` | `response.headcount.dataset` | Complication 1B headcount % bars; exec-summary "Q net" callout |
-| `ds_employees` | `response.employees.dataset` | Phase 1.3 (in-quarter hires filter) and the talent-flow strategic-thread synthesis |
+| `ds_employees` | `response.employees.dataset` | Phase 1.3 (joiners filter via `start_date`), Phase 1.12 (leavers + destinations via `end_date` + `next_*`), and the talent-flow strategic-thread synthesis (joiner origins via `prior_*`, leaver destinations via `next_*`) |
 
 Pull in-quarter rows from `ds_headcount` for the exec-summary "+X% Q1
 net" callout. Each row carries `time_period` (first day of month),
 `employee_count`, and `growth_pct` (MoM %; NULL for the oldest row).
 
-### 1.2 Title movement (target quarter only)
+Because joiners and leavers are derived from the same `ds_employees`
+source as the headcount counts, the joiner / leaver math reconciles
+with the MoM headcount delta within snapshot-lag tolerance — this is
+the canonical pattern; do not re-derive these slices from
+`PEOPLE_EXPERIENCES` via `query_onfire`.
+
+### 1.2 Title movement (window-bound)
 
 See `references/snowflake-queries.md` → query 02.
 
-Classify every Q-event into:
+Classify every in-window event into:
 - **Net-new title** - title string had no prior holder
 - **Now-gone title** - last remaining holder of an existing title departed
 
-Persists as `ds_title_movement`. **Strictly bounded to the target
-quarter** - any event outside is excluded.
+Persists as `ds_title_movement`. **Strictly bounded to the window** -
+any event outside `window_start` / `window_end` is excluded.
+
+For `12_month` mode the same query runs against the 12-month
+predicate; expect ~5x more events than a single quarter.
 
 ### 1.3 Quarter hires with geo + function (derived from `ds_employees`)
 
@@ -298,6 +361,88 @@ For any company in `ds_acq_firmo` with NULL `LOCATION_COUNTRY`, query
 `ONFIRE.PEOPLE` for that company's employees and use the **modal
 country** as the inferred country. Persists as `ds_geo_fallback`.
 
+### 1.12 Leavers and their destinations (derived from `ds_employees`)
+
+No second tool call — Phase 1.1 already pulled the employee roster,
+which now covers leavers (incl. long-tenured departures) and attaches
+the immediately-next company on each row. Derive `ds_leavers` from
+`ds_employees` via `query_datasets`:
+
+```sql
+-- datasets: {"e": "ds_employees"}
+SELECT
+    person_linkedin_url,
+    person_linkedin_id,
+    full_name,
+    title_name,
+    title_role,
+    title_sub_role,
+    title_levels,
+    start_date,
+    end_date,
+    location_country,
+    location_region,
+    location_continent,
+    location_name,
+    current_job_title,
+    current_company_name,
+    current_company_linkedin_url,
+    -- destination on the same row, no second join needed:
+    next_company_name,
+    next_company_linkedin_url,
+    next_title,
+    next_start_date,
+    next_end_date
+FROM e
+WHERE end_date IS NOT NULL                           -- they left
+  AND end_date >= '{window_start_yyyymm}'            -- in the window
+  AND end_date <= '{window_end_yyyymm}'
+ORDER BY end_date, location_country
+```
+
+`start_date` / `end_date` are stored as `YYYY-MM` strings, not full
+dates — compare against `YYYY-MM` literals.
+
+Tenure-at-target is derivable per row as `end_date - start_date` (in
+months). Interns surface naturally as 4-6-month tenures with `intern`
+in the title — call those out separately from real departures.
+
+`ds_leavers` is a single dataset; destination columns live on the same
+row. If a destination size / industry / country breakdown is needed,
+join the distinct `next_company_linkedin_url` values to
+`ONFIRE.COMPANIES` via a follow-up `query_onfire` call (batch in groups
+of 30-50). Many leavers will not have a captured next role — call the
+gap out explicitly ("6 of 18 destinations captured").
+
+Used in: Complication 1B leavers card; Phase 2 strategic-thread
+synthesis ("where are senior people going?").
+
+### 1.13 Departed-no-backfill recoverability (only if Phase 2 detects any)
+
+See `references/snowflake-queries.md` → query 13.
+
+For each title classified as `departed-no-backfill` in Phase 2.1, run
+two checks:
+
+1. **Current-holder scan.** Query `ONFIRE.PEOPLE_EXPERIENCES.SUMMARY`
+   and `ONFIRE.PEOPLE.HEADLINE` / `JOB_SUMMARY` for current target
+   employees whose free-text mentions the function's work (not just
+   keyword on title). A title-keyword search misses people doing the
+   work under a different title.
+2. **Open-job-posting check.** Filter `ds_open_jobs_active` for the
+   same function keywords.
+
+Three outcomes per departed-no-backfill title:
+
+| Read | Definition |
+|---|---|
+| **Parallel hold by ...** | The function is still held by 1+ current employees whose role summary describes the work. Often pre-existed the departed person's tenure. |
+| **Open posting in flight** | No current holder but an active posting targets the function. |
+| **Function lapsed** | No current holder AND no open posting. The dedicated seat experiment ended and the work isn't visible elsewhere. |
+
+This becomes the Departed-no-backfill detail table on page 4 - a
+post-Phase-2 enrichment, not a Phase 1 data slice.
+
 ---
 
 ## Phase 2 - Analysis
@@ -307,20 +452,25 @@ The short version:
 
 ### 2.1 Title movement → 3 buckets
 
-Classify every Q-event in `ds_title_movement`:
+Classify every in-window event in `ds_title_movement`:
 
 | Bucket | Definition |
 |---|---|
-| Paired swaps | Old title departed AND a new title arrived in the same function in-quarter |
-| Departed-no-backfill | Title departed, no Q-replacement seen → Q+1 hiring watch |
+| Paired swaps | Old title departed AND a new title arrived in the same function in-window |
+| Departed-no-backfill | Title departed, no in-window replacement → trigger Phase 1.13 recoverability check |
 | Net-new functions | Title arrived with no prior holder, no departure pair |
 
-For each Q-event, also tag **seniority**: leadership (VP / Director /
+For each event, also tag **seniority**: leadership (VP / Director /
 Manager+) vs department (IC, individual contributor, even Senior /
 Principal / Staff).
 
 Then synthesise the bets into **3-5 strategic threads** that explain
 the cluster (e.g. "broaden public-sector GTM" or "build AI ops bench").
+
+**Important:** the departed-no-backfill bucket is NOT a Q+1 watch list.
+Most departed-no-backfill titles are short-tenure dedicated seats where
+the function continues elsewhere - confirm via Phase 1.13 before
+characterising a function as "lost."
 
 ### 2.2 Sentiment owned vs external
 
@@ -401,8 +551,8 @@ and the per-page layout spec.
 | 1 | Cover | first page, no `.act` |
 | 2 | Executive summary | yes |
 | 3 | Complication 1A · Org reshape - hero + leadership / dept ledger | yes |
-| 4 | Complication 1A · Movement types + strategic threads | yes |
-| 5 | Complication 1B · Geo + Q-hires + headcount trend | yes |
+| 4 | Complication 1A · Movement types + departed-no-backfill detail + strategic threads | yes |
+| 5 | Complication 1B · Headcount + joiners (geo, function, origin size) + leavers (geo, function, destinations) | yes |
 | 6 | Complication 1C · Open job postings | yes |
 | 7 | Complication 2A · Customer acquisition motion | yes |
 | 8 | Complication 2B · Sentiment split | yes |
@@ -439,8 +589,23 @@ These come from the canonical Sonatype brief. Violate at peril:
   verbatim evidence quotes.
 - **Verbatim quotes only.** Author LinkedIn handles attached for
   verification. No paraphrasing.
-- **Unresolved rows shown muted.** Never hidden. Use `opacity: 0.65`
-  and `color: var(--ink-3)` on those rows.
+- **Never name the prepared-for tenant in customer-facing copy.** Not
+  in action titles, findings, callouts, Complication 3 descriptions,
+  Exhibit A timeline, Assumptions list or anywhere else in the brief
+  body. When the tenant naturally surfaces (e.g. their CEO publicly
+  critiqued the target), describe by category descriptor - "a
+  category-incumbent CEO" - never by name. The cover line is generic
+  ("Prepared for the requesting tenant") unless `brand_cover: true`.
+- **Evidence-wall voices are third-party only.** Never include
+  verbatim messages on page 11 from either the target competitor or
+  the prepared-for tenant. Both companies are excluded - this applies
+  to the author of the post AND to any reposted customer testimonial
+  whose attribution names a target or tenant employee. If the only
+  available speaker for a trust event is a target or tenant voice,
+  describe analytically on page 10 (Complication 3).
+- **Unresolved rows shown muted.** Never hidden by default. Use
+  `opacity: 0.65` and `color: var(--ink-3)` on those rows. (Caller
+  may opt to drop them entirely - see Open knobs.)
 - **Page numbers run sequentially** `02 / N` through `N / N`. The
   cover has no footer.
 
@@ -448,12 +613,12 @@ These come from the canonical Sonatype brief. Violate at peril:
 
 | Section | Reads from | Key template variables |
 |---|---|---|
-| Cover | Phase 0 firmo + tenant | `{competitor_name}`, `{prepared_for}`, `{q_label}`, `{brief_date}` |
-| Exec summary | All phases | hero callout if `vendor_trust_count >= 3`, three hero stats, 5 numbered findings |
+| Cover | Phase 0 firmo + tenant | `{competitor_name}`, `{window_label}`, `{brief_date}`; cover line "Prepared for the requesting tenant" unless `brand_cover: true` |
+| Exec summary | All phases | hero callout if `vendor_trust_count >= 3`, three hero stats, 5 numbered findings; the tenant is described by category descriptor where it surfaces |
 | Org reshape A | `ds_title_movement` + Phase 2 buckets | IN / OUT / NET-DELTA cards + leadership-vs-dept ledger |
-| Org reshape B | Phase-2 buckets + threads | 3 movement-type cards + 3 strategic threads |
-| Geo + GTM | `ds_q_hires` + `ds_headcount` | continent bars + headcount % bars |
-| Open jobs | `ds_open_jobs_quarter` + `ds_open_jobs_active` | Q-window postings table + active-set grouped by function |
+| Org reshape B | Phase-2 buckets + threads + Phase 1.13 recoverability | 3 movement-type cards + departed-no-backfill detail table + 3 strategic threads |
+| Headcount + movement | `ds_headcount` + `ds_q_hires` + `ds_q_hires_priors` (origin firmographics) + `ds_leavers` (destinations attached per row via `next_company_*`) | Headcount bars + Joiners card (region / function / origin size + notable origins) + Leavers card (region / seniority / function + captured destinations) |
+| Open jobs | `ds_open_jobs_quarter` + `ds_open_jobs_active` | in-window postings table + active-set grouped by function |
 | Acquisition | `ds_acquisition` ⨝ `ds_acq_firmo` ⨝ `ds_geo_fallback` | monthly stacked bar SVG + size + region cards |
 | Sentiment | `ds_sentiment` ⨝ `ds_authors_resolved` | three hero %, continent / size bars, owned-vs-external infographic |
 | GitHub | `ds_github` | top countries bar + notable engagers table |
@@ -497,18 +662,32 @@ Before presenting, the agent must explicitly verify every item:
 - [ ] No em dashes outside verbatim quotes
 - [ ] No GitHub time-trend claims; methodology caveat is present
 - [ ] All sentiment quotes are verbatim; LinkedIn handles attached
-- [ ] Evidence wall contains no quotes from origin-tenant employees or
-      competitor employees (both discarded in Phase 1.10 bias exclusion)
-- [ ] Unresolved rows shown muted, not hidden
+- [ ] **Evidence wall contains no quotes from competitor employees or
+      from prepared-for-tenant employees.** Both are discarded in Phase
+      1.10 bias exclusion. Verify by scanning every `.ev.neg` and
+      `.ev.pos` block on page 11 against the two excluded
+      `company_linkedin_url` values.
+- [ ] **No mention of the prepared-for tenant anywhere in customer-
+      facing copy.** Grep the assembled HTML for the tenant's brand
+      name - the only allowed occurrence is the cover line when
+      `brand_cover: true` is set; otherwise nowhere.
+- [ ] Unresolved rows shown muted (or dropped if `hide_unresolved:
+      true` was set), not silently mixed into resolved counts
 - [ ] No named accounts in summary stats or strategic-read callouts
-      (named accounts allowed only in the cover, the exhibit, and the
-      evidence wall)
+      (named accounts allowed only in the cover, the exhibit, the
+      evidence wall and the joiner / leaver detail cards on page 5)
 - [ ] **Assumptions and Definitions** block present (not "Sources and
       methodology")
-- [ ] Quarter window is strictly enforced - every signal outside the
-      window is excluded or explicitly flagged
+- [ ] Window is strictly enforced - every signal outside
+      `window_start` / `window_end` is excluded or explicitly flagged.
+      Page footers, running headers and section titles all reflect the
+      chosen window mode (`Q1 2026` vs `12-month view`).
 - [ ] Vendor-trust page included only if 3+ distinct trust dimensions
       detected
+- [ ] **Departed-no-backfill detail table** on page 4 answers, for
+      each departed title: (a) is the function still held under a
+      different title (Phase 1.13 SUMMARY scan), (b) is there an open
+      posting for it, (c) is the function lapsed?
 - [ ] PDF rendered successfully; no overflow or whitespace bugs
 - [ ] File presented to user with a one-line summary, not a recap of
       the brief contents
@@ -537,8 +716,21 @@ After delivery, the user often asks:
 
 | Knob | Default | When to change |
 |---|---|---|
-| Quarter window | last completed full calendar quarter | user names a different quarter |
-| Vendor-trust threshold | 3 distinct dimensions | the user wants the page included regardless |
-| Customer acquisition source | `INSIGHTS_2_EVIDENCES` if allowed; PEOPLE snapshot otherwise; uploaded CSV if provided | the caller forces a path |
-| Sentiment scope | full quarter universe (unsampled) | never reduce |
-| Industry buckets | 5 (Software / IT services / Public+Healthcare+Cyber+Financial / Media / Other) | competitor has a heavy bias the bucketing doesn't expose |
+| `window_mode` | `quarter` | Set `12_month` for an annual review or when the quarter is too thin to read leadership intent from |
+| `quarter` | Last completed full calendar quarter | User names a different quarter |
+| `brand_cover` | `false` (cover reads "Prepared for the requesting tenant") | Set `true` only when the brief will not leave the tenant's organisation |
+| `hide_unresolved` | `false` (Unresolved rows shown muted at the bottom of cross-tabs) | Set `true` to drop them entirely - cleaner-looking sentiment cards when the unresolved bucket is noisy |
+| `hide_n_labels` | `false` (sentiment cross-tabs show `n=X` per row) | Set `true` to drop the `n=X` annotations - cleaner cards, but the reader loses the row weight |
+| Vendor-trust threshold | 3 distinct dimensions | The user wants the page included regardless |
+| Customer acquisition source | `INSIGHTS_2_EVIDENCES` if allowed; PEOPLE snapshot otherwise; uploaded CSV if provided | The caller forces a path |
+| Sentiment scope | Full window universe (unsampled) | Never reduce |
+| Industry buckets | 5 (Software / IT services / Public+Healthcare+Cyber+Financial / Media / Other) | Competitor has a heavy bias the bucketing doesn't expose |
+
+## Casing notes on insight values
+
+`ONFIRE.INSIGHTS_2_EVIDENCES.INSIGHT_VALUE` stores the competitor brand
+in its **canonical capitalisation** which may not match the friendly
+`competitor_name` (e.g. `CloudSmith` not `Cloudsmith`, `JFrog` not
+`Jfrog`). Use `ILIKE` or canonicalise both sides of the comparison.
+A naive `INSIGHT_VALUE = '{competitor_name}'` filter will return zero
+rows even when the data is there.

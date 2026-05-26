@@ -21,19 +21,21 @@ Template variables:
 
 **Not a `query_onfire` SQL** — this slice now lands via the dedicated
 `get_company_headcount` tool, which reads from
-`SILVER.EXPLORIUM.PEOPLE_EXPERIENCES` (tenure intervals) and
-`SILVER.EXPLORIUM.EXPLORIUM_PEOPLE_FULL` (profile enrichment) and
-self-joins for the person's prior company.
+`ONFIRE.PEOPLE_GRAND_EXPERIENCES` (tenure intervals) and
+`ONFIRE.PEOPLE_GRAND` (profile enrichment) and self-joins on
+`ONFIRE.PEOPLE_GRAND_EXPERIENCES` for **both** the person's prior AND
+next company. Both tables are tool-managed and not exposed via
+`query_onfire`.
 
 ```
 get_company_headcount(
     company_linkedin_urls=["{company_linkedin_url}"],
     months=12,
-    include_employees=True,
 )
 ```
 
-The response carries two datasets:
+The roster is always returned alongside the monthly counts — no opt-in
+flag needed. The response carries two datasets, both always populated:
 
 ```json
 {
@@ -58,21 +60,29 @@ bar chart.
 
 ### `ds_employees`
 
-One row per (person × stint) for tenures that either started in the
-12-month window or are still active. Columns include:
+One row per (person × stint) where any of these hold:
+
+- `start_date` falls in the 12-month window → **joiner**
+- `end_date IS NULL` → **still active**
+- `end_date` falls in the 12-month window → **leaver** (covers long-tenured departures whose start is outside the window)
+
+Columns:
 
 | Column | Source | Notes |
 |---|---|---|
-| `person_linkedin_url`, `person_linkedin_id`, `is_primary` | `PEOPLE_EXPERIENCES` | Identity |
-| `start_date`, `end_date` | `PEOPLE_EXPERIENCES` | `YYYY-MM` strings; NULL end = still in role |
-| `title_name`, `title_role`, `title_sub_role`, `title_levels` | `PEOPLE_EXPERIENCES` | Title classification at the company |
-| `full_name`, `headline` | `EXPLORIUM_PEOPLE_FULL` | Latest snapshot |
-| `location_country`, `location_region`, `location_continent`, `location_name` | `EXPLORIUM_PEOPLE_FULL` | Geo |
-| `current_job_title`, `current_company_name`, `current_company_linkedin_url` | `EXPLORIUM_PEOPLE_FULL` | What they're doing *now* |
-| `prior_company_name`, `prior_company_linkedin_url`, `prior_title`, `prior_start_date`, `prior_end_date` | self-join on `PEOPLE_EXPERIENCES` | The stint immediately before the target one |
+| `person_linkedin_url`, `person_linkedin_id`, `is_primary` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Identity |
+| `start_date`, `end_date` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | `YYYY-MM` strings; NULL end = still in role |
+| `title_name`, `title_role`, `title_sub_role`, `title_levels` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Title classification at the company |
+| `full_name`, `headline` | `ONFIRE.PEOPLE_GRAND` | Latest snapshot |
+| `location_country`, `location_region`, `location_continent`, `location_name` | `ONFIRE.PEOPLE_GRAND` | Geo |
+| `current_job_title`, `current_company_name`, `current_company_linkedin_url` | `ONFIRE.PEOPLE_GRAND` | What they're doing *now* |
+| `prior_company_name`, `prior_company_linkedin_url`, `prior_title`, `prior_start_date`, `prior_end_date` | self-join on `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | The stint immediately before the target one (joiner origin) |
+| `next_company_name`, `next_company_linkedin_url`, `next_title`, `next_start_date`, `next_end_date` | self-join on `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | The stint immediately after the target one (leaver destination). NULL when `end_date IS NULL` |
 
-Used in: Phase 1.3 Q-hires filter, talent-flow strategic-thread
-synthesis, Complication 1B function/region breakdown.
+Used in: Phase 1.3 Q-hires filter (`start_date IN window`), Q-leavers
+filter (`end_date IN window`), talent-flow strategic-thread synthesis
+(joiner origins via `prior_*`, leaver destinations via `next_*`),
+Complication 1B function/region breakdown.
 
 ---
 
@@ -172,13 +182,20 @@ Used in:
 
 ---
 
-## Query 04 — Open job postings (REPLACED)
+## Query 04 — Open job postings
 
-`ONFIRE.JOB_POSTS` is posting-level (one row per LinkedIn job
-post). It has no `DELETED_AT` column; use `APPLICATION_ACTIVE = 1` to scope
-to currently open roles. There is no hiring-manager fan-out - if the brief
-needs an outreach target, pair this slice with `entity-people-search` on the
-account's recruiters or team leads.
+Source: `SILVER.JOB_POST.STG_JOB_POSTS` (posting-level, one row per
+LinkedIn job post). It has no `DELETED_AT` column; use
+`APPLICATION_ACTIVE = 1` to scope to currently open roles. There is no
+hiring-manager fan-out - if the brief needs an outreach target, pair
+this slice with `entity-people-search` on the account's recruiters or
+team leads.
+
+**Pitfall - allowlisting.** `SILVER.JOB_POST.STG_JOB_POSTS` is gated
+per-tenant on `query_onfire`. If the table is rejected, the agent must
+either (a) accept a user-uploaded CSV with the same schema, or
+(b) flag the open-jobs section as "not captured in our pipeline for
+this tenant" in the Assumptions block, and continue.
 
 ### 04a — Postings dated in the target quarter
 
@@ -194,7 +211,7 @@ SELECT ID,
        APPLICATION_ACTIVE,
        REDIRECTED_URL,
        EXTERNAL_URL
-FROM ONFIRE.JOB_POSTS
+FROM SILVER.JOB_POST.STG_JOB_POSTS
 WHERE LOWER(COMPANY_LINKEDIN_URL) = '{company_linkedin_url}'
   AND DATE_POSTED BETWEEN '{q_start}' AND '{q_end}'
 ORDER BY DATE_POSTED
@@ -215,7 +232,7 @@ SELECT ID,
        EMPLOYMENT_TYPE,
        REDIRECTED_URL,
        EXTERNAL_URL
-FROM ONFIRE.JOB_POSTS
+FROM SILVER.JOB_POST.STG_JOB_POSTS
 WHERE LOWER(COMPANY_LINKEDIN_URL) = '{company_linkedin_url}'
   AND APPLICATION_ACTIVE = 1
 ORDER BY DATE_POSTED DESC NULLS LAST
@@ -338,16 +355,27 @@ series.
 
 ### Preferred path — `INSIGHTS_2_EVIDENCES`
 
+**Casing pitfall.** `INSIGHT_VALUE` stores the competitor name in its
+canonical capitalisation, which may not match `{competitor_name}`
+(e.g. `CloudSmith` not `Cloudsmith`, `JFrog` not `Jfrog`). Use
+`ILIKE` to be safe. A naive `INSIGHT_VALUE = '{competitor_name}'` will
+return zero rows even when data exists.
+
 ```sql
 SELECT PERSON_LINKEDIN_URL,
        COMPANY_LINKEDIN_URL,
+       EVIDENCE_TYPE_ID,
        MIN(START_DATE) AS first_seen
 FROM ONFIRE.INSIGHTS_2_EVIDENCES
-WHERE INSIGHT_VALUE = '{competitor_name}'
+WHERE INSIGHT_VALUE ILIKE '{competitor_name}'   -- case-insensitive whole-string match
   AND START_DATE IS NOT NULL
   AND START_DATE BETWEEN DATEADD(MONTH, -12, '{q_end}') AND '{q_end}'
-GROUP BY PERSON_LINKEDIN_URL, COMPANY_LINKEDIN_URL
+GROUP BY PERSON_LINKEDIN_URL, COMPANY_LINKEDIN_URL, EVIDENCE_TYPE_ID
 ```
+
+`EVIDENCE_TYPE_ID` is useful when you want to split the cohort by
+signal source (profile keyword vs community message vs job post vs
+GitHub) - see the design system for the per-source breakdown patterns.
 
 **Persists as `ds_acquisition`.**
 
@@ -490,6 +518,148 @@ ORDER BY JOB_COMPANY_NAME, n_employees DESC
 
 Then take the modal `LOCATION_COUNTRY` per company. If no employees
 match either, leave the company in the Unresolved bucket (shown muted).
+
+---
+
+## Query 11 — Leavers + destinations (derived from `ds_employees`)
+
+**Not a `query_onfire` SQL.** Phase 1.1's `ds_employees` already
+covers leavers (rows where `end_date IN window`) and attaches the
+immediately-next company per row via the symmetric self-join. The
+old separate `query_onfire` against `PEOPLE_EXPERIENCES` plus the
+window-function CTE for destinations are **superseded** — derive a
+single `ds_leavers` from `ds_employees` via `query_datasets`:
+
+```sql
+-- datasets: {"e": "ds_employees"}
+SELECT
+    person_linkedin_url,
+    person_linkedin_id,
+    full_name,
+    title_name,
+    title_role,
+    title_sub_role,
+    title_levels,
+    start_date,
+    end_date,
+    location_country,
+    location_region,
+    location_continent,
+    location_name,
+    current_job_title,
+    current_company_name,
+    current_company_linkedin_url,
+    -- destination is on the same row, no second join needed:
+    next_company_name,
+    next_company_linkedin_url,
+    next_title,
+    next_start_date,
+    next_end_date
+FROM e
+WHERE end_date IS NOT NULL                            -- they left
+  AND end_date >= '{window_start_yyyymm}'             -- in the window
+  AND end_date <= '{window_end_yyyymm}'
+ORDER BY end_date, location_country
+```
+
+**Persists as `ds_leavers`.**
+
+`start_date` / `end_date` are stored as `YYYY-MM` strings — compare
+against `YYYY-MM` literals, never `YYYY-MM-DD`. Tenure-at-target =
+`end_date - start_date` (in months).
+
+Interns surface naturally as 4-6-month tenures with `intern` in
+`title_name` — call those out separately from real departures.
+
+`next_company_*` is NULL for some leavers — their next role hasn't
+landed in the data lake yet. Call the gap out explicitly ("6 of 18
+destinations captured"). For destination size / industry / country,
+batch-pair the distinct `next_company_linkedin_url` values to
+`ONFIRE.COMPANIES` via a follow-up `query_onfire` (groups of 30-50).
+
+Symmetric pattern for **joiner origins**: `ds_employees` already
+carries the `prior_company_*` block on every row — slice the same
+dataset with `start_date IN window AND end_date IS NULL` to get the
+joiner cohort with origins attached (this is `ds_q_hires` from
+Query 03; the slim-projected-with-origins flavour is `ds_q_hires_priors`).
+
+There is no separate `ds_leaver_destinations` dataset — destinations
+ride on the leaver row.
+
+Used in: Complication 1B leavers card; Phase 2 strategic-thread
+synthesis ("where are senior people going?").
+
+---
+
+## ~~Query 12~~ — deprecated (folded into Query 11)
+
+The previous `query_onfire` CTE that detected leavers in
+`PEOPLE_EXPERIENCES` and window-functioned the next employer has been
+**replaced** by Query 11's `query_datasets` derivation. The
+`get_company_headcount` tool emits both halves on the same row via the
+`next_*` columns, so no separate destinations dataset is needed.
+
+---
+
+## Query 13 — Departed-no-backfill recoverability (SUMMARY scan)
+
+For each title in the `departed-no-backfill` bucket from Phase 2.1,
+two passes against current employees:
+
+### 13a — Current-holder SUMMARY scan
+
+```sql
+SELECT pe.PERSON_LINKEDIN_URL,
+       pe.TITLE_NAME,
+       pe.TITLE_ROLE,
+       pe.SUMMARY                AS experience_summary,
+       p.HEADLINE,
+       p.JOB_SUMMARY
+FROM ONFIRE.PEOPLE_EXPERIENCES pe
+LEFT JOIN ONFIRE.PEOPLE p
+  ON LOWER(p.LINKEDIN_URL) = LOWER(pe.PERSON_LINKEDIN_URL)
+  AND p.DELETED_AT IS NULL
+WHERE LOWER(pe.COMPANY_LINKEDIN_URL) = '{company_linkedin_url}'
+  AND pe.END_DATE IS NULL                    -- still in role
+  AND (
+        LOWER(pe.SUMMARY)    LIKE '%{function_keyword_1}%'
+     OR LOWER(pe.SUMMARY)    LIKE '%{function_keyword_2}%'
+     OR LOWER(p.HEADLINE)    LIKE '%{function_keyword_1}%'
+     OR LOWER(p.HEADLINE)    LIKE '%{function_keyword_2}%'
+     OR LOWER(p.JOB_SUMMARY) LIKE '%{function_keyword_1}%'
+     OR LOWER(p.JOB_SUMMARY) LIKE '%{function_keyword_2}%'
+  )
+```
+
+Pick 4-8 keywords that describe the function in plain language. For
+example, for a departed "Head of Technology Partnerships", scan for
+`partnership`, `alliance`, `ecosystem`, `integration partner`, `channel`,
+`business development`. The SUMMARY scan catches people doing the work
+under a different title - a title-keyword search would miss them.
+
+### 13b — Open-posting check
+
+```sql
+-- against ds_open_jobs_active
+SELECT job_post_title, job_function, country, date_posted
+FROM a
+WHERE LOWER(job_post_title) LIKE '%{function_keyword_1}%'
+   OR LOWER(job_text)       LIKE '%{function_keyword_1}%'
+```
+
+### 13c — Read
+
+| 13a result | 13b result | Read |
+|---|---|---|
+| 1+ rows | any | **Parallel hold by [title].** The function is still held by a current employee whose role summary describes the work. Often the parallel holder pre-existed the departed person's tenure. |
+| 0 rows | 1+ active posting | **Open posting in flight.** No current holder but an active req targets the function. |
+| 0 rows | 0 active postings | **Function lapsed.** Dedicated seat experiment ended and the work isn't visible elsewhere - the only true "lost capability" outcome. |
+
+**Always check 13a before concluding "function lost"** - title-keyword
+search routinely overstates departed-no-backfill as lost capability.
+On real briefs most outcomes are 13a-hits (parallel hold).
+
+Used in: Page 4 Departed-no-backfill detail table.
 
 ---
 

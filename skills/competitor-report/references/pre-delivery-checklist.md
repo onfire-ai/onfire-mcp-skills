@@ -32,14 +32,36 @@ proceeding.
 - [ ] **All quote text is verbatim** - no paraphrasing of any
       `message_text` field
 - [ ] **Every quoted author has a LinkedIn handle attached**
+- [ ] **No evidence-wall quote is from the target competitor account.**
+      Scan every `.ev.neg` and `.ev.pos` on page 11 - reject any quote
+      whose speaker's current employer is the competitor itself.
+- [ ] **No evidence-wall quote is from the prepared-for tenant.** Same
+      scan - reject any whose speaker works for the tenant. Analytical
+      mentions of either company on other pages are permitted; the
+      rule is scoped to verbatim quotes on the evidence wall.
+- [ ] **No mention of the prepared-for tenant anywhere in customer-
+      facing copy.** Grep the assembled HTML for the tenant's brand
+      name; the only allowed occurrence is the cover line when
+      `brand_cover: true` was set, otherwise nowhere. When a tenant CEO
+      or employee surfaces in events, use a category descriptor ("a
+      category-incumbent CEO").
 - [ ] **Unresolved rows shown muted, not hidden** (`opacity: 0.65`
-      on those rows)
+      on those rows) - unless caller set `hide_unresolved: true`
 - [ ] **No named accounts in summary stats or strategic-read callouts**
-      - named accounts allowed only in the cover, the exhibit, and the
-      evidence wall
+      - named accounts allowed only in the cover, the exhibit, the
+      evidence wall, and the joiner / leaver detail cards on
+      Complication 1B
 - [ ] **No revenue estimates / dollar amounts** anywhere in the brief
 - [ ] **No GTM recommendations or "you should do X" language** - the
       brief is analytical only
+- [ ] **Departed-no-backfill detail table** on page 4 is present
+      whenever Phase 2.1 detected any departed-no-backfill events. For
+      each departed title it answers: (a) does any current employee
+      hold the function under a different title (via Phase 1.13a
+      SUMMARY scan, not just title-keyword), (b) is there an open
+      posting (via `ds_open_jobs_active`), (c) is the function lapsed?
+      Default to characterising as "parallel hold" unless both 13a and
+      13b return empty.
 
 ---
 
@@ -76,15 +98,28 @@ proceeding.
 
 ## Time-window discipline
 
-- [ ] **Quarter window is strictly enforced** - every signal outside
-      the window is excluded or explicitly flagged
+- [ ] **Window is strictly enforced** - every signal outside the
+      `window_start` / `window_end` range is excluded or explicitly
+      flagged.
+- [ ] **Window mode is consistent everywhere.** Page footers, running
+      headers, action titles, the Assumptions block, the cover and the
+      sowhats all reflect the chosen mode (`Q1 2026` if quarter mode,
+      `12-month view` / `12 months ending Mar 2026` if 12_month mode).
+      No leftover `Q1` references when running in 12-month mode.
 - [ ] **No GitHub time-trend claims** - the data is snapshot-only.
       The Complication 2C action sub explicitly says so, and the
       Assumptions and Definitions block reiterates.
 - [ ] **Acquisition window labelled** as `last 12 months ({rolling_12mo_start} - {q_end})`
+      regardless of brief window mode - the acquisition motion is
+      always 12-month trailing
 - [ ] **Mid-month current column flagged with asterisk + footnote**
       in the monthly stacked bar (if the brief includes the current
       partial month)
+- [ ] **`INSIGHT_VALUE` casing checked.** If Query 07 returns zero
+      rows, verify the competitor's canonical capitalisation in
+      `ONFIRE.INSIGHTS_2_EVIDENCES` (e.g. `CloudSmith` not
+      `Cloudsmith`) before concluding "no acquisition motion data".
+      Use `ILIKE`, not exact-match equality.
 
 ---
 

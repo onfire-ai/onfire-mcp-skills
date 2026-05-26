@@ -323,10 +323,13 @@ Default body sizing: **9pt** line-height **1.5**. Action titles are
 
 - No `running-foot` (the cover has no page number)
 - Big serif competitor name
-- "Competitor Intelligence Brief" eyebrow
-- "Prepared for {tenant}" line
-- Date + quarter label
-- One-line "Q-window: {q_start} - {q_end}" footnote
+- "Competitor Intelligence Brief" eyebrow (append `· 12-month view` when `window_mode = "12_month"`)
+- **"Prepared for the requesting tenant" line by default.** Only name
+  the tenant on the cover when `brand_cover: true` was passed at run
+  time - the brief body never names the tenant, and a branded cover
+  conflicts with the body rule.
+- Date + `{window_label}` (e.g. `Q1 2026` or `12 months ending Mar 2026`)
+- One-line "Window: {window_start} - {window_end}" footnote
 
 ### Page 2 - Executive summary (`.act`)
 
@@ -357,17 +360,48 @@ hero stats.
 
 - 3-card "Movement type" row:
   - **Paired swaps** (neutral, soft) - old → new in same function
-  - **Departed-no-backfill** (amber, warn) - Q+1 hiring watch
+  - **Departed-no-backfill** (amber, warn) - triggers Phase 1.13
+    recoverability check; do NOT characterise as "Q+1 hiring watch"
+    without first running the SUMMARY scan
   - **Net-new functions** (green, pos) - strategic bets
+- **Departed-no-backfill detail table** (full-width warn card,
+  conditional on any departed-no-backfill events). One row per
+  departed title with columns:
+  - **Departed title (tenure)** - title + person + start-end dates
+  - **Function now held by** - result of Phase 1.13a SUMMARY scan; if
+    none, the open-posting check result
+  - **Read** - pill: `Parallel hold by ...`, `Open posting in flight`,
+    or `Function lapsed`
 - 3-card "Strategic threads" row - the synthesis (e.g.
   "Public-sector GTM broadened", "Top-layer AI build", etc.)
 - Sowhat callout - bottom-line synthesis
 
 ### Page 5 - Complication 1B (`.act`)
 
-- Headcount % bar chart (12 months) on the left
-- Q-hire continent breakdown on the right
-- Sowhat - hiring tilt synthesis
+The headcount + movement page. Layout:
+
+- 3-card hero row: net headcount delta (absolute employees, e.g.
+  `+33` from 107 to 140); captured joiners count; captured leavers
+  count
+- **Headcount chart** (full-width card): bars per month with **MoM %
+  above each bar** and **absolute headcount below** so the reader sees
+  both the rate and the trajectory
+- 2-column grid below:
+  - **Joiners card (pos / green)** - by region bars, by origin-size
+    bars (SMB / Mid-market / Enterprise pulled from origin company's
+    firmographics), by function summary line, and a "Notable origins"
+    inline tier (Enterprise: A, B, C / Dev-tools peers: D, E, F /
+    Other patterns)
+  - **Leavers card (neg / red)** - by region bars, by seniority bars
+    (Senior Director / Director vs Manager vs IC vs Intern), by
+    function summary line, and a "Captured destinations" inline list
+    showing 4-6 named departures with their next employer; flag the
+    captured-vs-total ratio ("6 of 18 destinations captured")
+- Sowhat - balance of origin tiers (talent pull from incumbents vs
+  peers) and destinations (which leavers went where)
+
+This page is dense. Drop the by-function table if the page overflows -
+keep the by-region bars and origin-size bars.
 
 ### Page 6 - Complication 1C (`.act`)
 
@@ -433,14 +467,43 @@ where each card explains one trust dimension:
 
 ### Page 11 - Evidence wall (`.act`)
 
-Verbatim quotes only. Layout:
+Verbatim quotes only. **Third-party voices only** - never quote the
+target competitor or the prepared-for tenant on this page. Both
+companies are excluded - this applies to the author of the post AND to
+any reposted customer testimonial whose attribution line names a target
+or tenant employee. Reposts of external customer quotes still belong
+here; just re-attribute to the underlying customer speaker and drop
+the reposter's LinkedIn handle.
 
-- Eyebrow "Q evidence - the voices saying it"
+Layout:
+
+- Eyebrow "{window_label} evidence - the voices saying it"
 - For each trust event (if applicable):
-  - Mini-eyebrow with event name
-  - `.ev.neg` block with the verbatim quote (italics) + author LinkedIn
+  - `.ev.neg` block with the verbatim quote (italics) + third-party
+    author LinkedIn handle
 - "For balance - the strongest positive voices" section
-  - `.ev.pos` blocks - 2-3 verbatim positive quotes
+  - `.ev.pos` blocks - 2-3 verbatim positive quotes from third-party
+    customers
+
+**Selection filter** (apply before assembling the page):
+
+```sql
+-- against ds_sentiment ⨝ ds_authors_resolved
+SELECT linkedin_url, sender_name, company_name, sentiment_value,
+       message_text, confidence, message_timestamp
+FROM s
+WHERE sentiment_value IN ('positive','negative')
+  AND LOWER(company_linkedin_url) NOT IN (
+    '{company_linkedin_url}',   -- target competitor employees: excluded
+    '{tenant_linkedin_url}'     -- prepared-for tenant employees: excluded
+  )
+ORDER BY sentiment_value, confidence DESC
+```
+
+If removing tenant or target voices leaves the "For balance" section
+with fewer than 3 positive quotes, prefer reposted third-party
+customer testimonials (customer-success posts) over leaving the
+section thin.
 
 ### Page 12 - Assumptions and definitions (`.act`)
 
@@ -521,9 +584,20 @@ on top, full-width bar below.
 - **No revenue estimates or dollar amounts** anywhere in the brief.
 - **No GTM recommendations** - analytical only.
 - **No named accounts in summary stats or strategic-read callouts** -
-  named accounts allowed only in the cover, the exhibit, and the
-  evidence wall.
+  named accounts allowed only in the cover, the exhibit, the evidence
+  wall, and the joiner / leaver detail cards on Complication 1B.
 - **No raw counts in opinion / sentiment cuts** - use percentages.
+- **No tenant name anywhere in customer-facing copy.** Every reference
+  to the prepared-for tenant - whether they appear as the author of a
+  public critique, as a competitor in a feature comparison, or as the
+  audience of a recommendation - must be replaced with a category
+  descriptor ("a category-incumbent CEO", "a public artifact-management
+  vendor", "the requesting tenant"). The cover line is the only
+  permitted appearance, and only when `brand_cover: true` is set.
+- **No target or tenant voices on the evidence wall.** Verbatim quotes
+  on page 11 must be from third parties. Describe competitor /
+  tenant-side events analytically on Complication 3 using the category
+  descriptor.
 
 ---
 
