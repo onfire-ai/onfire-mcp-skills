@@ -138,6 +138,40 @@ proceeding.
 
 ---
 
+## Complication 1B split conditional (page 5b)
+
+- [ ] **1B-split page included if-and-only-if** all three thresholds
+      hit: ≥ 15 joiner stints AND ≥ 4 distinct title_role functions
+      represented AND ≥ 3 internal promotions detected. Otherwise the
+      function-bars and promotion-grouping content folds back into
+      page 5.
+- [ ] If included: **page numbering bumps** for every page from "Open
+      job postings" onward; brief renders 14 pages.
+- [ ] **Function bar rows have explicit % triples** (joiners, leavers,
+      net) and the only-flat function carries a `FLAT` pill.
+- [ ] **Internal promotions grouped by destination function**, not by
+      month / cluster.
+
+---
+
+## People-movement reconciliation
+
+- [ ] **Pages 3 and 5 source the same dataset** (`ds_employees`
+      returned by `get_company_headcount`); each page's action-sub
+      states the unit (title strings on page 3, person-stints on
+      pages 5/5b) so the reader does not try to reconcile manually.
+- [ ] **Headcount reconciliation:** `external_hires - real_departures`
+      is within ±5 of `headcount_delta` (from `ds_headcount`). A gap
+      > 5 should trigger a snapshot-lag check before publishing.
+- [ ] **External hires + internal promotions + real departures**
+      equals the raw `joiner_stints + leaver_stints` row count.
+- [ ] **Promotions detection** used the same-person same-stint pairing
+      (b.start_date >= a.end_date for the same `person_linkedin_url`).
+      Don't double-count promotions in both joiner and leaver hero
+      stats - they belong in their own bucket.
+
+---
+
 ## Back-matter integrity
 
 - [ ] **Section heading reads "Assumptions and definitions"** -

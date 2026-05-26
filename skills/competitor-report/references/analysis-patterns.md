@@ -354,7 +354,137 @@ coverage that pre-existed. Be explicit about that.
 
 ---
 
-## 10. Sowhat synthesis blocks
+## 10. People-movement classification (joiner / promotion / leaver)
+
+`ds_employees` is the single source of truth for the people-side
+analysis. Three derived buckets feed Pages 5, 5b and the exec-summary
+findings.
+
+### 10.1 Same-person stint pairing
+
+For every person with **two stints at the target** where one stint
+ends in window and the next stint starts in window:
+
+```sql
+-- datasets: {"e": "ds_employees"}
+SELECT a.person_linkedin_url,
+       a.title_name AS old_title,
+       a.end_date   AS promotion_month_end,
+       b.title_name AS new_title,
+       b.start_date AS promotion_month_start,
+       a.location_country
+FROM e a
+JOIN e b
+  ON a.person_linkedin_url = b.person_linkedin_url
+  AND a.end_date IS NOT NULL
+  AND b.end_date IS NULL
+  AND b.start_date >= a.end_date
+WHERE a.end_date BETWEEN '{window_start}' AND '{window_end}'
+ORDER BY a.end_date
+```
+
+That set is `internal_promotions`. The same join lets you reason
+about whether the gap between `a.end_date` and `b.start_date` is
+zero (clean within-month promotion) or one to two months (likely a
+title change with a small delay).
+
+### 10.2 The three buckets
+
+| Bucket | Definition |
+|---|---|
+| **External hires** | Person whose first Cloudsmith stint starts in window AND the person does NOT appear in `internal_promotions` (i.e. no parallel ending-stint). Equivalent: `start_date IN window AND end_date IS NULL` AND not in the promotion set. |
+| **Internal promotions** | Per §10.1 - same person, ending stint AND starting stint both in window. |
+| **Real departures** | Person whose final stint ends in window AND the person does NOT appear in `internal_promotions`. Equivalent: `end_date IN window` AND not in the promotion set. |
+
+### 10.3 Reconciliation rule
+
+```
+net_headcount_growth = external_hires − real_departures
+```
+
+This is exact — not approximate. The movement data is authoritative.
+Internal promotions are role changes within the company and contribute
+zero to headcount either way.
+
+A typical Cloudsmith-scale run looks like:
+- ~49 external hires
+- ~12 internal promotions
+- ~7 real departures
+- net_headcount_growth = 49 − 7 = **+42**
+
+The `ds_headcount` snapshot may show a slightly different endpoint
+(e.g. 103 → 140 = +37 in the Cloudsmith case) because LinkedIn profile
+updates lag real role changes by days to weeks. The movement-derived
+delta (+42) is always the number shown on page 5 — never the snapshot
+delta. A divergence between the two signals that some profiles
+updated late; it is a data-quality observation, not a tolerance band.
+Do NOT label a snapshot-vs-movement gap as "expected snapshot lag" in
+the brief. Show the movement-derived number and move on.
+
+### 10.4 Function classification
+
+The `title_role` field on `ds_employees` carries LinkedIn's
+classification. Most rows map directly; rows with `title_role IS NULL`
+are typically leadership / strategic seats (VP, Head of, Principal
+something) that LinkedIn doesn't bucket.
+
+Treat `null` title_role as a separate bucket labelled "Leadership /
+unclassified" rather than dropping the rows.
+
+### 10.4b Seniority classification (for page 5 Joiners + Leavers cards)
+
+Classify every person-stint into one of four seniority tiers using
+`title_name` (lowercased, word-boundary match) and `title_levels`:
+
+| Tier | Signals |
+|---|---|
+| **Leadership** (VP / Head of / Director) | `title_name` contains: `vp`, `vice president`, `chief`, `cto`, `cfo`, `coo`, `ceo`, `director`, `head of`, `general manager`, `managing director`, `partner` — OR — `title_levels` includes `vp` or `director` |
+| **Senior / Principal IC** | `title_name` contains `senior`, `principal`, `staff`, `lead`, `architect`, `specialist` — AND does NOT match the Leadership tier — OR — `title_levels` includes `senior` or `principal` |
+| **Mid-level IC** | Engineer, designer, analyst, AE, BDR, SDR, CSM, TSE, manager (non-senior) — the majority of individual contributors not caught by the two tiers above |
+| **Junior / Associate** | `title_name` contains `junior`, `associate`, `intern`, `graduate`, `trainee`, `entry` — OR — `title_levels` includes `entry` or `training` |
+
+Apply this classification to **both** the Joiners pool (external hires)
+and the Leavers pool (internal promotion old-titles + real departures).
+
+Render as horizontal bar sections on the respective cards:
+- **Joiners card** (green bars): labelled "By seniority." placed after
+  the "By region." bars and before the "By function" summary text.
+- **Leavers card** (red bars): labelled "By seniority." placed after
+  the "By region." bars and before the "By type" summary text.
+
+All four bars in each card are proportional to the same scale: the
+largest bucket = 100% width. Include count + percentage in the right-
+hand label of each bar row (e.g. `12 (20%)`).
+
+If a tier is empty, omit its bar row entirely rather than showing a
+zero bar.
+
+### 10.5 Reconciliation between Page 3 and Pages 5/5b
+
+The two views count different units and do not arithmetically
+reconcile - they are complementary. Page 3 is title-string-level;
+pages 5 / 5b are person-stint-level.
+
+| Page | Unit | Counts |
+|---|---|---|
+| Page 3 (Complication 1A) | Distinct title strings | Net-new / now-gone title strings |
+| Page 5 (Complication 1B) | Person-stints | Joiner / leaver / promotion / external-hire stints |
+| Page 5b (1B continued) | Person-stints | Same, aggregated by function |
+
+A single internal promotion creates:
+- **Page 3:** +1 net-new title, possibly +1 now-gone title
+- **Page 5:** +1 joiner stint, +1 leaver stint, 0 headcount
+
+A single external hire under a pre-existing title creates:
+- **Page 3:** 0 net-new, 0 now-gone (title already existed)
+- **Page 5:** +1 joiner stint, +1 headcount
+
+Always state the source explicitly on each page so readers do not
+try to reconcile manually.
+
+---
+
+## 11. Sowhat synthesis blocks
 
 Every page closes with a `.sowhat` callout that synthesises the page
 into one paragraph. The convention:

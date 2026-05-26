@@ -376,34 +376,131 @@ hero stats.
   "Public-sector GTM broadened", "Top-layer AI build", etc.)
 - Sowhat callout - bottom-line synthesis
 
-### Page 5 - Complication 1B (`.act`)
+### Page 5 - Complication 1B (`.act`) - Headcount + geographic movement
 
-The headcount + movement page. Layout:
+The headcount + geographic-movement page. Page 5 stays focused on the
+**where** of joiners and leavers; departmental change (the **what**)
+sits on page 6.
 
-- 3-card hero row: net headcount delta (absolute employees, e.g.
-  `+33` from 107 to 140); captured joiners count; captured leavers
-  count
+Layout:
+
+- **3-card hero row — movement-derived math only:**
+  - Card 1: **People joined** — `+{external_hires}` in green. Subtext:
+    "New external hires whose first stint starts in-window. Excludes
+    internal promotions — those people were already at the company."
+  - Card 2: **People left** — `−{real_departures}` in red. Subtext:
+    "People who actually left the company in-window. Excludes internal
+    promotions, which are role changes within the company, not exits."
+  - Card 3: **Net headcount growth** — `+{external_hires −
+    real_departures}` in green. Subtext: "{external_hires} joined −
+    {real_departures} left = +{net} net new people over the window."
+  - The net is always computed as `external_hires − real_departures`.
+    Do NOT pull the net from `ds_headcount` snapshot endpoints — those
+    can lag the movement data.
 - **Headcount chart** (full-width card): bars per month with **MoM %
-  above each bar** and **absolute headcount below** so the reader sees
-  both the rate and the trajectory
-- 2-column grid below:
-  - **Joiners card (pos / green)** - by region bars, by origin-size
-    bars (SMB / Mid-market / Enterprise pulled from origin company's
-    firmographics), by function summary line, and a "Notable origins"
-    inline tier (Enterprise: A, B, C / Dev-tools peers: D, E, F /
-    Other patterns)
-  - **Leavers card (neg / red)** - by region bars, by seniority bars
-    (Senior Director / Director vs Manager vs IC vs Intern), by
-    function summary line, and a "Captured destinations" inline list
-    showing 4-6 named departures with their next employer; flag the
-    captured-vs-total ratio ("6 of 18 destinations captured")
-- Sowhat - balance of origin tiers (talent pull from incumbents vs
-  peers) and destinations (which leavers went where)
+  above each bar** and **absolute headcount below**. Y-axis title
+  ("MoM growth %") rotated -90° at the left edge. X-axis title
+  ("Month · {start} - {end}") below the bars. Use `viewBox="0 0 700
+  138"` with `max-height: 80pt` on the SVG so text scales up but the
+  card stays compact. Chart note: "Headcount computed month by month
+  as the count of people with an active stint at that point in time."
+- **2-column grid below:**
+  - **Joiners card (pos / green border):**
+    1. "By region." bar section — one bar per region, proportional to
+       the largest region (= 100%).
+    2. "By seniority." bar section — four tiers: Leadership (VP / Head
+       of / Director) · Senior / Principal IC · Mid-level IC · Junior /
+       Associate. Bars are green, proportional to the largest tier.
+       Count + percentage on the right label of each row. Omit empty
+       tiers. (See analysis-patterns.md §10.4b for classification rules.)
+    3. "By function:" summary text line (e.g. "Eng 18, Sales 11…").
+    4. "Notable origins:" inline text (Enterprise names / Dev-tools
+       peers / regional pipeline if applicable).
+  - **Leavers card (neg / red border):**
+    1. "By region." bar section — same pattern, red bars.
+    2. "By seniority." bar section — same four tiers, red bars.
+       Classify both real departures and internal promotion old-titles
+       (both contribute to the leaver stint pool).
+    3. "By type:" summary text — internal promotions (n) + real
+       departures (n).
+    4. "Captured destinations:" inline list from
+       `ds_employees.next_company_*`; flag ratio (e.g. "3 of 7
+       destinations captured").
+- **No sowhat on page 5** when paired with page 6 - the page 6 sowhat
+  carries the combined synthesis.
 
-This page is dense. Drop the by-function table if the page overflows -
-keep the by-region bars and origin-size bars.
+This page is dense; the function and promotion content moved to page
+6. If the joiner book is thin (< 15 joiner stints) and there are no
+promotions worth showing, page 5 and 6 can be merged - in that case
+re-add the joiner-by-function summary line on the Joiners card and
+include a small `.sowhat` block.
 
-### Page 6 - Complication 1C (`.act`)
+### Page 5b (conditional) - Complication 1B continued (`.act`) - Departmental change + internal promotions - **CONDITIONAL**
+
+**Inclusion rule** (per SKILL.md Phase 3.1): include this page only
+when **all** of the following hold:
+- ≥ 15 in-window joiner stints
+- ≥ 4 distinct `title_role` functions represented in the joiner mix
+- ≥ 3 internal promotions detected
+
+Otherwise fold the function and promotion content back into page 5
+and skip this page. When included, page numbering bumps for every
+subsequent page (the brief renders as 14 pages instead of 13).
+
+The departmental-change page exists to give the functional-mix story
+the visual room it needs and to keep the internal-promotions detail
+readable.
+
+Layout:
+
+- 3-card hero row, each card calling out a department-level verdict:
+  - **Biggest gainer** (e.g. "Engineering" - largest joiner-stint
+    count).
+  - **Cleanest add** (e.g. "Sales" - any function with zero captured
+    departures and ≥ 3 joiners).
+  - **Only flat function** (joiners = leavers; orange / warn). If no
+    function is exactly flat, swap for "Smallest delta function."
+- **External hires · Promotions · Departures by department** card
+  (full-width):
+  - Title: "External hires · Internal promotions · Real departures by
+    department"
+  - Legend row (three swatches): green = External hires · amber =
+    Promotions within dept · red = Real departures. Caption: "Bar
+    widths proportional to the department with the most external hires
+    (= 100%)."
+  - One row per function bucket (Engineering, Leadership /
+    unclassified, Sales, Customer service, Design, Marketing,
+    Operations, HR + Finance condensed).
+  - Each row has:
+    - Function label on the left, stat quadruple on the right
+      ("External N · Promoted N · Departed N · Net +N").
+    - **Three** stacked horizontal bars (6pt height each, 1pt gap):
+      1. Green bar — external hires (top)
+      2. Amber / `--warn` bar — promotions within this department
+      3. Red bar — real departures (bottom)
+    - All bar widths share the same scale: the department with the
+      most external hires = 100%. This means the amber and red bars
+      can be visually compared directly against the green bar on the
+      same row and across rows.
+  - Departments with zero departures get a `CLEAN` pill (green) next
+    to the label. Departments where external hires = real departures
+    get a `FLAT` pill (amber).
+- **Internal promotions card (warn / amber)** - full-width:
+  - Eyebrow "Internal promotions by department (n = N)".
+  - Grouped by **destination function** (NOT by month), in a 3-column
+    grid: e.g. Engineering, Design / UX, Customer service, Leadership,
+    Marketing.
+  - Each group: function name + count pill, then one line per person:
+    `Name · old title → new title (Region)`.
+- **No sowhat on page 6** by default - the brief is already dense; if
+  a synthesis paragraph is needed, fold it into the hero stat
+  `.sub` text.
+
+The departmental bars use the same `--pos` green and `--neg` red as
+the rest of the brief, so the visual language is consistent with the
+sentiment cross-tabs.
+
+### Page 6 - Complication 1C (`.act`) - Captured job postings
 
 - Open job postings, grouped by hiring manager
 - Show: title, hiring manager name + LinkedIn handle, location,

@@ -8,11 +8,18 @@ description: Generate a full client-grade Competitor Intelligence Brief for a si
 ## What this skill does
 
 Given a **competitor company name** (e.g. `Sonatype`, `Snyk`, `JFrog`),
-this skill produces a 12-13 page A4 PDF analytical brief. The deliverable
-is internal-facing (prepared FOR the caller's tenant, ABOUT a non-customer
-vendor) and written in a consulting-firm idiom - Pyramid Principle, SCR
-(Situation / Complication / Resolution) narrative arc, McKinsey-style
-action titles.
+this skill produces a **13-page A4 PDF analytical brief** by default.
+The page count can flex to 14 when Complication 1B is split into a
+geographic page (page 5) and a departmental-change page (new page 6) -
+opt in to the split when the joiner book is rich enough to warrant a
+function-bar visualisation and the internal-promotion list deserves its
+own card. Briefs without vendor-trust events run 12 pages (Complication
+3 is omitted).
+
+The deliverable is internal-facing (prepared FOR the caller's tenant,
+ABOUT a non-customer vendor) and written in a consulting-firm idiom -
+Pyramid Principle, SCR (Situation / Complication / Resolution) narrative
+arc, McKinsey-style action titles.
 
 The brief is **analytical only**. No GTM plays, no recommendations, no
 revenue estimates. The reader synthesises the implications themselves.
@@ -519,7 +526,73 @@ company's employees). Then:
 7. Build a monthly stacked-bar histogram: rows = months, stacks = 4-5
    industry buckets.
 
-### 2.5 Vendor-trust event detection
+### 2.5 People movement — joiner / leaver / promotion semantics
+
+`ds_employees` returned by the headcount tool contains all the
+person-stint events the brief needs. Three derived buckets feed pages
+5, 6 and the exec-summary findings:
+
+| Bucket | Rule | Use on |
+|---|---|---|
+| **External hires** | `start_date IN window AND end_date IS NULL` AND the person has no other stint at the target whose `end_date` is in window | Page 5 hero stat: "People joined"; pages 5+6 joiner cards |
+| **Internal promotion** | One person has BOTH a stint ending in window AND a stint starting in window (`b.start_date >= a.end_date`, same `person_linkedin_url`) | Page 6 promotions card only - does NOT appear as a page 5 hero stat |
+| **Real departure** | `end_date IN window` AND the person has no active stint at the target (`end_date IS NULL` somewhere else for this person) | Page 5 hero stat: "People left"; page 5 leavers card |
+
+The net headcount growth is computed directly from movements — it is
+NOT taken from `ds_headcount` snapshot delta:
+
+```
+net_headcount_growth = external_hires − real_departures
+```
+
+This is the only number shown as the Net stat on page 5. The three
+page 5 hero stats are therefore:
+
+| Card | Label | Value |
+|---|---|---|
+| 1 | People joined | `+{external_hires}` (green) |
+| 2 | People left | `−{real_departures}` (red) |
+| 3 | Net headcount growth | `+{external_hires − real_departures}` (green) |
+
+The subtext on card 3 explains: "N joined − M left = +Z net new
+people over the window." This makes the math explicit and
+self-verifiable for the reader. Do NOT show the `ds_headcount`
+snapshot endpoint numbers as the primary stat — they can diverge from
+the movement-derived delta because LinkedIn profile updates lag behind
+real role changes. The movement data is always authoritative.
+
+Internal promotions are role changes within the company and do not
+affect headcount. They appear on page 6 only, not in the page 5 hero
+row.
+
+#### 2.5.b Reconciling page 3 (titles) with pages 5+6 (people)
+
+The two views count different things and do not arithmetically
+reconcile - they are complementary:
+
+| Page | Unit | Counts |
+|---|---|---|
+| Page 3 (Complication 1A) | Distinct title strings | Net-new = title with no prior holder, first arrived in window. Now-gone = title where the last remaining holder departed in-window. |
+| Pages 5+6 (Complication 1B) | Person-stints | Joiners = stint started in window. Leavers = stint ended in window. Promotions = same person with both. |
+
+A single internal promotion creates:
+- **Page 3**: +1 net-new title (the new title string), possibly +1 now-gone (if the old title had no other holders)
+- **Pages 5/6**: +1 joiner stint, +1 leaver stint, +0 headcount
+
+A single external hire under a title that already exists at the company
+creates:
+- **Page 3**: 0 net-new, 0 now-gone (title pre-existed)
+- **Pages 5/6**: +1 joiner stint, +1 headcount
+
+This is why on a typical Cloudsmith-scale 12-month window, page 3 will
+show ~35 net-new titles while page 5 shows ~60 joiner stints. The page
+3 number is always smaller because it dedupes within title; page 5 is
+larger because every hire-into-existing-title still counts.
+
+The brief should state the source explicitly on each page footer or
+sowhat so readers do not try to reconcile manually.
+
+### 2.6 Vendor-trust event detection
 
 Scan opinionated negatives in `ds_sentiment` for distinct
 **trust dimensions**:
@@ -546,24 +619,50 @@ and the per-page layout spec.
 
 ### 3.1 Page order
 
-| # | Section | Forced page break (`class="page act"`) |
-|---|---|---|
-| 1 | Cover | first page, no `.act` |
-| 2 | Executive summary | yes |
-| 3 | Complication 1A · Org reshape - hero + leadership / dept ledger | yes |
-| 4 | Complication 1A · Movement types + departed-no-backfill detail + strategic threads | yes |
-| 5 | Complication 1B · Headcount + joiners (geo, function, origin size) + leavers (geo, function, destinations) | yes |
-| 6 | Complication 1C · Open job postings | yes |
-| 7 | Complication 2A · Customer acquisition motion | yes |
-| 8 | Complication 2B · Sentiment split | yes |
-| 9 | Complication 2C · GitHub footprint snapshot | yes |
-| 10 | Complication 3 · Vendor-trust events (conditional) | yes |
-| 11 | Evidence wall (verbatim quotes) | yes |
-| 12 | Assumptions and definitions | yes |
-| 13 | Exhibit A · Company reference card | yes |
+The default brief is **13 pages**. Two pages are conditional and can
+extend the brief by one position each:
 
-The conditional page 10 shifts everything below by one position when
-omitted.
+- **Complication 3 - Vendor-trust events** (default: included only if
+  3+ distinct trust dimensions are detected; see Phase 2.6).
+- **Complication 1B continued - Departmental change** (default:
+  omitted; include when the joiner book is rich enough that the
+  function-bar visualisation and the internal-promotion grouping
+  earn their own page). When included, the brief runs 14 pages.
+
+| # | Section | Forced page break (`class="page act"`) | Default? |
+|---|---|---|---|
+| 1 | Cover | first page, no `.act` | always |
+| 2 | Executive summary | yes | always |
+| 3 | Complication 1A · Org reshape - hero + leadership / dept ledger | yes | always |
+| 4 | Complication 1A · Movement types + departed-no-backfill detail + strategic threads | yes | always |
+| 5 | Complication 1B · Headcount chart + joiners + leavers | yes | always |
+| 5.5 | **Complication 1B continued · Departmental change + internal promotions** | yes | **conditional** (see decision rule below) |
+| 6 | Complication 1C · Captured job postings (window-only) | yes | always |
+| 7 | Complication 2A · Customer acquisition motion | yes | always |
+| 8 | Complication 2B · Sentiment split | yes | always |
+| 9 | Complication 2C · GitHub footprint snapshot | yes | always |
+| 10 | Complication 3 · Vendor-trust events | yes | **conditional** (3+ dimensions) |
+| 11 | Evidence wall (verbatim quotes) | yes | always |
+| 12 | Assumptions and definitions | yes | always |
+| 13 | Exhibit A · Company reference card | yes | always |
+
+#### Decision rule for the Complication 1B split
+
+Include the 1B-continued page when **all** of the following are true:
+
+- ≥ 15 in-window joiner stints
+- ≥ 4 distinct `title_role` functions represented in the joiner mix
+- ≥ 3 internal promotions detected
+
+Otherwise the function-bars and promotion-grouping content fold back
+into page 5: re-add the joiner-by-function summary line on the
+Joiners card, drop the promotions-by-department grid, and include a
+short `.sowhat` block.
+
+When the 1B split is enabled, page numbering bumps for every page
+from "Open job postings" onward (the brief renders as 14 pages
+total). When the vendor-trust page is also omitted, the brief stays
+at 13 pages (the split absorbs the freed slot).
 
 ### 3.2 Hard layout rules
 
@@ -617,8 +716,9 @@ These come from the canonical Sonatype brief. Violate at peril:
 | Exec summary | All phases | hero callout if `vendor_trust_count >= 3`, three hero stats, 5 numbered findings; the tenant is described by category descriptor where it surfaces |
 | Org reshape A | `ds_title_movement` + Phase 2 buckets | IN / OUT / NET-DELTA cards + leadership-vs-dept ledger |
 | Org reshape B | Phase-2 buckets + threads + Phase 1.13 recoverability | 3 movement-type cards + departed-no-backfill detail table + 3 strategic threads |
-| Headcount + movement | `ds_headcount` + `ds_q_hires` + `ds_q_hires_priors` (origin firmographics) + `ds_leavers` (destinations attached per row via `next_company_*`) | Headcount bars + Joiners card (region / function / origin size + notable origins) + Leavers card (region / seniority / function + captured destinations) |
-| Open jobs | `ds_open_jobs_quarter` + `ds_open_jobs_active` | in-window postings table + active-set grouped by function |
+| Headcount + geographic movement (Page 5) | `ds_headcount` + `ds_employees` (filter joiners / leavers) + `ds_q_hires_priors` (origin firmographics) | Headcount chart with X+Y axis titles + Joiners card (by region, notable origins) + Leavers card (by region, captured destinations via `next_company_*`) |
+| Departmental change + promotions (Page 6) | `ds_employees` aggregated by `title_role` | Function bar chart (joiner vs leaver stints per department with %) + internal-promotions card grouped by destination department |
+| Open jobs (Page 7) | `ds_open_jobs_quarter` | Single table of captured-in-window postings (no active/closed column - we capture existence, not state) |
 | Acquisition | `ds_acquisition` ⨝ `ds_acq_firmo` ⨝ `ds_geo_fallback` | monthly stacked bar SVG + size + region cards |
 | Sentiment | `ds_sentiment` ⨝ `ds_authors_resolved` | three hero %, continent / size bars, owned-vs-external infographic |
 | GitHub | `ds_github` | top countries bar + notable engagers table |
@@ -665,8 +765,42 @@ Before presenting, the agent must explicitly verify every item:
 - [ ] **Evidence wall contains no quotes from competitor employees or
       from prepared-for-tenant employees.** Both are discarded in Phase
       1.10 bias exclusion. Verify by scanning every `.ev.neg` and
-      `.ev.pos` block on page 11 against the two excluded
-      `company_linkedin_url` values.
+      `.ev.pos` block on page 12 (page 11 if vendor-trust events page
+      is omitted) against the two excluded `company_linkedin_url`
+      values.
+- [ ] **Pages 3 and 5/6 numbers come from the same source** -
+      `ds_employees` returned by `get_company_headcount`. Page 3 counts
+      title strings; pages 5/6 count person-stints. They do not
+      arithmetically reconcile by design (a same-person internal
+      promotion contributes +1 to page 3 net-new AND +1 joiner / +1
+      leaver to page 5). The action-sub on each page must say which
+      unit it counts to avoid reader confusion.
+- [ ] **Page 5 hero stats show movement-derived math:** card 1 =
+      `+{external_hires}` (People joined), card 2 = `−{real_departures}`
+      (People left), card 3 = `+{external_hires − real_departures}` (Net
+      headcount growth). Card 3 subtext must state the arithmetic
+      explicitly. `ds_headcount` snapshot numbers must NOT appear as the
+      primary net stat.
+- [ ] **Page 5 Joiners card** includes a "By seniority" bar section
+      (Leadership VP/Head/Director · Senior/Principal IC · Mid-level IC ·
+      Junior/Associate) after the "By region" bars and before the "By
+      function" text. Bars are green, proportional to the largest bucket.
+- [ ] **Page 5 Leavers card** includes a "By seniority" bar section
+      (same four tiers) after the "By region" bars and before the "By
+      type" text. Bars are red. Seniority is derived from the actual
+      `title_name` and `title_levels` fields on `ds_employees`; internal
+      promotion old-titles and real departures are classified together
+      since both contribute to the leaver stint pool.
+- [ ] **Page 6 function bar chart** shows THREE bars per department row
+      (not two): green (external hires), amber/warn (promotions within
+      dept), red (real departures). Row label shows explicit triple:
+      "External N · Promoted N · Departed N · Net +N". All bar widths
+      are proportional to the same scale (max external hires = 100%).
+      Flags any function with zero departures with a `CLEAN` pill (or
+      `FLAT` if joiners = departures).
+- [ ] **Page 6 promotions card** is grouped by destination function,
+      not by month / cluster (e.g. Engineering · 5; Design · 2;
+      Customer service · 2; Leadership · 2; Marketing · 1).
 - [ ] **No mention of the prepared-for tenant anywhere in customer-
       facing copy.** Grep the assembled HTML for the tenant's brand
       name - the only allowed occurrence is the cover line when
@@ -719,6 +853,7 @@ After delivery, the user often asks:
 | `window_mode` | `quarter` | Set `12_month` for an annual review or when the quarter is too thin to read leadership intent from |
 | `quarter` | Last completed full calendar quarter | User names a different quarter |
 | `brand_cover` | `false` (cover reads "Prepared for the requesting tenant") | Set `true` only when the brief will not leave the tenant's organisation |
+| `split_1b` | `auto` (apply the §3.1 thresholds: ≥ 15 joiners + ≥ 4 functions + ≥ 3 promotions). | Set `true` to force the page 5b split regardless; set `false` to keep page 5 monolithic. |
 | `hide_unresolved` | `false` (Unresolved rows shown muted at the bottom of cross-tabs) | Set `true` to drop them entirely - cleaner-looking sentiment cards when the unresolved bucket is noisy |
 | `hide_n_labels` | `false` (sentiment cross-tabs show `n=X` per row) | Set `true` to drop the `n=X` annotations - cleaner cards, but the reader loses the row weight |
 | Vendor-trust threshold | 3 distinct dimensions | The user wants the page included regardless |
@@ -734,3 +869,125 @@ in its **canonical capitalisation** which may not match the friendly
 `Jfrog`). Use `ILIKE` or canonicalise both sides of the comparison.
 A naive `INSIGHT_VALUE = '{competitor_name}'` filter will return zero
 rows even when the data is there.
+
+---
+
+## Session changelog (most recent first)
+
+### 2026-05-26 (v2) — Page 5/6 layout overhaul from Cloudsmith post-review
+
+**Page 5 hero stats — math must close**
+- The three hero cards are now: **People joined** (`+N`, green) /
+  **People left** (`−M`, red) / **Net headcount growth** (`+{N−M}`,
+  green). The net is always `external_hires − real_departures` — pure
+  movement math. The `ds_headcount` snapshot delta is no longer the
+  source for the net card because snapshot counts lag behind movement
+  records. The subtext on the net card states the arithmetic explicitly.
+- Internal promotions do NOT appear as a hero stat on page 5 — they are
+  role changes within the company and do not affect headcount.
+- Removed all "snapshot lag ±5" language from the reconciliation rule
+  and the pre-delivery checklist. The movement-derived delta is
+  authoritative; snapshot divergences are a data-quality signal, not
+  an expected tolerance.
+
+**Page 5 Joiners + Leavers cards — seniority section added**
+- Both the Joiners (green) card and the Leavers (red) card now include
+  a **"By seniority"** bar section placed between the "By region" bars
+  and the "By function" / "By type" summary text.
+- Four tiers: Leadership (VP / Head of / Director) · Senior / Principal
+  IC · Mid-level IC · Junior / Associate. Derived from `title_name` and
+  `title_levels` on `ds_employees`.
+- Joiner bars are green; Leaver bars are red. All bars proportional to
+  the largest bucket in that card (= 100%).
+
+**Page 6 department chart — 3 bars per row**
+- The "Joiners vs leavers" chart is replaced by a three-bar chart:
+  1. **Green** — External hires into this department
+  2. **Amber** — Internal promotions within / into this department
+  3. **Red** — Real departures from this department
+- Row label changes from "Joiners N · Leavers N · Net +N" to
+  "External N · Promoted N · Departed N · Net +N".
+- All bar widths share the same scale (max external hires = 100%).
+- Departments with zero departures get a `CLEAN` pill; departments where
+  external hires = real departures get a `FLAT` pill.
+- The chart title changes from "Joiners vs leavers by department
+  (stints)" to "External hires · Internal promotions · Real departures
+  by department".
+- Legend shows three swatches (green / amber / red).
+
+### 2026-05-26 — Cloudsmith / JFrog brief learnings
+
+Folded in from the Cloudsmith × JFrog session. Every change below was
+shaken out by a real brief that exposed a gap.
+
+**Editorial / tenant policy**
+- **Tenant is never named in customer-facing copy.** Action titles,
+  findings, callouts, Complication 3 descriptions, Exhibit A timeline,
+  Assumptions list - all must use category descriptors ("a category-
+  incumbent CEO") instead of the tenant brand name. Cover line is
+  generic by default; opt in via `brand_cover: true`. (Phase 3.2 hard
+  rules + design-system Forbidden patterns + Phase 4 checklist.)
+- **Evidence wall is third-party only.** Target competitor employees
+  AND tenant employees are both excluded from verbatim quotes. Reposted
+  customer testimonials get re-attributed to the underlying customer
+  speaker. (design-system Page 11 spec + Phase 1.10 bias exclusion
+  query.)
+
+**Window modes**
+- New `window_mode` knob: `quarter` (default) or `12_month`. The 12-
+  month mode rewrites the page footers, headers, Assumptions block and
+  every action title to read "12 months ending {Mon} {YYYY}" instead
+  of "Q{N} {YYYY}". The customer-acquisition motion always uses a
+  trailing 12-month series regardless of mode.
+
+**Data sources**
+- **Page 3 (titles) and Pages 5/5b (people) both source `ds_employees`
+  returned by `get_company_headcount`** - which is backed by
+  `ONFIRE.PEOPLE_GRAND_EXPERIENCES` + `ONFIRE.PEOPLE_GRAND` (tool-
+  managed, not exposed via `query_onfire`). Same source, different
+  units (title strings vs person-stints) - they're complementary not
+  reconcilable. Each page must state its unit in the action-sub.
+- **Open job postings: `SILVER.JOB_POST.STG_JOB_POSTS`** (Query 04).
+  No `DELETED_AT` column - use `APPLICATION_ACTIVE = 1` for the active
+  cut, but the brief currently disowns the active flag because the
+  index only captures posting existence, not real-time open/closed
+  state. Page 7 sums captured-in-window postings only, no active
+  column.
+- **`INSIGHT_VALUE` casing pitfall** on `ONFIRE.INSIGHTS_2_EVIDENCES`.
+  The competitor brand may be stored in canonical capitalisation
+  (`CloudSmith`, `JFrog`) that doesn't match `competitor_name`. Use
+  `ILIKE`, never exact-match equality. (Casing notes section + Query
+  07.)
+
+**People-movement analysis (new)**
+- Three derived buckets from `ds_employees`: **external hires**,
+  **internal promotions**, **real departures** (Phase 2.5).
+- Internal promotions = same person with both an in-window stint end
+  and an in-window stint start. Detected via self-join on
+  `person_linkedin_url`.
+- Reconciliation rule: `external_hires - real_departures ≈
+  headcount_delta` within ±5 (snapshot lag).
+
+**Page 5 / 5b split**
+- Page 5 stays focused on **geographic movement** (region bars, origins,
+  destinations, headcount chart).
+- New conditional Page 5b carries **departmental change** (function
+  bars with %) and **internal promotions grouped by destination
+  function**. Inclusion rule in §3.1.
+
+**Departed-no-backfill recoverability (page 4)**
+- Page 4 carries a detail table for every departed-no-backfill title:
+  is the function still held by a current employee under a different
+  title (Phase 1.13a SUMMARY scan, NOT title-keyword search), is there
+  an open posting trying to backfill, or has the function lapsed.
+- Distinguish same-person promotion vs different-person parallel
+  coverage explicitly (§9.4 of analysis-patterns).
+
+**Chart polish**
+- Headcount chart on page 5: X-axis title ("Month · {start} - {end}")
+  and Y-axis title ("MoM growth %") rotated -90° at the left edge.
+  Use `viewBox="0 0 700 138"` with `max-height: 80pt` so font glyphs
+  scale up visibly while the card stays compact.
+- Page 6 function bars: explicit `Joiners X (Y%) · Leavers Z (W%) ·
+  Net +N` triples on every row; FLAT pill for any function with
+  joiners = leavers.
