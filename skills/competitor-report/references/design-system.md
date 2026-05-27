@@ -343,8 +343,30 @@ hero stats.
 - Action title: pyramid-principle one-sentence lead with the
   highest-priority finding
 - 3-card vendor-trust callout (if conditional pass)
-- 3-card hero stat row: e.g. "Q headcount %", "External sentiment
-  ratio", "Open Q-posted roles"
+- 3-card hero stat row: e.g. "12-month captured hires", "12-month
+  external positive share", "12-month indications from potential
+  customers". The third card's label and subtext must reflect that the
+  number represents companies showing signals in the insights pipeline,
+  not closed-won accounts — use language like "Distinct external
+  companies showing {competitor} indications in our insights pipeline.
+  N at production-depth; M still evaluators." Do NOT label this card
+  "new external accounts" or imply customer acquisition.
+- **Geographic footprint card** (full-width, below the hero stats,
+  above the findings). Source: `ds_office_segmentation` from Phase
+  1.14. Layout:
+  - Title: `Geographic footprint · {N} official office(s), {M}
+    employees`.
+  - One-line caption that distinguishes official offices (from
+    `search_offices`) from distributed clusters (people who list those
+    locations but where the competitor has no official site).
+  - Two-column grid of horizontal `barwrap` bars — one per bucket from
+    `ds_office_segmentation`. HQ bucket gets a green bar + `HQ` pill;
+    other official offices get a green bar; distributed hubs get a
+    grey-blue bar + `distributed` pill; the `Remote / location not
+    disclosed` row gets a muted grey bar. Width is `pct_of_total`.
+    Right-side label is `{count} ({pct}%)`.
+  - Closing `Read.` paragraph: lead with the HQ + the largest non-HQ
+    hub; flag any `Remote / location not disclosed` share above 20%.
 - 5-item numbered findings list, finding #01 = the lead finding from
   the action title
 
@@ -416,13 +438,17 @@ Layout:
     3. "By function:" summary text line (e.g. "Eng 18, Sales 11…").
     4. "Notable origins:" inline text (Enterprise names / Dev-tools
        peers / regional pipeline if applicable).
-  - **Leavers card (neg / red border):**
-    1. "By region." bar section — same pattern, red bars.
-    2. "By seniority." bar section — same four tiers, red bars.
-       Classify both real departures and internal promotion old-titles
-       (both contribute to the leaver stint pool).
-    3. "By type:" summary text — internal promotions (n) + real
-       departures (n).
+  - **Leavers card (neg / red border):** **Real departures only.**
+    Internal promotions are role changes within the company and do NOT
+    contribute to this card — including them breaks the logic
+    (a promoted person did not leave).
+    1. "By region." bar section — same pattern, red bars, real
+       departures only.
+    2. "By seniority." bar section — same four tiers, red bars, real
+       departures only.
+    3. "{N} real departures:" summary text — composition by seniority
+       (e.g. "1 Head of, 1 Director, 2 managers, 1 senior IC, 1 IC, 1
+       intern").
     4. "Captured destinations:" inline list from
        `ds_employees.next_company_*`; flag ratio (e.g. "3 of 7
        destinations captured").
@@ -552,8 +578,46 @@ GitHub footprint snapshot. Conventions:
 - Methodology caveat embedded in `.action-sub`: "the date field is
   collection-date, not event-date, so this is a footprint snapshot
   not a time series"
+- **Country bars MUST sum to the "Engager rows tracked" headline.** If
+  bars sum to 67 and the headline says 68, add `+ 1 unresolved` to the
+  Other bucket so the math reconciles. Every "X countries together
+  account for Y%" claim must be derived by dividing the named-country
+  counts by the headline total — never transcribe a memorised number.
 
-### Page 10 - Complication 3 (`.act`) - CONDITIONAL
+### Page 10 - Complication 2D (`.act`) - Event attendance signals - CONDITIONAL
+
+Include this page only if **at least one captured attendance signal**
+appears for the competitor in `ONFIRE.EVENTS_CONTACTS`. Source: Phase
+1.15.
+
+Layout:
+
+- 3-card hero row:
+  - **Captured attendances** (positive green): total signals captured.
+  - **Distinct events** (positive green): number of unique events, with
+    a compact event list in the subtext (e.g. "KubeCon NA 2025 (3);
+    AWS Cloud Day Dublin (1)").
+  - **Region of attendees**: short text like "US only" or "EMEA-led"
+    with the city / country breakdown in the subtext.
+- Full-width **detail card** with a table: one row per attendance.
+  Columns: Event (bold), Attendee, Role, Location.
+- Sowhat:
+  - **The roles named MUST exist in the data.** Do not write "sales,
+    marketing, enablement, or SRE" if no attendee is in sales. List
+    only the role categories actually present.
+  - **The geo framing MUST match the data.** Do not call it "US east-
+    coast" if one attendee is in Colorado. Use "US-based" or "east-
+    coast plus Mountain" or whatever is accurate.
+  - When the captured sample is single-digit, frame the absolute count
+    as a floor (events without a public attendance signature are
+    invisible to the corpus) and shift the read to surface
+    concentration: which event got the most seats, which functions
+    showed up.
+- This page sits between Complication 2C (GitHub) and Complication 3
+  (Vendor-trust) because both 2C and 2D answer "where the people
+  showed up publicly".
+
+### Page 11 - Complication 3 (`.act`) - CONDITIONAL
 
 Only included if 3+ vendor-trust dimensions detected. Three-card layout
 where each card explains one trust dimension:
@@ -562,7 +626,7 @@ where each card explains one trust dimension:
 - "Two are amplified by external voices"
 - "External validation"
 
-### Page 11 - Evidence wall (`.act`)
+### Page 12 - Evidence wall (`.act`)
 
 Verbatim quotes only. **Third-party voices only** - never quote the
 target competitor or the prepared-for tenant on this page. Both
@@ -602,16 +666,6 @@ with fewer than 3 positive quotes, prefer reposted third-party
 customer testimonials (customer-success posts) over leaving the
 section thin.
 
-### Page 12 - Assumptions and definitions (`.act`)
-
-- Heading: "Assumptions and definitions" (NOT "Sources and
-  methodology")
-- 12-15 definitional bullets - what each term in the brief means
-- Subsection: "What this brief does not cover"
-- Subsection: "Refresh cadence"
-
-See `references/analysis-patterns.md` for the canonical bullet list.
-
 ### Page 13 - Exhibit A · Company reference card (`.act`)
 
 - Eyebrow "Exhibit A - Company reference card"
@@ -622,6 +676,24 @@ See `references/analysis-patterns.md` for the canonical bullet list.
   - Left: product lineup table + "Who they sell to" paragraph
   - Right: "How they position" + "Public signals" + "Reference timeline"
 - Sowhat - bottom-line read tying the quarter back to the baseline
+
+### Page 14 - Assumptions and definitions (`.act`)
+
+- Heading: "Assumptions and definitions" (NOT "Sources and
+  methodology")
+- Action title: "What each term in the brief means." (short — do
+  NOT extend with "what the brief does not cover" / "how often the
+  data refreshes" — those subsections are no longer included).
+- 12-15 definitional bullets in a 2-column grid (`Definitions` +
+  `Definitions, continued`) — what each term in the brief means.
+- **No "What this brief does not cover" subsection.**
+- **No "Refresh cadence" subsection.**
+
+See `references/analysis-patterns.md` for the canonical bullet list.
+
+Exhibit A sits before Assumptions so the brief closes on the
+definitional appendix, not the firmographic card — the reader leaves
+with the glossary, not the reference card.
 
 ---
 

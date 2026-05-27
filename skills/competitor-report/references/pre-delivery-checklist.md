@@ -9,6 +9,45 @@ proceeding.
 
 ---
 
+## Self-validation pass (triple-check before anything else)
+
+**The single highest-frequency defect class is the brief contradicting
+itself.** Catch it here.
+
+- [ ] **Every bar group sums to its stated total.** Compute by hand.
+      Page 2 footprint = live HC. Page 5 Joiner bars = external-hires
+      hero. Page 5 Leaver bars = real-departures hero. Page 6 columns
+      sum to page-5 heroes. Page 7 by-X each sum to captured postings.
+      Page 8 monthly cohort sums to N. Page 9 sentiment rows sum to
+      EXACTLY 100% (no 99 / 101). Page 10 country bars sum to engager-
+      rows headline.
+- [ ] **Every "X%" claim recomputed against the actual data on the
+      same page.** Do the division. Do not transcribe.
+- [ ] **Page 5 Net headcount hero = chart endpoints.** `end_HC −
+      start_HC` from the chart, not the movement math.
+- [ ] **Same number cited on multiple pages is identical everywhere.**
+      Live headcount appears on page 2, page 5 chart, and page 14
+      Exhibit A — all three say the same number. The 49 / 7 / Net
+      triple is consistent between page 2 stat sub and page 5 heroes.
+      The 87 / 6 / 81 triple is consistent across page 2 hero, page 2
+      finding, and page 8 hero.
+- [ ] **Cross-page references point to the right page.** Every "see
+      page N" / "on page N" / "evidence wall on page N" is verified
+      after every conditional-page insertion or removal.
+- [ ] **Roles and geo claims in narrative match the underlying data.**
+      No "sales role attended" when no attendee is in sales. No "US
+      east-coast" when one attendee is in Colorado. No "cited in 4+
+      postings" when the postings table contains zero matches.
+- [ ] **Page count fit.** Rendered PDF physical page count == logical
+      section count. If not, at least one section overflows. Use the
+      WeasyPrint footer-duplicate diagnostic to identify overflowing
+      sections; trim until physical == logical.
+- [ ] **Final scan as a skeptical outsider.** Read every action title
+      top-to-bottom, then every sowhat. If anything reads odd, fix it
+      before delivery.
+
+---
+
 ## Structural integrity
 
 - [ ] **Cover page has no `.act` class** (`<div class="page cover">`,
@@ -33,8 +72,10 @@ proceeding.
       `message_text` field
 - [ ] **Every quoted author has a LinkedIn handle attached**
 - [ ] **No evidence-wall quote is from the target competitor account.**
-      Scan every `.ev.neg` and `.ev.pos` on page 11 - reject any quote
-      whose speaker's current employer is the competitor itself.
+      Scan every `.ev.neg` and `.ev.pos` on the evidence-wall page
+      (page 12 in the default layout; one less if vendor-trust is
+      omitted; one less if event-attendance is also omitted) — reject
+      any quote whose speaker's current employer is the competitor.
 - [ ] **No evidence-wall quote is from the prepared-for tenant.** Same
       scan - reject any whose speaker works for the tenant. Analytical
       mentions of either company on other pages are permitted; the
@@ -132,9 +173,11 @@ proceeding.
 - [ ] If included: **trust-event amplification is consistent** across
       the exec summary callout, finding #01, the Complication 3 page,
       and the evidence wall
-- [ ] If omitted: **page 10 is removed** and pages 11-13 renumber to
-      10-12; no dangling references to "vendor-trust events" anywhere
-      in the brief
+- [ ] If omitted: **the vendor-trust page is removed** and all
+      downstream pages renumber down by 1. Every cross-reference of
+      the form "see page N" / "evidence wall on page N" must be
+      audited and corrected. No dangling references to "vendor-trust
+      events" anywhere in the brief.
 
 ---
 
@@ -160,11 +203,22 @@ proceeding.
       returned by `get_company_headcount`); each page's action-sub
       states the unit (title strings on page 3, person-stints on
       pages 5/5b) so the reader does not try to reconcile manually.
-- [ ] **Headcount reconciliation:** `external_hires - real_departures`
-      is within ±5 of `headcount_delta` (from `ds_headcount`). A gap
-      > 5 should trigger a snapshot-lag check before publishing.
-- [ ] **External hires + internal promotions + real departures**
-      equals the raw `joiner_stints + leaver_stints` row count.
+- [ ] **Page 5 Net headcount card = snapshot delta from the chart.**
+      The Net hero card MUST equal `last_month_HC − first_month_HC`
+      shown in the chart on the same page, NOT `external_hires −
+      real_departures`. If movement math and snapshot delta diverge by
+      more than ±3, surface the gap in the action title ("the N-person
+      gap reflects LinkedIn-profile lag") rather than hiding it.
+- [ ] **Page 5 Joiners card region/seniority/function bars sum to the
+      external-hires hero number.** No internal-promotion stints in
+      those bars. The card carries a small grey subtitle stating "{N}
+      external hires only. Internal promotions sit on page 6."
+- [ ] **Page 5 Leavers card bars sum to the real-departures hero
+      number.** No internal-promotion artifact stints in those bars.
+- [ ] **Page 6 department chart columns reconcile:** the external
+      column sums to the page-5 external-hires hero, the promotions
+      column sums to the promotions card total below, the departures
+      column sums to the page-5 real-departures hero.
 - [ ] **Promotions detection** used the same-person same-stint pairing
       (b.start_date >= a.end_date for the same `person_linkedin_url`).
       Don't double-count promotions in both joiner and leaver hero
@@ -187,8 +241,21 @@ proceeding.
 
 ## Exhibit A integrity
 
-- [ ] **Exhibit A is on the last page** (page 13, or page 12 if
-      vendor-trust omitted)
+- [ ] **Exhibit A is the second-to-last page**, with Assumptions as
+      the last page. The brief closes on the definitional appendix,
+      not the firmographic card. Exact page numbers shift when
+      conditional pages (event-attendance, vendor-trust, 1B-split) are
+      included or omitted — the rule is the relative order, not a
+      fixed page number.
+- [ ] **Headcount in Exhibit A matches the live snapshot used
+      everywhere else** (single number, no "~150 / 140-person offsite"
+      mixing). The Employees card says exactly the same number that
+      appears on page 2 Geographic footprint, page 5 chart endpoint,
+      and any action-title headcount mention.
+- [ ] **Exhibit A sowhat carries no unsupported claims.** If the
+      sowhat says "cited explicitly in N postings", page 7's postings
+      table must contain those citations. If it doesn't, trim the
+      parenthetical instead of leaving an overclaim.
 - [ ] **Firmographic strip has all 6 cards** (HQ / Founded / Employees /
       Revenue band / Ownership / Last raise) - any missing data
       replaced with "Not disclosed" or "n/a", not blank
@@ -214,7 +281,7 @@ proceeding.
       coherent argument by themselves
 - [ ] **Read the `.sowhat` blocks top-to-bottom** - they should
       reinforce the argument with cross-section connections
-- [ ] **The brief tells one story**, not 13 isolated sections
+- [ ] **The brief tells one story**, not N isolated sections
 
 If reading just the action titles + sowhats doesn't deliver the
 brief's lead finding, the structure has drifted. Fix before delivery.

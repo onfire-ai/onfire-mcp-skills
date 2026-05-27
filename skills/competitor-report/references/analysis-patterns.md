@@ -443,14 +443,30 @@ Classify every person-stint into one of four seniority tiers using
 | **Mid-level IC** | Engineer, designer, analyst, AE, BDR, SDR, CSM, TSE, manager (non-senior) — the majority of individual contributors not caught by the two tiers above |
 | **Junior / Associate** | `title_name` contains `junior`, `associate`, `intern`, `graduate`, `trainee`, `entry` — OR — `title_levels` includes `entry` or `training` |
 
-Apply this classification to **both** the Joiners pool (external hires)
-and the Leavers pool (internal promotion old-titles + real departures).
+Apply this classification to **both** the Joiners pool and the Leavers
+pool, with the **same symmetric "no promotions" rule** on both sides:
+
+- **Joiners card** counts **external hires only** (49 in the canonical
+  Cloudsmith example). Internal promotions are excluded from the
+  Joiners card region / seniority / function bars — they live on the
+  page 6 promotions card.
+- **Leavers card** counts **real departures only** (7 in the canonical
+  example). Internal-promotion old-titles are role changes within the
+  company and do NOT contribute to the Leavers card; including them
+  breaks the logic because a promoted person did not leave.
+
+The page 6 department chart is the only place that combines all three
+(external + promotions + departures) in a single visual, with three
+explicit bars per row.
 
 Render as horizontal bar sections on the respective cards:
 - **Joiners card** (green bars): labelled "By seniority." placed after
   the "By region." bars and before the "By function" summary text.
+  Card carries a small grey subtitle: "{N} external hires only.
+  Internal promotions sit on page 6, not in these bars."
 - **Leavers card** (red bars): labelled "By seniority." placed after
-  the "By region." bars and before the "By type" summary text.
+  the "By region." bars and before the `{N} real departures:` summary
+  text.
 
 All four bars in each card are proportional to the same scale: the
 largest bucket = 100% width. Include count + percentage in the right-

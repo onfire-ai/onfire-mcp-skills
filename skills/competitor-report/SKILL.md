@@ -70,19 +70,27 @@ Assumptions block, and all action titles ("Q1 hiring tilt" vs
 
 ---
 
-## The 5 phases
+## The 6 phases
 
-The skill works through **five phases in strict order**. Each phase has
+The skill works through **six phases in strict order**. Each phase has
 mandatory inputs from the previous phase. Do not skip ahead; the
 analysis phase depends on every data slice being persisted as a dataset.
 
 ```
-Phase 0  Scope and identity            (~1 minute)
-Phase 1  Data gathering                (~5-8 minutes)
-Phase 2  Analysis                       (~3-5 minutes)
-Phase 3  Report assembly                (~3-5 minutes)
-Phase 4  Pre-delivery checklist         (~1 minute)
+Phase 0   Scope and identity            (~1 minute)
+Phase 1   Data gathering                (~5-8 minutes)
+Phase 2   Analysis                      (~3-5 minutes)
+Phase 3   Report assembly               (~3-5 minutes)
+Phase 3.5 Self-validation pass          (~3-5 minutes) — MANDATORY
+Phase 4   Pre-delivery checklist        (~1 minute)
 ```
+
+**Phase 3.5 is non-negotiable.** Every brief that has shipped without
+this pass has contained at least one self-contradiction a careful
+reader catches in five minutes. Triple-check every number, every
+percentage, every cross-page reference. The brief is one argument
+across all pages — if any two pages disagree on the same fact, the
+brief is wrong.
 
 ---
 
@@ -450,6 +458,123 @@ Three outcomes per departed-no-backfill title:
 This becomes the Departed-no-backfill detail table on page 4 - a
 post-Phase-2 enrichment, not a Phase 1 data slice.
 
+### 1.14 Office segmentation (geographic footprint for page 2)
+
+Powers the **Geographic footprint** card on the executive summary
+(page 2). Three calls in sequence:
+
+```
+Onfire MCP: search_offices(
+  company_name="{competitor_name}",
+  company_website="{competitor_website}",
+  telemetry={intent: "Competitor brief office segmentation"}
+)
+```
+
+Returns `offices` (list of `{city, country, state, region, is_hq}`)
+and `total_offices`. Persist as `ds_offices`.
+
+Then pull the location distribution from the company's people table:
+
+```sql
+SELECT
+    LOCATION_COUNTRY,
+    LOCATION_REGION,
+    LOCATION_NAME,
+    COUNT(*) AS employee_count
+FROM ONFIRE.PEOPLE
+WHERE JOB_COMPANY_LINKEDIN_URL ILIKE '%/company/{slug}%'
+  AND JOB_COMPANY_LINKEDIN_ID = {company_linkedin_id}
+  AND DELETED_AT IS NULL
+GROUP BY LOCATION_COUNTRY, LOCATION_REGION, LOCATION_NAME
+ORDER BY employee_count DESC, LOCATION_NAME, LOCATION_REGION NULLS LAST
+LIMIT 500
+```
+
+Persist as `ds_location_distribution`. The `JOB_COMPANY_LINKEDIN_ID`
+guard is required when the slug is ambiguous (e.g. `cloudsmith` vs
+`cloudsmiths`) — otherwise the query pollutes with the wrong company.
+
+**Use the headcount snapshot (from Phase 1.1) as the denominator** for
+the % column, not the sum of the distribution rows. People with a null
+`LOCATION_COUNTRY` are excluded from the group-by but are still part of
+the headcount — surface this as a "Remote / location not disclosed"
+row equal to `headcount_total − sum(employee_count)`.
+
+#### Assignment rules (location cluster → office)
+
+Per the `office-segmentation` skill:
+
+1. **City match** — an office `city` (case-insensitive) appears inside
+   `LOCATION_NAME` → assign cluster to that office.
+2. **Country match** — only when no city match exists AND a single
+   office exists in that country → assign to that office.
+3. **Multiple offices in same country, no city hit** → assign to
+   `Remote / Unknown` rather than guess.
+4. **No match** → assign to `Remote / Unknown`.
+
+For competitors with only 1 official office (common for sub-200-person
+scale-ups), most clusters will only match by country. Surface the
+distinction in the card narrative — Belfast HQ catchment vs distributed
+hubs without an official site.
+
+Persist the rolled-up table as `ds_office_segmentation`:
+
+| Column | Notes |
+|---|---|
+| `bucket_label` | E.g. "Belfast HQ", "Jaipur cluster", "Remote / location not disclosed" |
+| `bucket_type` | `hq` / `office` / `distributed_hub` / `other` / `remote_unknown` |
+| `employee_count` | Sum of matching `LOCATION_NAME` clusters |
+| `pct_of_total` | `employee_count / headcount_total` |
+| `notes` | Cities included in this bucket |
+
+### 1.15 Event attendance signals (conditional Complication 2D)
+
+Powers the **Event attendance** page (Complication 2D). Source:
+`ONFIRE.EVENTS_CONTACTS` — every captured signal of an actively-employed
+competitor person attending a conference, summit, webinar or industry
+event.
+
+```sql
+SELECT
+    contact_linkedin_url,
+    insight_name,
+    contact_country,
+    contact_region,
+    active_employment
+FROM ONFIRE.EVENTS_CONTACTS
+WHERE deleted_at IS NULL
+  AND company_linkedin_id = {competitor_linkedin_id}
+ORDER BY insight_name, contact_country
+```
+
+Use `company_linkedin_id` (numeric) — slug-only matches pollute the
+result with same-named companies (e.g. `cloudsmith` vs `cloudsmiths`).
+`insight_name` is always prefixed `Event - `.
+
+Then enrich with names + titles by joining to `ONFIRE.PEOPLE` on
+`linkedin_url`:
+
+```sql
+SELECT
+    ec.contact_linkedin_url, ec.insight_name, ec.contact_country,
+    ec.contact_region, ec.active_employment,
+    p.full_name, p.job_title, p.location_name
+FROM ONFIRE.EVENTS_CONTACTS ec
+LEFT JOIN ONFIRE.PEOPLE p
+  ON p.linkedin_url = ec.contact_linkedin_url
+ AND p.deleted_at IS NULL
+WHERE ec.deleted_at IS NULL
+  AND ec.company_linkedin_id = {competitor_linkedin_id}
+ORDER BY ec.insight_name, ec.contact_country
+```
+
+Persist as `ds_events_contacts`. **Include the Complication 2D page
+only if at least one attendance signal is captured.** Below 5 captured
+attendances, the sowhat MUST frame the absolute count as a floor and
+focus on surface concentration (which events, which roles) rather than
+counts.
+
 ---
 
 ## Phase 2 - Analysis
@@ -534,9 +659,9 @@ person-stint events the brief needs. Three derived buckets feed pages
 
 | Bucket | Rule | Use on |
 |---|---|---|
-| **External hires** | `start_date IN window AND end_date IS NULL` AND the person has no other stint at the target whose `end_date` is in window | Page 5 hero stat: "People joined"; pages 5+6 joiner cards |
-| **Internal promotion** | One person has BOTH a stint ending in window AND a stint starting in window (`b.start_date >= a.end_date`, same `person_linkedin_url`) | Page 6 promotions card only - does NOT appear as a page 5 hero stat |
-| **Real departure** | `end_date IN window` AND the person has no active stint at the target (`end_date IS NULL` somewhere else for this person) | Page 5 hero stat: "People left"; page 5 leavers card |
+| **External hires** | `start_date IN window AND end_date IS NULL` AND the person has no other stint at the target whose `end_date` is in window | Page 5 hero stat: "People joined"; page 5 Joiners card (region + seniority breakdown) |
+| **Internal promotion** | One person has BOTH a stint ending in window AND a stint starting in window (`b.start_date >= a.end_date`, same `person_linkedin_url`) | Page 6 promotions card only — does NOT appear as a page 5 hero stat AND does NOT appear in either the Joiners or the Leavers card on page 5 |
+| **Real departure** | `end_date IN window` AND the person has no active stint at the target (`end_date IS NULL` somewhere else for this person) | Page 5 hero stat: "People left"; page 5 Leavers card (region + seniority breakdown — real departures only) |
 
 The net headcount growth is computed directly from movements — it is
 NOT taken from `ds_headcount` snapshot delta:
@@ -632,19 +757,31 @@ extend the brief by one position each:
 | # | Section | Forced page break (`class="page act"`) | Default? |
 |---|---|---|---|
 | 1 | Cover | first page, no `.act` | always |
-| 2 | Executive summary | yes | always |
+| 2 | Executive summary (+ Geographic footprint card) | yes | always |
 | 3 | Complication 1A · Org reshape - hero + leadership / dept ledger | yes | always |
-| 4 | Complication 1A · Movement types + departed-no-backfill detail + strategic threads | yes | always |
-| 5 | Complication 1B · Headcount chart + joiners + leavers | yes | always |
+| 4 | Complication 1A · Functions added, replaced, lapsed + departed-no-backfill detail | yes | always |
+| 5 | Complication 1B · Headcount chart + joiners (external only) + leavers (real departures only) | yes | always |
 | 5.5 | **Complication 1B continued · Departmental change + internal promotions** | yes | **conditional** (see decision rule below) |
 | 6 | Complication 1C · Captured job postings (window-only) | yes | always |
 | 7 | Complication 2A · Customer acquisition motion | yes | always |
 | 8 | Complication 2B · Sentiment split | yes | always |
 | 9 | Complication 2C · GitHub footprint snapshot | yes | always |
-| 10 | Complication 3 · Vendor-trust events | yes | **conditional** (3+ dimensions) |
-| 11 | Evidence wall (verbatim quotes) | yes | always |
-| 12 | Assumptions and definitions | yes | always |
+| 10 | **Complication 2D · Event attendance signals** | yes | **conditional** (include if ≥ 1 captured attendance) |
+| 11 | Complication 3 · Vendor-trust events | yes | **conditional** (3+ dimensions) |
+| 12 | Evidence wall (verbatim quotes) | yes | always |
 | 13 | Exhibit A · Company reference card | yes | always |
+| 14 | Assumptions and definitions | yes | always |
+
+**Renumbering rule.** When a conditional page is included or omitted,
+EVERY subsequent page footer / running header / cross-reference must be
+updated. After every insertion or removal:
+
+1. Find every `NN / N` footer/header span and update both the numerator
+   (the page's own number) and the denominator (the total).
+2. Find every cross-reference of the form "see page N" / "on page N" /
+   "(page N)" in action subs, sowhats, and findings — verify each one
+   still points to the page it describes.
+3. Re-run the Phase 3.5.b cross-page consistency check.
 
 #### Decision rule for the Complication 1B split
 
@@ -713,7 +850,7 @@ These come from the canonical Sonatype brief. Violate at peril:
 | Section | Reads from | Key template variables |
 |---|---|---|
 | Cover | Phase 0 firmo + tenant | `{competitor_name}`, `{window_label}`, `{brief_date}`; cover line "Prepared for the requesting tenant" unless `brand_cover: true` |
-| Exec summary | All phases | hero callout if `vendor_trust_count >= 3`, three hero stats, 5 numbered findings; the tenant is described by category descriptor where it surfaces |
+| Exec summary | All phases | hero callout if `vendor_trust_count >= 3`, three hero stats, **Geographic footprint card** from `ds_office_segmentation`, 5 numbered findings; the tenant is described by category descriptor where it surfaces |
 | Org reshape A | `ds_title_movement` + Phase 2 buckets | IN / OUT / NET-DELTA cards + leadership-vs-dept ledger |
 | Org reshape B | Phase-2 buckets + threads + Phase 1.13 recoverability | 3 movement-type cards + departed-no-backfill detail table + 3 strategic threads |
 | Headcount + geographic movement (Page 5) | `ds_headcount` + `ds_employees` (filter joiners / leavers) + `ds_q_hires_priors` (origin firmographics) | Headcount chart with X+Y axis titles + Joiners card (by region, notable origins) + Leavers card (by region, captured destinations via `next_company_*`) |
@@ -721,11 +858,12 @@ These come from the canonical Sonatype brief. Violate at peril:
 | Open jobs (Page 7) | `ds_open_jobs_quarter` | Single table of captured-in-window postings (no active/closed column - we capture existence, not state) |
 | Acquisition | `ds_acquisition` ⨝ `ds_acq_firmo` ⨝ `ds_geo_fallback` | monthly stacked bar SVG + size + region cards |
 | Sentiment | `ds_sentiment` ⨝ `ds_authors_resolved` | three hero %, continent / size bars, owned-vs-external infographic |
-| GitHub | `ds_github` | top countries bar + notable engagers table |
+| GitHub | `ds_github` | top countries bar + notable engagers table; country bars MUST sum to the headline engager-rows total (add `Unresolved` bucket if needed) |
+| Event attendance (conditional) | `ds_events_contacts` from Phase 1.15 | 3 hero cards (captured attendances / distinct events / region) + detail table; if sample is single-digit, frame as a floor |
 | Vendor-trust | Phase-2 detection | 3 trust-dimension cards |
 | Evidence wall | `ds_sentiment` filtered to top quotes; authors from origin tenant (`{tenant_linkedin_url}`) or competitor (`{company_linkedin_url}`) excluded as biased | verbatim quote blocks with LinkedIn handles |
-| Assumptions | static | definitional list (no source counts) |
-| Exhibit A | Phase 0 firmo | firmographic cards + product table + timeline |
+| Exhibit A (page 12) | Phase 0 firmo | firmographic cards + product table + timeline |
+| Assumptions (page 13) | static | definitional list only — no "What this brief does not cover" subsection, no "Refresh cadence" subsection |
 
 ### 3.4 PDF rendering
 
@@ -741,6 +879,166 @@ pip install weasyprint --break-system-packages
 ```
 
 Present both files to the user via `mcp__cowork__present_files`.
+
+---
+
+## Phase 3.5 - Self-validation pass (MANDATORY)
+
+**Triple-check every fact, every number, every cross-reference before
+moving to Phase 4. The brief loses all credibility the moment a careful
+reader catches the report contradicting itself.** This phase is not
+optional. Run it on every brief, every re-render, every time.
+
+Adopt the mindset: *the reader will add up every bar group, divide every
+percentage, cross-check every name and every page-number reference.
+Anything that doesn't reconcile is a defect.*
+
+### 3.5.a Arithmetic checks (every page, every bar group)
+
+For each page that contains numeric breakdowns, compute the totals
+yourself and compare against the headline number:
+
+1. **Every bar group must sum to its stated total** (and that total must
+   match the headline number elsewhere on the page).
+   - Page 2 Geographic footprint bars → sum = live headcount.
+   - Page 5 Joiners region / seniority / function bars → each sums to
+     the External-hires hero (+49 in the canonical example).
+   - Page 5 Leavers region / seniority bars → each sums to the Real-
+     departures hero (−7 in the canonical example).
+   - Page 6 department chart: external column sums to External-hires
+     hero on page 5; promotions column sums to the Promotions card
+     total below; departures column sums to Real-departures hero on
+     page 5.
+   - Page 7 Open jobs by-department / by-seniority / by-location each
+     sums to the captured-postings count.
+   - Page 8 acquisition motion: monthly cohort sums to N (87 in
+     example); industry legend sums to N; size-band cuts sum to their
+     stated n.
+   - Page 9 sentiment: **every row must sum to exactly 100%.** If
+     rounding produces 99% or 101%, bump one component by ±1 so the
+     row reads 100. Do not ship a 99%/101% row.
+   - Page 10 GitHub country bars sum to "Engager rows tracked"
+     headline. If they don't, add an `Unresolved` bucket to make them
+     reconcile.
+
+2. **Every "X of Y" or "X%" claim must be derived from the actual data
+   on the same page.** Recompute: if you claim "UK and US together
+   account for 56%", the math is `(UK_engagers + US_engagers) /
+   total_engagers`. Do the division yourself. Do not transcribe a
+   number you saw earlier — recompute against what's now in the bars.
+
+3. **Hero card numbers must match the chart they sit above/below.**
+   On page 5, the "Net headcount change" hero card MUST equal the
+   `last_month_headcount − first_month_headcount` shown in the chart.
+   These two numbers come from the same source — they MUST agree.
+
+4. **Joiner / Leaver hero cards are movement-derived events; the Net
+   card is the snapshot delta.** If those two disagree by more than
+   ±3 people, surface the gap in the action title as "the N-person
+   gap reflects LinkedIn-profile lag" rather than silently averaging.
+
+### 3.5.b Cross-page consistency checks
+
+The brief is one argument across N pages. Numbers cited on multiple
+pages MUST agree (or carry an explicit "different unit" note):
+
+- Live headcount (140 in the canonical example) appears on **page 2
+  Geographic footprint**, **page 5 chart endpoint**, **page 14 Exhibit
+  A Employees card**, and possibly in **action titles**. All four
+  numbers must agree. Round once, then never re-round.
+- The 49 / 7 / +Net movement triple appears in **page 2 stat-card sub**
+  ("page 5") and in **page 5 hero cards**. Verify both pages cite the
+  same numbers.
+- The 35 / 11 / +24 title triple appears in **page 2 stat-card sub**
+  ("page 3"), **page 3 hero stats**, and possibly the **page 2 action
+  sub**. Verify all three.
+- The 87 / 6 / 81 acquisition triple appears in **page 2 third hero**,
+  **page 2 finding #03**, and **page 8 hero**. All three must agree.
+- The 4-dimension vendor-trust callout on **page 2** must match the
+  **page 12 action title and cards** (3 cards + 1 callout = 4
+  dimensions). Eyebrow must say "Four named vendor-trust dimensions",
+  not "Three".
+- **Page numbers in cross-references must match actual rendered page
+  numbers.** When the brief inserts a new conditional page (e.g.
+  Event-attendance), every "see page N" reference downstream shifts —
+  audit every cross-reference after re-rendering.
+
+### 3.5.c Text vs. data contradiction checks
+
+The narrative copy must match the data, not the other way around. If
+the narrative was written before the data was finalized, REWRITE the
+narrative.
+
+- Roles / titles mentioned in a sowhat must exist in the underlying
+  data. ("All four attendees are by sales, marketing, enablement, or
+  SRE" — but no attendee is in sales? Wrong. Drop "sales".)
+- Geographic claims must match the location data. ("US east-coast
+  tilt" — but one attendee is in Colorado? Wrong. Use "US-based" or
+  "east-coast plus Mountain".)
+- Claims of "cited explicitly in 4+ active job postings" must be
+  verifiable in the page 7 table. If the postings table contains zero
+  matches, drop the claim — do not let an overclaim sit unsupported.
+- Headcount adjectives ("~150 employees", "140-person offsite",
+  "around 150") all collapse to the single live snapshot number. Use
+  one number throughout.
+
+### 3.5.d Page-fit check (every section is one A4 page)
+
+Render to PDF and count pages. If the rendered PDF has more physical
+pages than logical sections, **at least one section is overflowing**
+and creating whitespace on the next page. To diagnose:
+
+```python
+from weasyprint import HTML
+doc = HTML(filename='{competitor_lc}-brief.html').render()
+print(f'Physical pages: {len(doc.pages)}')
+
+# Walk pages and find duplicated footers (= overflow)
+seen = {}
+overflow = []
+for i, page in enumerate(doc.pages, 1):
+    # extract footer text "NN / N"
+    box = page._page_box
+    texts = []
+    def walk(b):
+        if hasattr(b, 'text') and b.text and b.text.strip():
+            texts.append(b.text.strip())
+        if hasattr(b, 'children'):
+            for c in b.children: walk(c)
+    walk(box)
+    footer = next((t for t in texts if ' / ' in t and t.split(' / ')[-1].isdigit()), None)
+    if footer in seen:
+        overflow.append(footer)
+    seen[footer] = i
+print(f'Overflowing sections: {overflow}')
+```
+
+If `overflow` is non-empty, trim the listed sections (see Phase 3.2
+hard layout rules and the design-system per-page specs). Iterate until
+physical pages == logical sections.
+
+Common overflow causes:
+- Action sub > 80 words
+- Findings (.find) padding > 3pt
+- Geographic footprint with no margin tightening
+- Departed-no-backfill detail with verbose footnotes
+- Footer pushed off by tall action title — reduce action-title font
+  from 14pt → 12.5pt on dense pages
+
+### 3.5.e Stale-comment / dev-marker sweep
+
+HTML comments like `<!-- PAGE 10 / COMPLICATION 3 -->` don't render but
+mislead anyone editing the file. When pages are reordered or inserted,
+update the comments to match the actual footer page number.
+
+### 3.5.f The "would a reader catch this?" final scan
+
+Read the rendered PDF front-to-back **as a skeptical reader**. Stop at
+every number and ask: *does this match what I read two pages ago?* Stop
+at every "see page N" and verify the page exists and contains what's
+referenced. Stop at every chart label and check it matches the bars.
+
+If you would flinch reading it as an outsider, fix it before delivery.
 
 ---
 
@@ -775,22 +1073,38 @@ Before presenting, the agent must explicitly verify every item:
       promotion contributes +1 to page 3 net-new AND +1 joiner / +1
       leaver to page 5). The action-sub on each page must say which
       unit it counts to avoid reader confusion.
-- [ ] **Page 5 hero stats show movement-derived math:** card 1 =
-      `+{external_hires}` (People joined), card 2 = `−{real_departures}`
-      (People left), card 3 = `+{external_hires − real_departures}` (Net
-      headcount growth). Card 3 subtext must state the arithmetic
-      explicitly. `ds_headcount` snapshot numbers must NOT appear as the
-      primary net stat.
+- [ ] **Page 5 hero stats: cards 1 + 2 are movement events; card 3 is
+      the snapshot delta.** Card 1 = `+{external_hires}` (External hires
+      hero), card 2 = `−{real_departures}` (Real departures hero), card
+      3 = `+{snapshot_end − snapshot_start}` (Net headcount change). The
+      Net card MUST equal the chart's last-month minus first-month
+      headcount, NOT `external_hires − real_departures`. If those two
+      diverge, surface the gap in the action title (e.g. "the 5-person
+      gap to +37 reflects LinkedIn-profile lag"). The Net card subtext
+      must state `{start_HC} → {end_HC} = +{net} (+{pct}%). Matches
+      the bar chart below.` Do NOT compute the Net from movement math
+      — snapshot is canonical.
+- [ ] **Page 5 Joiners + Leavers card titles** are plain: `Joiners`
+      and `Leavers` (with the IN / OUT pill). Do NOT append a
+      parenthetical like `(n = 61 stints; 49 external + 12 internal
+      promotions)` — the breakdown lives in the bars, not the title.
+- [ ] **Page 5 Joiners card counts external hires only.** The region,
+      seniority, and function bars on the Joiners card sum to
+      `external_hires` (49 in the canonical example), NOT to `external
+      + internal_promotions` (61). Internal promotions live on page 6
+      only. Add a small grey subtitle on the card: "{N} external hires
+      only. Internal promotions sit on page 6, not in these bars."
 - [ ] **Page 5 Joiners card** includes a "By seniority" bar section
       (Leadership VP/Head/Director · Senior/Principal IC · Mid-level IC ·
       Junior/Associate) after the "By region" bars and before the "By
       function" text. Bars are green, proportional to the largest bucket.
-- [ ] **Page 5 Leavers card** includes a "By seniority" bar section
-      (same four tiers) after the "By region" bars and before the "By
-      type" text. Bars are red. Seniority is derived from the actual
-      `title_name` and `title_levels` fields on `ds_employees`; internal
-      promotion old-titles and real departures are classified together
-      since both contribute to the leaver stint pool.
+- [ ] **Page 5 Leavers card classifies real departures only.**
+      Internal promotions are role changes within the company and do
+      NOT contribute to the Leavers card (region, seniority, or type
+      summary). Including them breaks the logic: a promoted person did
+      not leave. Bars are red. Seniority is derived from the actual
+      `title_name` and `title_levels` fields on `ds_employees` for the
+      real-departure subset.
 - [ ] **Page 6 function bar chart** shows THREE bars per department row
       (not two): green (external hires), amber/warn (promotions within
       dept), red (real departures). Row label shows explicit triple:
@@ -801,6 +1115,19 @@ Before presenting, the agent must explicitly verify every item:
 - [ ] **Page 6 promotions card** is grouped by destination function,
       not by month / cluster (e.g. Engineering · 5; Design · 2;
       Customer service · 2; Leadership · 2; Marketing · 1).
+- [ ] **Page 6 action title and Biggest-gainer card report
+      hires AS external + promotions explicitly.** Example: "Engineering
+      added 13 external + 5 internal promotions (18 total)" — not "18
+      external hires" (which contradicts the page 6 chart showing 13
+      external). Departure counts in the Biggest-gainer subtext refer
+      to that function's departures, NOT the company-wide total.
+- [ ] **Sentiment rows on page 9 sum to 100%.** No 99% / 101% rows.
+      If raw rounding gives 99 or 101, bump one component by ±1.
+- [ ] **GitHub country bars on page 10 sum to the "Engager rows
+      tracked" headline.** If a bar group sums to 67 but the headline
+      says 68, add `+ 1 unresolved` to a bucket so the math closes.
+      Every "UK and US together account for X%" claim must be derived
+      by dividing the two named-country counts by the headline total.
 - [ ] **No mention of the prepared-for tenant anywhere in customer-
       facing copy.** Grep the assembled HTML for the tenant's brand
       name - the only allowed occurrence is the cover line when
@@ -810,8 +1137,21 @@ Before presenting, the agent must explicitly verify every item:
 - [ ] No named accounts in summary stats or strategic-read callouts
       (named accounts allowed only in the cover, the exhibit, the
       evidence wall and the joiner / leaver detail cards on page 5)
+- [ ] **Page order: Exhibit A precedes Assumptions.** Exhibit A is
+      page 12 (one before last) and Assumptions is page 13 (last).
+- [ ] **Page 2 Geographic footprint card** is present below the three
+      hero stats and above the Five findings list. The card title reads
+      `Geographic footprint · {N} official office(s), {M} employees`.
+      The bucket bars come from `ds_office_segmentation`. The narrative
+      flags any `Remote / location not disclosed` share above 20%.
+- [ ] **Page 2 third hero stat is labelled "12-month indications from
+      potential customers"** (not "12-month new external accounts").
+      The number 87 (or equivalent) represents companies showing signals
+      in the insights pipeline, not closed-won accounts — the language
+      must reflect that.
 - [ ] **Assumptions and Definitions** block present (not "Sources and
-      methodology")
+      methodology"). Definitions list ONLY — no "What this brief does
+      not cover" subsection, no "Refresh cadence" subsection.
 - [ ] Window is strictly enforced - every signal outside
       `window_start` / `window_end` is excluded or explicitly flagged.
       Page footers, running headers and section titles all reflect the
@@ -873,6 +1213,205 @@ rows even when the data is there.
 ---
 
 ## Session changelog (most recent first)
+
+### 2026-05-27 (v3) — Cloudsmith re-edit round 2: snapshot delta, external-only joiners, event-attendance page, Phase 3.5 self-validation
+
+Continuation of the in-session edit pass on the Cloudsmith 12-month
+brief. Every change below was triggered by a real inconsistency a
+reader caught in the rendered PDF.
+
+**Phase 3.5 — Self-validation pass (NEW phase, MANDATORY)**
+- Inserted between Phase 3 (report assembly) and Phase 4 (pre-delivery
+  checklist). The agent MUST triple-check every number, percentage,
+  bar-sum and cross-page reference before delivery.
+- Five sub-passes: arithmetic checks, cross-page consistency, text-vs-
+  data contradiction, page-fit (one A4 per logical section), and stale
+  dev-comment sweep.
+- Failure mode the phase guards against: hero card #3 says +42 net but
+  the chart says +29; UK + US = 56% when the math says 72%; "all four
+  attendees are sales, marketing, enablement or SRE" when no attendee
+  is in sales; "page 11 evidence wall" reference when the wall is now
+  on page 13. Every one of these has shipped in a real brief.
+
+**Page 5 hero card #3 (Net headcount) — switched from movement math to
+snapshot delta**
+- Was: `external_hires − real_departures` (e.g. 49 − 7 = +42).
+- Now: `last_month_HC − first_month_HC` from the chart (e.g. 140 − 103
+  = +37 = +35.9%). The hero number MUST equal the chart endpoints.
+- The action title surfaces the gap explicitly: "the N-person gap to
+  +{snapshot delta} reflects LinkedIn-profile lag".
+
+**Page 5 chart — extended to full 12-month window**
+- Was: 10 bars (Jun 25 → Mar 26). Now: 12 bars (Apr 25 → Mar 26).
+- Apr 25 baseline bar renders as a minimal grey "base" bar with no
+  MoM value. Pitch 52 with bar-width 38 for the 12-bar layout.
+
+**Page 5 Joiners card — bars are EXTERNAL HIRES ONLY**
+- Was: region / seniority / function bars summed to 61 (= 49 external +
+  12 internal promotions).
+- Now: bars sum to 49. A small grey subtitle on the card says: "49
+  external hires only. Internal promotions sit on page 6, not in these
+  bars." This keeps the Joiners card symmetric with the Leavers card
+  (also real-departures only).
+
+**Page 6 — Engineering numbers rewritten to avoid "18 external" overclaim**
+- The action title and Biggest-gainer card previously said "Engineering
+  added 18 external + 5 internal promotions" / "18 external hires + 5
+  internal promotions". Both contradicted the page 6 chart that shows
+  Engineering external = 13.
+- Now reads "13 external + 5 internal promotions (18 total)" — explicit
+  about the breakdown.
+- Departure count fixed: "against 2 departures" (Engineering's
+  departures) not "over 7 people out" (company-wide total).
+
+**Page 7 — Open jobs Ireland (non-Dublin) bar fixed**
+- Was: "Ireland (non-Dublin) 2 (20%)" — bars summed to 90%.
+- Now: 3 (30%), bars sum to 100%. Three Ireland AppSec / Data
+  postings (Oct, Dec, Jan) correctly counted.
+
+**Page 9 sentiment rows — round so each sums to exactly 100%**
+- Mid-market row was 36 / 27 / 36 = 99%. Now 36 / 28 / 36 = 100%.
+- General rule for the skill: any cross-tab row that rounds to 99% or
+  101% gets one component nudged ±1 to hit 100%.
+
+**Page 10 GitHub — UK+US share corrected and 67-vs-68 reconciled**
+- The "UK and US together account for 56% of engager rows" line was
+  wrong: 25 + 24 = 49 of 68 = 72%. Fixed to 72%.
+- Country bars previously summed to 67 vs the 68 headline. Fixed by
+  adding "+ 1 unresolved" to the Other bucket (now 7 engagers), so
+  bars sum to 68.
+
+**Page 11 NEW — Event attendance signals (Complication 2D)**
+- New full page between GitHub (Complication 2C) and Vendor-trust
+  events (Complication 3). Source: `ONFIRE.EVENTS_CONTACTS` filtered
+  by `company_linkedin_id`.
+- Three-card hero: Captured attendances / Distinct events / Region of
+  attendees. Detail table: one row per attendance, columns Event,
+  Attendee, Role, Location.
+- When the sample is thin (single-digit attendances), the sowhat
+  frames it as a floor and does NOT claim coverage or trends — the
+  brief should reach for surface concentration, not absolute counts.
+- All page numbers downstream of the insertion must be renumbered.
+  Audit cross-references ("see page N") after every insertion.
+
+**Page 11 sowhat — text MUST match the data**
+- Old text claimed "sales, marketing, enablement, or SRE roles"
+  attended events. None of the four attendees was in sales — wrong.
+- Fixed to "marketing, enablement, events, or SRE roles" and dropped
+  the "US east-coast" geo claim (one attendee is in Colorado, not the
+  east coast). Now reads "three east-coast — MA, PA, MD — plus one
+  in Colorado".
+
+**Page 12 vendor-trust — eyebrow + action sub corrected**
+- Eyebrow was "Three named vendor-trust dimensions" but content shows
+  four. Fixed to "Four named vendor-trust dimensions".
+- Action sub now references the correct evidence-wall page number
+  (13, not 11) after the event-attendance insertion.
+
+**Page 14 Exhibit A — drop unsupported "Cloudsmith 2.0" claim**
+- Sowhat claimed "Cloudsmith 2.0 platform build (cited explicitly in
+  4+ active job postings)" — but the page 7 postings table contains
+  no such citation. Removed the parenthetical; replaced with the
+  general "this platform-and-GTM build".
+- Headcount language standardized to single number (140 throughout —
+  no more "~150 / 140-person offsite / size band 51-200" mixing).
+
+**Page 2 — consolidated to fit one A4**
+- Findings reduced from five to four (combined the durable-sentiment
+  finding with the four-trust-frictions finding). Eyebrow updated to
+  "Four findings".
+- Action title font reduced to 12.5pt with line-height 1.2 on dense
+  pages. `.find` padding reduced (5pt → 2pt), font-size 14pt → 10pt
+  on the numeral.
+- Geographic footprint card padding tightened.
+
+**Page-fit rule (NEW)**
+- Each logical section MUST fit on one A4 page. If physical PDF page
+  count > logical section count, at least one section is overflowing.
+- Use the WeasyPrint diagnostic in Phase 3.5.d to identify overflowing
+  sections by footer-text duplication.
+- Common trim levers: `.action-sub` 8pt → 7pt, `.find` padding 5pt →
+  2pt, action-title font 14pt → 12.5pt, drop strategic-thread cards
+  in favour of a consolidated sowhat.
+
+**Indications terminology (across page 2 + page 8 + page 14)**
+- The customer-acquisition headline (87 companies) is "potential
+  customer indications" — NOT "new external accounts" (implies
+  closed-won), NOT "first-seen in our insights pipeline" (jargon).
+- Card label: "12-month indications from potential customers".
+- Action title verb: "surfaced indications from" not "acquired" /
+  "first-seen".
+
+### 2026-05-27 — Cloudsmith re-edit: page 2 geo card, leavers logic fix, page 12/13 swap
+
+All changes shaken out by an in-session edit pass on the Cloudsmith
+12-month brief.
+
+**Page 2 — Geographic footprint card (new)**
+- New full-width card on the executive summary, between the three
+  hero stats and the Five findings. Fed by `ds_office_segmentation`
+  (Phase 1.14): one bucket per `search_offices` hit + distributed
+  clusters from `ONFIRE.PEOPLE` + a `Remote / location not disclosed`
+  bucket equal to `headcount_total − sum(matched_clusters)`.
+- HQ bucket gets a green bar + `HQ` pill; distributed hubs get a
+  grey-blue bar + `distributed` pill; remote/unknown is muted grey.
+- Narrative flags any `Remote / location not disclosed` share above
+  20% — common for cloud-native dev-tools scale-ups.
+
+**Page 2 — third hero stat renamed**
+- Was: `12-month new external accounts`. Now:
+  `12-month indications from potential customers`. The number 87 (or
+  equivalent) is companies showing signals in the insights pipeline,
+  not closed-won accounts. Card subtext now reads "Distinct external
+  companies showing {competitor} indications in our insights pipeline.
+  N at production-depth; M still evaluators." The executive-summary
+  action title uses "surfaced indications from {N} potential customer
+  accounts" — not "acquired {N} net-new external accounts".
+
+**Page 5 — Joiners / Leavers card titles**
+- Card titles are plain `Joiners` and `Leavers` (with IN / OUT pill).
+  Drop the `(n = 61 stints; 49 external + 12 internal promotions)`
+  parenthetical — the breakdown lives in the bars, not the title.
+- Customer-facing text now uses "people" instead of "stints" for count
+  framing ("11 net-new people", "12 of 61 people are APAC", etc.).
+  The methodology language in Phase 2.5 keeps "stints" as the technical
+  term for the underlying person-stint events.
+
+**Page 5 — Leavers card classifies real departures only**
+- Previously the Leavers card mixed real departures with internal
+  promotion old-titles ("both contribute to the leaver stint pool").
+  That breaks the logic — a promoted person did not leave. The card
+  now reflects real departures only, with a `By type:` line trimmed to
+  just "{N} real departures: 1 Head of, 1 Director, 2 managers, …" and
+  no reference to internal-promotion artifacts. Internal promotions
+  remain on the Page 6 promotions card.
+
+**Page 5 — Net headcount subtext**
+- Card 3 subtext is just `{N} joined − {M} left = +{Z} net new people
+  over the window.` Drop the trailing `consistent with the monthly
+  chart below` — the chart is on the same page and the redundant
+  cross-reference reads as filler.
+
+**Page order — Exhibit A and Assumptions swapped**
+- Was: page 12 Assumptions, page 13 Exhibit A. Now: page 12 Exhibit A,
+  page 13 Assumptions. The brief closes on the definitional appendix
+  rather than the firmographic card. When vendor-trust is omitted the
+  numbering shifts but the relative order holds.
+
+**Page 13 (Assumptions) — subsections removed**
+- Removed the `What this brief does not cover` subsection and the
+  `Refresh cadence` subsection. The page is the canonical definitions
+  list and nothing else. Action title trimmed to "What each term in
+  the brief means."
+
+**Phase 1.14 — Office segmentation (new step)**
+- New Phase 1 step combining `search_offices`, the location-distribution
+  query on `ONFIRE.PEOPLE`, and the bucket-assignment rules from the
+  `office-segmentation` skill. Output: `ds_office_segmentation`,
+  feeding the page 2 Geographic footprint card.
+- Use `JOB_COMPANY_LINKEDIN_ID = {company_linkedin_id}` in the location
+  query alongside the slug `ILIKE` — slug-only matches pollute the
+  result with same-named companies (e.g. `cloudsmith` vs `cloudsmiths`).
 
 ### 2026-05-26 (v2) — Page 5/6 layout overhaul from Cloudsmith post-review
 
