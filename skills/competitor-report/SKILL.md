@@ -301,10 +301,75 @@ the assembled report.
 
 See `references/snowflake-queries.md` → query 07.
 
-If `INSIGHTS_2_EVIDENCES` is in the allowed-tables list for
-`query_onfire`, prefer this query:
+**Methodology — first-ever, not any-mention.** The cohort is companies
+whose **first-ever** Cloudsmith mention in the insights pipeline (across
+all time, not just the window) falls inside the 12-month window.
+Companies with any prior mention before the window start are excluded.
+This is the canonical "true new mentioner" cohort.
+
+The naive "any mention in window" query over-counts dramatically:
+on the canonical Cloudsmith run the naive query returned 87 companies,
+of which only **63** were truly first-ever-in-window; 24 of the 87 had
+earlier mentions and should not have been counted as "new". Use this
+template:
 
 ```sql
+WITH external_mentions AS (
+  SELECT company_linkedin_url, person_linkedin_url, start_date
+  FROM ONFIRE.INSIGHTS_2_EVIDENCES
+  WHERE insight_value ILIKE '{competitor_name}'        -- ILIKE handles canonical capitalisation
+    AND company_linkedin_url IS NOT NULL
+    AND company_linkedin_url NOT ILIKE '%/company/{competitor_slug}'
+    AND company_linkedin_url NOT ILIKE '%/company/{competitor_slug}s'  -- guard against same-named consultancies (Cloudsmiths)
+    AND start_date IS NOT NULL
+),
+first_ever AS (
+  SELECT company_linkedin_url, MIN(start_date) AS first_ever_date
+  FROM external_mentions
+  GROUP BY company_linkedin_url
+),
+first_in_window AS (
+  SELECT * FROM first_ever
+  WHERE first_ever_date BETWEEN '{window_start}' AND '{window_end}'
+),
+mentioner_counts AS (
+  SELECT
+    fiw.company_linkedin_url,
+    fiw.first_ever_date,
+    COUNT(DISTINCT em.person_linkedin_url) AS distinct_mentioners_in_window
+  FROM first_in_window fiw
+  JOIN external_mentions em
+    ON em.company_linkedin_url = fiw.company_linkedin_url
+   AND em.start_date BETWEEN '{window_start}' AND '{window_end}'
+  GROUP BY 1, 2
+)
+SELECT * FROM mentioner_counts
+```
+
+Persists as `ds_acquisition`. **Production-depth = `distinct_mentioners_in_window >= 2`; evaluator = 1.**
+
+**Validation check.** Compare the result against the naive "any mention
+in window" count by running an extra check query:
+
+```sql
+-- naive (over-counts; informational only)
+SELECT COUNT(DISTINCT company_linkedin_url)
+FROM ONFIRE.INSIGHTS_2_EVIDENCES
+WHERE insight_value ILIKE '{competitor_name}'
+  AND start_date BETWEEN '{window_start}' AND '{window_end}'
+  AND company_linkedin_url NOT ILIKE '%/company/{competitor_slug}'
+  AND company_linkedin_url NOT ILIKE '%/company/{competitor_slug}s';
+```
+
+If `naive_count > first_ever_count`, the gap is companies with prior
+mentions that the brief MUST NOT count. Surface the gap in the brief
+as a footnote so the reader trusts the methodology.
+
+Legacy template (any-mention in window — **DO NOT USE for the brief**;
+kept here as a reference for what the brief is *not* doing):
+
+```sql
+-- WRONG / over-counting — kept for diff reference only
 SELECT PERSON_LINKEDIN_URL, COMPANY_LINKEDIN_URL, MIN(START_DATE) AS first_seen
 FROM ONFIRE.INSIGHTS_2_EVIDENCES
 WHERE INSIGHT_VALUE = '{competitor_name}'
@@ -963,6 +1028,23 @@ pages MUST agree (or carry an explicit "different unit" note):
   Event-attendance), every "see page N" reference downstream shifts —
   audit every cross-reference after re-rendering.
 
+### 3.5.b.1 Acquisition-motion methodology check
+
+The Customer acquisition motion page (Complication 2A) MUST use the
+"first-ever-in-window" cohort, NOT the "any-mention-in-window" cohort.
+Re-verify by counting both and surfacing the gap:
+
+- `first_ever_count` — from Phase 1.7's mentioner_counts CTE.
+- `naive_any_mention_count` — companies with at least one mention in
+  the window, regardless of prior history.
+
+If `naive > first_ever`, the gap is companies with pre-window mentions.
+The brief MUST cite `first_ever_count` everywhere — page 2 hero #3,
+page 2 finding #03, page 2 action title/sub, page 8 hero #1+#2+#3, page
+8 by-region and by-size cards, page 14 Exhibit A sowhat. Search the
+assembled HTML for the naive count and replace; if you find any
+instance, you have a defect.
+
 ### 3.5.c Text vs. data contradiction checks
 
 The narrative copy must match the data, not the other way around. If
@@ -1213,6 +1295,44 @@ rows even when the data is there.
 ---
 
 ## Session changelog (most recent first)
+
+### 2026-05-28 — Acquisition motion: methodology corrected to "first-ever-in-window"
+
+The single biggest defect ever shipped from this skill was the
+acquisition-motion methodology. Phase 1.7 was using "any mention in
+the 12-month window" — which counts companies as "new" even if they
+had Cloudsmith mentions years earlier. On the canonical Cloudsmith
+run, that naive query returned **87** companies; the true first-ever-
+in-window cohort is **63**. The 24-company gap was being framed in
+the brief as "new external accounts" when they were not new.
+
+**Fixes:**
+- Phase 1.7 rewritten to use `MIN(start_date)` per company across all
+  time, then filter `first_ever_date BETWEEN window_start AND window_end`.
+- Production-depth threshold (≥ 2 distinct mentioners in window) is
+  applied to the first-ever cohort only — on the canonical run this
+  collapses production-depth from 6 to **1** (Endor Labs). Sysdig,
+  AWS, Wiz, NVIDIA, BotConsulting were all in the old "production-
+  depth 6" list because they had prior mentions; under the corrected
+  methodology they are excluded.
+- A validation check query is included so the agent can quantify the
+  gap between any-mention and first-ever counts on every run, and
+  surface it in the brief.
+- Same-named-consultancy guard: the SQL now excludes
+  `linkedin.com/company/{slug}s` (e.g. `cloudsmiths`) in addition to
+  the competitor's own company URL. The `s` suffix pattern catches
+  the Cloudsmith vs Cloudsmiths trap and analogous cases.
+- Assumptions definition rewritten to be explicit about "first-ever",
+  not "earliest first-seen in window" — the old phrasing was ambiguous
+  enough to mis-implement.
+
+This also means the Strategic-read sowhat on the acquisition page must
+NOT claim "production accounts reveal a security-and-cloud-native
+pattern" based on the old 6-company list — under the corrected
+methodology there is typically only 1-2 production-depth companies and
+the sowhat must reflect that floor honestly. The dominant story in the
+corrected acquisition data is the breadth of the single-touch evaluator
+pool, not the production-depth cluster.
 
 ### 2026-05-27 (v3) — Cloudsmith re-edit round 2: snapshot delta, external-only joiners, event-attendance page, Phase 3.5 self-validation
 
