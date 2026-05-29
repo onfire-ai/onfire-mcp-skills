@@ -1,6 +1,6 @@
 ---
 name: company-growth-trends
-description: Analyse monthly headcount growth and technology/persona adoption trends for companies. For total company headcount use `get_company_headcount`; for technology or persona growth use `query_onfire` against ONFIRE.GROWTH_INSIGHT_MONTHLY. Use when the user wants to know if a company is hiring or contracting, whether a specific technology is spreading within a company, or how headcount growth compares to tech adoption — phrases like "is Acme growing?", "is EDR adoption growing at these accounts?", "compare CrowdStrike vs total headcount trend at Palo Alto Networks", "which accounts are shrinking?", "is the data engineering team at Snowflake expanding?", or any month-over-month growth question.
+description: Analyse monthly headcount growth and technology/persona adoption trends for companies. For total company headcount use `get_company_headcount`; for technology or persona growth use `query_onfire` against ONFIRE.GROWTH_INSIGHT_MONTHLY. Use when the user wants to know if a company is hiring or contracting, whether a specific technology is spreading within a company, or how headcount growth compares to tech adoption — phrases like "is Acme growing?", "is EDR adoption growing at these accounts?", "compare Sentinex vs total headcount trend at Skywall Networks", "which accounts are shrinking?", "is the data engineering team at Frostbyte expanding?", or any month-over-month growth question.
 ---
 
 # company-growth-trends
@@ -10,7 +10,7 @@ Two complementary data sources accessed via separate tools:
 | What you need | Tool to use | Source |
 |---|---|---|
 | **Total company headcount** over time + (optional) employee roster with prior-company | `get_company_headcount` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` (tenure-based) + `ONFIRE.PEOPLE_GRAND` (profile enrichment). Tool-managed; never exposed via `query_onfire`. |
-| **Technology / persona growth** (e.g. CrowdStrike, data engineer) | `query_onfire` → `ONFIRE.GROWTH_INSIGHT_MONTHLY` | Pre-computed monthly % change |
+| **Technology / persona growth** (e.g. Sentinex, data engineer) | `query_onfire` → `ONFIRE.GROWTH_INSIGHT_MONTHLY` | Pre-computed monthly % change |
 
 > **Rule:** Never use `query_onfire` for total headcount questions. Always use `get_company_headcount`.
 
@@ -18,12 +18,12 @@ Two complementary data sources accessed via separate tools:
 
 ## When to use this
 
-- "Is Capital One's CrowdStrike footprint growing?" → `query_onfire` (insight)
+- "Is Meridian Bank's Sentinex footprint growing?" → `query_onfire` (insight)
 - "Compare EDR adoption to total headcount at these 5 accounts" → both tools, then compare
 - "Which of our target accounts are shrinking overall?" → `get_company_headcount`
-- "Is the data engineering persona expanding at Snowflake?" → `query_onfire` (insight)
-- "Who joined Stripe in the last 12 months and where did they come from?" → `get_company_headcount` (roster is always returned)
-- "Who left Stripe in the last quarter and where did they go?" → `get_company_headcount` (roster includes leavers + next-company)
+- "Is the data engineering persona expanding at Frostbyte?" → `query_onfire` (insight)
+- "Who joined Northwind in the last 12 months and where did they come from?" → `get_company_headcount` (roster is always returned)
+- "Who left Northwind in the last quarter and where did they go?" → `get_company_headcount` (roster includes leavers + next-company)
 - Any month-over-month growth / trend question for companies
 
 Skip this for:
@@ -122,7 +122,7 @@ The roster is one source of truth for both directions:
 ```python
 # Default — monthly series + full roster (joiners, leavers, still-active)
 get_company_headcount(
-    company_linkedin_urls=["linkedin.com/company/cloudsmith"],
+    company_linkedin_urls=["linkedin.com/company/packmint"],
     months=12,
 )
 ```
@@ -133,8 +133,8 @@ get_company_headcount(
 - `growth_pct: null` → oldest month in the window (no prior month to diff against)
 - `growth_pct: -1.5` → headcount contracted 1.5% MoM
 - An employee row with `end_date IS NULL` is currently at the company
-- `prior_company_name = "Microsoft"` → the person was at Microsoft right before this stint; useful for joiner-origin / talent-flow analysis
-- `next_company_name = "Snowflake"` → after leaving the target company they went to Snowflake; useful for leaver-destination analysis (only set when `end_date IS NOT NULL`)
+- `prior_company_name = "Globex"` → the person was at Globex right before this stint; useful for joiner-origin / talent-flow analysis
+- `next_company_name = "Frostbyte"` → after leaving the target company they went to Frostbyte; useful for leaver-destination analysis (only set when `end_date IS NOT NULL`)
 
 ---
 
@@ -173,8 +173,8 @@ SELECT
 FROM ONFIRE.GROWTH_INSIGHT_MONTHLY
 WHERE deleted_at IS NULL
   AND str_value IS NOT NULL
-  AND company_linkedin_url ILIKE '%/company/capital-one%'
-  AND LOWER(insight_name) = 'growth-crowdstrike'
+  AND company_linkedin_url ILIKE '%/company/meridian-bank%'
+  AND LOWER(insight_name) = 'growth-sentinex'
 ORDER BY time_period DESC
 LIMIT 13
 ```
@@ -188,7 +188,7 @@ SELECT
 FROM ONFIRE.GROWTH_INSIGHT_MONTHLY
 WHERE deleted_at IS NULL
   AND str_value IS NOT NULL
-  AND company_linkedin_url ILIKE '%/company/snowflake%'
+  AND company_linkedin_url ILIKE '%/company/frostbyte%'
   AND time_period >= DATEADD(month, -3, CURRENT_DATE())
 ORDER BY insight_name, time_period DESC
 LIMIT 200
@@ -205,9 +205,9 @@ FROM ONFIRE.GROWTH_INSIGHT_MONTHLY
 WHERE deleted_at IS NULL
   AND str_value IS NOT NULL
   AND company_linkedin_url IN (
-      'linkedin.com/company/stripe',
-      'linkedin.com/company/twilio',
-      'linkedin.com/company/datadog'
+      'linkedin.com/company/northwind',
+      'linkedin.com/company/sendline',
+      'linkedin.com/company/pathwatch'
   )
   AND insight_name ILIKE 'growth-edr%'
   AND time_period = (
@@ -228,7 +228,7 @@ Call both tools and merge the results in your response.
 **Step 1** — get total headcount:
 ```python
 get_company_headcount(
-    company_linkedin_urls=["linkedin.com/company/palo-alto-networks"],
+    company_linkedin_urls=["linkedin.com/company/skywall-networks"],
     months=13,
 )
 ```
@@ -241,7 +241,7 @@ SELECT
 FROM ONFIRE.GROWTH_INSIGHT_MONTHLY
 WHERE deleted_at IS NULL
   AND str_value IS NOT NULL
-  AND company_linkedin_url ILIKE '%/company/palo-alto-networks%'
+  AND company_linkedin_url ILIKE '%/company/skywall-networks%'
   AND insight_name ILIKE 'growth-edr%'
 ORDER BY time_period DESC
 LIMIT 13
@@ -264,7 +264,7 @@ LIMIT 13
 
 Both tools return a `dataset` handle + `preview_rows` (first 20).
 
-1. Narrate the trend: *"Palo Alto Networks' total headcount grew +3.2% MoM in April 2025, while CrowdStrike persona adoption grew +8.5% — outpacing overall hiring."*
+1. Narrate the trend: *"Skywall Networks' total headcount grew +3.2% MoM in April 2025, while Sentinex persona adoption grew +8.5% — outpacing overall hiring."*
 2. For time-series questions, show a table of `time_period → growth_pct`.
 3. Offer `download_dataset` for the full CSV.
 4. Follow-up slices → use `query_datasets` against the existing `dataset_id`.

@@ -1,6 +1,6 @@
 ---
 name: entity-people-search
-description: Search for people/prospects directly from Onfire's LinkedIn people entity table (ONFIRE.PEOPLE) using the `query_onfire` tool. Use when the user wants to find prospects by job title, company, location, seniority, skills, or keywords in their profile — phrases like "find engineers at Stripe", "who are the VPs of Security at banks in the US", "show me people with 'Splunk' in their job summary", "look up this LinkedIn URL", or any people search that doesn't require Forschung's cross-database scoring.
+description: Search for people/prospects directly from Onfire's LinkedIn people entity table (ONFIRE.PEOPLE) using the `query_onfire` tool. Use when the user wants to find prospects by job title, company, location, seniority, skills, or keywords in their profile — phrases like "find engineers at Northwind", "who are the VPs of Security at banks in the US", "show me people with 'Loglytics' in their job summary", "look up this LinkedIn URL", or any people search that doesn't require Forschung's cross-database scoring.
 ---
 
 # entity-people-search
@@ -10,9 +10,9 @@ No external API hop — query the canonical LinkedIn people entity table straigh
 
 ## When to use this
 
-- "Find security engineers at Capital One"
+- "Find security engineers at Meridian Bank"
 - "Who are the CISOs in financial services in Germany?"
-- "Show me people whose job summary mentions CrowdStrike"
+- "Show me people whose job summary mentions Sentinex"
 - "Look up this LinkedIn URL: linkedin.com/in/johndoe"
 - "Get me VPs of Engineering at companies with 200-500 employees"
 - Any people lookup that can be expressed as column filters on LinkedIn profile data
@@ -60,7 +60,7 @@ SELECT
     JOB_SUMMARY, LOCATION_NAME, JOB_START_DATE
 FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
-  AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/company/capital-one%'
+  AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/company/meridian-bank%'
 ORDER BY JOB_START_DATE DESC NULLS LAST
 LIMIT 50
 ```
@@ -85,9 +85,9 @@ SELECT
     JOB_SUMMARY
 FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
-  AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/company/stripe%'
-  AND (LOWER(JOB_SUMMARY) LIKE '%crowdstrike%'
-       OR LOWER(HEADLINE) LIKE '%crowdstrike%')
+  AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/company/northwind%'
+  AND (LOWER(JOB_SUMMARY) LIKE '%sentinex%'
+       OR LOWER(HEADLINE) LIKE '%sentinex%')
 LIMIT 30
 ```
 

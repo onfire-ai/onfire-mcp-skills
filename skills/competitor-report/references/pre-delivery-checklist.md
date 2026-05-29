@@ -158,8 +158,8 @@ itself.** Catch it here.
       partial month)
 - [ ] **`INSIGHT_VALUE` casing checked.** If Query 07 returns zero
       rows, verify the competitor's canonical capitalisation in
-      `ONFIRE.INSIGHTS_2_EVIDENCES` (e.g. `CloudSmith` not
-      `Cloudsmith`) before concluding "no acquisition motion data".
+      `ONFIRE.INSIGHTS_2_EVIDENCES` (e.g. `PackMint` not
+      `Packmint`) before concluding "no acquisition motion data".
       Use `ILIKE`, not exact-match equality.
 
 ---

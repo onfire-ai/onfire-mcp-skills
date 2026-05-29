@@ -28,7 +28,7 @@ Detect which job titles are newly entering or permanently leaving a company, mon
 
 | Parameter | Default | Notes |
 |---|---|---|
-| `company_linkedin_url` | **required** | e.g. `linkedin.com/company/mondaydotcom`. Infer slug from company name if needed (e.g. "Salesforce" → `linkedin.com/company/salesforce`). State the inferred URL explicitly. |
+| `company_linkedin_url` | **required** | e.g. `linkedin.com/company/taskboard`. Infer slug from company name if needed (e.g. "Cloudforce" → `linkedin.com/company/cloudforce`). State the inferred URL explicitly. |
 | `start_date` | 12 months ago | Convert natural language: "2 years" → 24 months ago, "since Jan 2024" → `2024-01-01`, "6 months" → 6 months ago. Format: `YYYY-MM-DD`. |
 | `title_filter` | none | Translate "only engineering titles" or "titles with manager" to SQL: `AND LOWER(TITLE_NAME) ILIKE '%engineer%'`. Multiple keywords → `AND (LOWER(TITLE_NAME) ILIKE '%kw1%' OR LOWER(TITLE_NAME) ILIKE '%kw2%')`. |
 | `show_all` | false | Default: only rows where `title_new_to_company = TRUE` OR `title_gone_from_company = TRUE`. If user says "show everything" or "all movement", remove the signal filter. |
@@ -123,13 +123,13 @@ If `show_all=true`, append: ` · [Z] total move events`
 
 ### No results
 If the query returns 0 rows, say:
-> "No title movement found for `[url]` in this window. The LinkedIn URL slug may not match — try a variant (e.g. `linkedin.com/company/salesforce` vs `linkedin.com/company/salesforcecom`)."
+> "No title movement found for `[url]` in this window. The LinkedIn URL slug may not match — try a variant (e.g. `linkedin.com/company/cloudforce` vs `linkedin.com/company/cloudforcecom`)."
 
 ---
 
 ## Edge cases
 
-- **Inferred URL**: state it — *"Using `linkedin.com/company/salesforce` — correct me if wrong."*
+- **Inferred URL**: state it — *"Using `linkedin.com/company/cloudforce` — correct me if wrong."*
 - **Title noise**: spelling variants (`mid-market solution engineer` vs `mid-market solutions engineer`) appear as separate rows. Mention if prominent.
 - **Future-dated END_DATE**: occasional data artifact. Note if it affects results.
 - **Large result sets** (>150 rows with `show_all=true`): suggest narrowing by title filter or date range.

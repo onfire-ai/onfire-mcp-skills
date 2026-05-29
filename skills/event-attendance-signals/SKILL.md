@@ -1,6 +1,6 @@
 ---
 name: event-attendance-signals
-description: Find people who attended conferences, summits, webinars, or industry events using the `query_onfire` tool against ONFIRE.EVENTS_CONTACTS. Use when the user wants to know who went to a specific event, find attendees from a target company, discover which events a person attended, or filter prospects by event participation — phrases like "who attended Dreamforce 2025", "find people from Salesforce at RSA", "which events did people from our target accounts go to", "show me Gartner IT Symposium attendees", or any event attendance lookup.
+description: Find people who attended conferences, summits, webinars, or industry events using the `query_onfire` tool against ONFIRE.EVENTS_CONTACTS. Use when the user wants to know who went to a specific event, find attendees from a target company, discover which events a person attended, or filter prospects by event participation — phrases like "who attended CloudCon 2025", "find people from Cloudforce at SecureCon", "which events did people from our target accounts go to", "show me Quadrant IT Symposium attendees", or any event attendance lookup.
 ---
 
 # event-attendance-signals
@@ -11,11 +11,11 @@ conference or industry gathering, their employer, and their location.
 
 ## When to use this
 
-- "Who attended Dreamforce 2025?"
-- "Find all Defcon 33 attendees from US-based companies"
-- "Which events did people from Capital One go to?"
+- "Who attended CloudCon 2025?"
+- "Find all HackSummit 33 attendees from US-based companies"
+- "Which events did people from Meridian Bank go to?"
 - "Show me every event a list of LinkedIn profiles attended"
-- "Who from Germany was at the NabShow?"
+- "Who from Germany was at the MediaExpo?"
 - Any question about conference attendance or event participation
 
 Skip this for:
@@ -33,7 +33,7 @@ Skip this for:
 | `COMPANY_LINKEDIN_URL` | TEXT | Employer's LinkedIn URL at time of event |
 | `COMPANY_LINKEDIN_ID` | NUMBER | Numeric company ID |
 | `COMPANY_WEBSITE` | TEXT | Employer's website |
-| `INSIGHT_NAME` | TEXT | Event name, always prefixed `Event - ` (e.g. `"Event - Dreamforce 2025"`) |
+| `INSIGHT_NAME` | TEXT | Event name, always prefixed `Event - ` (e.g. `"Event - CloudCon 2025"`) |
 | `CONTACT_LINKEDIN_URL` | TEXT | Attendee's LinkedIn URL |
 | `CONTACT_LINKEDIN_ID` | NUMBER | Numeric person ID |
 | `CONTACT_COUNTRY` | TEXT | Lowercase country (e.g. `"united states"`) |
@@ -65,7 +65,7 @@ SELECT
     insight_name
 FROM ONFIRE.EVENTS_CONTACTS
 WHERE deleted_at IS NULL
-  AND insight_name ILIKE '%Dreamforce 2025%'
+  AND insight_name ILIKE '%CloudCon 2025%'
 ORDER BY company_website NULLS LAST
 LIMIT 500
 ```
@@ -79,7 +79,7 @@ SELECT
     active_employment
 FROM ONFIRE.EVENTS_CONTACTS
 WHERE deleted_at IS NULL
-  AND company_linkedin_url ILIKE '%/company/capital-one%'
+  AND company_linkedin_url ILIKE '%/company/meridian-bank%'
 ORDER BY insight_name
 LIMIT 200
 ```
@@ -123,9 +123,9 @@ SELECT
 FROM ONFIRE.EVENTS_CONTACTS
 WHERE deleted_at IS NULL
   AND company_linkedin_url IN (
-      'https://www.linkedin.com/company/stripe',
-      'https://www.linkedin.com/company/twilio',
-      'https://www.linkedin.com/company/datadog'
+      'https://www.linkedin.com/company/northwind',
+      'https://www.linkedin.com/company/sendline',
+      'https://www.linkedin.com/company/pathwatch'
   )
 GROUP BY insight_name
 ORDER BY unique_attendees DESC
@@ -141,7 +141,7 @@ SELECT
     contact_region
 FROM ONFIRE.EVENTS_CONTACTS
 WHERE deleted_at IS NULL
-  AND insight_name ILIKE '%RSA%'
+  AND insight_name ILIKE '%SecureCon%'
   AND LOWER(contact_country) = 'united states'
   AND LOWER(contact_region) = 'california'
 ORDER BY company_website NULLS LAST
@@ -159,7 +159,7 @@ LIMIT 200
 
 ## Common pitfalls
 
-- **`INSIGHT_NAME` is always prefixed `Event - `** — e.g. `"Event - Dreamforce 2025"`. Use `ILIKE '%Dreamforce%'` for fuzzy matching; don't expect the bare event name.
+- **`INSIGHT_NAME` is always prefixed `Event - `** — e.g. `"Event - CloudCon 2025"`. Use `ILIKE '%CloudCon%'` for fuzzy matching; don't expect the bare event name.
 - **`CONTACT_COUNTRY` is lowercase** — use `"united states"` not `"United States"`. Apply `LOWER()` when comparing.
 - **`DELETED_AT IS NULL`** — always include this filter.
 - **Re-running for follow-ups** — slice the existing dataset with `query_datasets`.

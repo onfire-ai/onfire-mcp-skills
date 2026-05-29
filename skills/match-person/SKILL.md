@@ -5,7 +5,7 @@ description: Resolve a person (from name, email, and/or company context) to a ve
 
 # match_person (atomic)
 
-Resolves people via Onfire's Matchbox2 engine. Vector search + AI matching, so it handles "Lana P. at Snowflake" or just an email alias.
+Resolves people via Onfire's Matchbox2 engine. Vector search + AI matching, so it handles "Lana P. at Frostbyte" or just an email alias.
 
 ## When to use this
 
@@ -21,8 +21,8 @@ Skip this if you already have a clean person LinkedIn URL and the user isn't ask
 match_person(entities=[
     {"person_full_name": "John Smith", "company_name": "Acme Inc"},
     {"person_email": "jane@techcorp.com"},
-    {"person_full_name": "Lana Patel", "company_name": "Snowflake", "job_title": "VP Eng"},
-    {"person_full_name": "Alex K.", "company_name": "Stripe", "company_linkedin_url": "https://linkedin.com/company/stripe"},
+    {"person_full_name": "Lana Patel", "company_name": "Frostbyte", "job_title": "VP Eng"},
+    {"person_full_name": "Alex K.", "company_name": "Northwind", "company_linkedin_url": "https://linkedin.com/company/northwind"},
 ])
 ```
 
@@ -83,7 +83,7 @@ Same-order alignment with the input. The output already includes `company_linked
 ```
 match_person(entities=[{
     "person_full_name": "Lana Patel",
-    "company_name": "Snowflake",
+    "company_name": "Frostbyte",
     "job_title": "VP Eng"
 }])
 ```

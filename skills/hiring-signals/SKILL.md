@@ -1,6 +1,6 @@
 ---
 name: hiring-signals
-description: Find open job postings at target companies using the `query_onfire` tool against SILVER.JOB_POST.STG_JOB_POSTS. Use when the user wants to know what roles a company is actively hiring for, where they're hiring, what seniority they're posting, which companies are hiring for a technology or skill, what open positions signal budget or expansion - phrases like "what is Stripe hiring for?", "find VP-level roles at my target accounts", "which accounts are expanding their security team?", "find buyers at companies hiring AI engineers", "show open data engineer roles in EMEA", or any job posting / hiring signal lookup.
+description: Find open job postings at target companies using the `query_onfire` tool against SILVER.JOB_POST.STG_JOB_POSTS. Use when the user wants to know what roles a company is actively hiring for, where they're hiring, what seniority they're posting, which companies are hiring for a technology or skill, what open positions signal budget or expansion - phrases like "what is Northwind hiring for?", "find VP-level roles at my target accounts", "which accounts are expanding their security team?", "find buyers at companies hiring AI engineers", "show open data engineer roles in EMEA", or any job posting / hiring signal lookup.
 compatibility:
   tools:
     - query_onfire
@@ -15,11 +15,11 @@ company's open requisitions.
 
 ## When to use this
 
-- "What is Capital One actively hiring for right now?"
+- "What is Meridian Bank actively hiring for right now?"
 - "Find companies hiring Kubernetes or Python engineers"
 - "Which of our target accounts are expanding their security team?"
 - "Show me all open DevSecOps roles posted in the last 30 days"
-- "What's the geographic shape of Cloudsmith's open postings?"
+- "What's the geographic shape of Packmint's open postings?"
 - "Which accounts have the most active postings in EMEA right now?"
 - Any job posting lookup or hiring signal question
 
@@ -48,7 +48,7 @@ LinkedIn Jobs.
 | `SENIORITY_JOB` | TEXT | Seniority level (see values below) |
 | `JOB_POST_SENIORITY_SCORE` | NUMBER | Numeric seniority score (0 = lower, higher = more senior) |
 | `EMPLOYMENT_TYPE` | TEXT | `"Full-time"`, `"Part-time"`, `"Contract"`, `"Internship"` |
-| `EXTERNAL_URL` | TEXT | The company's own careers-page URL when present (e.g. `careers.cloudsmith.com/...`); often null |
+| `EXTERNAL_URL` | TEXT | The company's own careers-page URL when present (e.g. `careers.packmint.com/...`); often null |
 | `REDIRECTED_URL` | TEXT | The LinkedIn Jobs URL for the posting |
 | `APPLICATION_ACTIVE` | NUMBER | `1` if the posting is currently active, `0` if closed / filled |
 | `PAYLOAD_LAST_UPDATED` | TIMESTAMP | When the source payload was last updated |
@@ -78,7 +78,7 @@ SELECT JOB_POST_TITLE,
        DATE_POSTED,
        REDIRECTED_URL
 FROM SILVER.JOB_POST.STG_JOB_POSTS
-WHERE LOWER(COMPANY_LINKEDIN_URL) = 'linkedin.com/company/capital-one'
+WHERE LOWER(COMPANY_LINKEDIN_URL) = 'linkedin.com/company/meridian-bank'
   AND APPLICATION_ACTIVE = 1
 ORDER BY DATE_POSTED DESC NULLS LAST
 LIMIT 50
@@ -94,7 +94,7 @@ SELECT JOB_POST_TITLE,
        APPLICATION_ACTIVE,
        REDIRECTED_URL
 FROM SILVER.JOB_POST.STG_JOB_POSTS
-WHERE LOWER(COMPANY_LINKEDIN_URL) = 'linkedin.com/company/cloudsmith'
+WHERE LOWER(COMPANY_LINKEDIN_URL) = 'linkedin.com/company/packmint'
   AND DATE_POSTED BETWEEN '2026-01-01' AND '2026-03-31'
 ORDER BY DATE_POSTED
 ```
@@ -130,9 +130,9 @@ SELECT COMPANY_NAME,
 FROM SILVER.JOB_POST.STG_JOB_POSTS
 WHERE APPLICATION_ACTIVE = 1
   AND LOWER(COMPANY_LINKEDIN_URL) IN (
-        'linkedin.com/company/stripe',
-        'linkedin.com/company/twilio',
-        'linkedin.com/company/datadog'
+        'linkedin.com/company/northwind',
+        'linkedin.com/company/sendline',
+        'linkedin.com/company/pathwatch'
       )
   AND (
         JOB_POST_TITLE ILIKE '%security%'
@@ -153,7 +153,7 @@ SELECT COMPANY_NAME,
 FROM SILVER.JOB_POST.STG_JOB_POSTS
 WHERE APPLICATION_ACTIVE = 1
   AND SENIORITY_JOB IN ('Director','Executive')
-  AND LOWER(COMPANY_LINKEDIN_URL) = 'linkedin.com/company/cisco'
+  AND LOWER(COMPANY_LINKEDIN_URL) = 'linkedin.com/company/nornet'
 ORDER BY DATE_POSTED DESC NULLS LAST
 LIMIT 50
 ```
@@ -166,9 +166,9 @@ SELECT COMPANY_NAME,
 FROM SILVER.JOB_POST.STG_JOB_POSTS
 WHERE APPLICATION_ACTIVE = 1
   AND LOWER(COMPANY_LINKEDIN_URL) IN (
-        'linkedin.com/company/stripe',
-        'linkedin.com/company/twilio',
-        'linkedin.com/company/datadog'
+        'linkedin.com/company/northwind',
+        'linkedin.com/company/sendline',
+        'linkedin.com/company/pathwatch'
       )
 GROUP BY COMPANY_NAME, COMPANY_LINKEDIN_URL
 ORDER BY open_roles DESC
@@ -181,7 +181,7 @@ SELECT COUNTRY,
        COUNT(*) AS open_roles
 FROM SILVER.JOB_POST.STG_JOB_POSTS
 WHERE APPLICATION_ACTIVE = 1
-  AND LOWER(COMPANY_LINKEDIN_URL) = 'linkedin.com/company/cloudsmith'
+  AND LOWER(COMPANY_LINKEDIN_URL) = 'linkedin.com/company/packmint'
 GROUP BY COUNTRY
 ORDER BY open_roles DESC
 ```
@@ -193,7 +193,7 @@ SELECT JOB_FUNCTION,
        COUNT(*) AS n
 FROM SILVER.JOB_POST.STG_JOB_POSTS
 WHERE APPLICATION_ACTIVE = 1
-  AND LOWER(COMPANY_LINKEDIN_URL) = 'linkedin.com/company/cloudsmith'
+  AND LOWER(COMPANY_LINKEDIN_URL) = 'linkedin.com/company/packmint'
 GROUP BY JOB_FUNCTION, SENIORITY_JOB
 ORDER BY n DESC
 ```

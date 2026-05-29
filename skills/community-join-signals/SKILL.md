@@ -1,6 +1,6 @@
 ---
 name: community-join-signals
-description: Find people who joined specific online communities (Slack workspaces, Discord servers, Reddit communities, LinkedIn groups, GitHub orgs) using the `query_onfire` tool against ONFIRE.EVIDENCES. Use when the user asks who joined a community, who is a member of a specific Slack/Discord/Reddit/LinkedIn group, or wants to find community presence signals for accounts or individuals — phrases like "who joined the JFrog Slack", "members of the DevSecOps Discord", "find everyone from Stripe who's in any Kubernetes community", "who joined any security Slack since January", or any community-membership lookup.
+description: Find people who joined specific online communities (Slack workspaces, Discord servers, Reddit communities, LinkedIn groups, GitHub orgs) using the `query_onfire` tool against ONFIRE.EVIDENCES. Use when the user asks who joined a community, who is a member of a specific Slack/Discord/Reddit/LinkedIn group, or wants to find community presence signals for accounts or individuals — phrases like "who joined the Artifex Slack", "members of the DevSecOps Discord", "find everyone from Northwind who's in any Kubernetes community", "who joined any security Slack since January", or any community-membership lookup.
 ---
 
 # community-join-signals
@@ -12,10 +12,10 @@ group, or GitHub org. It's the primary source for community intent signals.
 
 ## When to use this
 
-- "Who joined the JFrog Slack?"
+- "Who joined the Artifex Slack?"
 - "Members of the Keep Security Discord"
-- "Find everyone from Capital One who's in any DevSecOps community"
-- "Who from Stripe joined any GitHub org related to Kubernetes?"
+- "Find everyone from Meridian Bank who's in any DevSecOps community"
+- "Who from Northwind joined any GitHub org related to Kubernetes?"
 - "Show me LinkedIn group members for BigQuery"
 - Any question asking about community membership or join events
 
@@ -43,9 +43,9 @@ The `EVIDENCES` table has structured columns plus a `PAYLOAD` variant
 
 | Field | How to access | Example values |
 |-------|---------------|----------------|
-| Community name | `PAYLOAD:COMMUNITY_NAME::VARCHAR` | "JFrog Slack", "DevSecOps Community" |
+| Community name | `PAYLOAD:COMMUNITY_NAME::VARCHAR` | "Artifex Slack", "DevSecOps Community" |
 | Platform type | `PAYLOAD:COMMUNITY_TYPE::VARCHAR` | "Slack", "Discord", "Github", "Linkedin", "Reddit" |
-| Community URL | `PAYLOAD:COMMUNITY_URL::VARCHAR` | "https://jfrog.slack.com" |
+| Community URL | `PAYLOAD:COMMUNITY_URL::VARCHAR` | "https://artifex.slack.com" |
 | Member ID | `PAYLOAD:MEMBER_ID::VARCHAR` | Platform-native member identifier |
 | Join timestamp | `PAYLOAD:TIMESTAMP::VARCHAR` | ISO timestamp of join |
 
@@ -71,7 +71,7 @@ SELECT
 FROM ONFIRE.EVIDENCES
 WHERE evidence_type_id = 7
   AND deleted_at IS NULL
-  AND PAYLOAD:COMMUNITY_NAME::VARCHAR ILIKE '%jfrog%'
+  AND PAYLOAD:COMMUNITY_NAME::VARCHAR ILIKE '%artifex%'
 ORDER BY start_date DESC NULLS LAST
 LIMIT 500
 ```
@@ -103,7 +103,7 @@ SELECT
 FROM ONFIRE.EVIDENCES
 WHERE evidence_type_id = 7
   AND deleted_at IS NULL
-  AND company_linkedin_url ILIKE '%/company/capital-one%'
+  AND company_linkedin_url ILIKE '%/company/meridian-bank%'
 ORDER BY start_date DESC NULLS LAST
 LIMIT 200
 ```
@@ -152,7 +152,7 @@ SELECT
 FROM ONFIRE.EVIDENCES
 WHERE evidence_type_id = 7
   AND deleted_at IS NULL
-  AND company_linkedin_url ILIKE '%/company/stripe%'
+  AND company_linkedin_url ILIKE '%/company/northwind%'
 GROUP BY 1, 2, 3
 ORDER BY member_count DESC
 LIMIT 30

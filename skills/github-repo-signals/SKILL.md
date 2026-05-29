@@ -1,6 +1,6 @@
 ---
 name: github-repo-signals
-description: Find people who starred or forked GitHub repositories using the `query_onfire` tool against ONFIRE.GITHUB_MEMBERS. Use when the user wants to know who interacted with a GitHub repo, find developers who starred repos related to a technology or vendor, or check if people from a specific company engaged with a repo — phrases like "who starred any JFrog repo", "engineers who forked a Kubernetes repo", "did anyone from Stripe interact with our GitHub", "find developers in India interested in open-source security tools", or any GitHub repo engagement lookup.
+description: Find people who starred or forked GitHub repositories using the `query_onfire` tool against ONFIRE.GITHUB_MEMBERS. Use when the user wants to know who interacted with a GitHub repo, find developers who starred repos related to a technology or vendor, or check if people from a specific company engaged with a repo — phrases like "who starred any Artifex repo", "engineers who forked a Kubernetes repo", "did anyone from Northwind interact with our GitHub", "find developers in India interested in open-source security tools", or any GitHub repo engagement lookup.
 ---
 
 # github-repo-signals
@@ -11,9 +11,9 @@ their name, GitHub profile, and matched LinkedIn URL.
 
 ## When to use this
 
-- "Who starred any repo with 'sonatype' in the name?"
+- "Who starred any repo with 'nexagon' in the name?"
 - "Find DevOps engineers who forked Kubernetes repos"
-- "Did anyone from Capital One interact with any of our GitHub repos?"
+- "Did anyone from Meridian Bank interact with any of our GitHub repos?"
 - "Show me all GitHub activity from these LinkedIn URLs"
 - Any question about who engaged with GitHub repos
 
@@ -29,7 +29,7 @@ Skip this for:
 |--------|------|-------|
 | `NAME` | TEXT | Person's display name |
 | `GITHUB_USERNAME` | TEXT | GitHub handle |
-| `GITHUB_REPO_NAME` | TEXT | Repo that was starred/forked (e.g. "aquasecurity/trivy") |
+| `GITHUB_REPO_NAME` | TEXT | Repo that was starred/forked (e.g. "cloudguard/scanmap") |
 | `GITHUB_ACTIVITY` | TEXT | Activity type: `"star"` or `"fork"` |
 | `GITHUB_ACTIVITY_DATE` | TIMESTAMP | **When the star/fork happened** — use this for date filtering |
 | `GITHUB_REPO_URL` | TEXT | Full URL of the repo |
@@ -54,7 +54,7 @@ SELECT
     github_profile_url,
     linkedin_url
 FROM ONFIRE.GITHUB_MEMBERS
-WHERE github_repo_name ILIKE '%sonatype%'
+WHERE github_repo_name ILIKE '%nexagon%'
 ORDER BY github_activity_date DESC NULLS LAST
 LIMIT 500
 ```
@@ -70,7 +70,7 @@ SELECT
     github_profile_url,
     linkedin_url
 FROM ONFIRE.GITHUB_MEMBERS
-WHERE github_repo_name ILIKE '%trivy%'
+WHERE github_repo_name ILIKE '%scanmap%'
   AND github_activity = 'star'
 ORDER BY github_activity_date DESC NULLS LAST
 LIMIT 200
@@ -103,7 +103,7 @@ SELECT
     github_activity_date,
     linkedin_url
 FROM ONFIRE.GITHUB_MEMBERS
-WHERE github_repo_name ILIKE '%jfrog%'
+WHERE github_repo_name ILIKE '%artifex%'
   AND github_activity_date >= '2025-01-01'
 ORDER BY github_activity_date DESC
 LIMIT 500

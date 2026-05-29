@@ -9,8 +9,8 @@ description: Generate a full account research report for any company. The Onfire
 
 The Onfire MCP owns the data pipeline. This skill owns the rendering.
 
-Given a **company website** (e.g. `capitalone.com`) and a **tenant ID**
-(e.g. `fortinet`), this skill:
+Given a **company website** (e.g. `meridianbank.com`) and a **tenant ID**
+(e.g. `ironwall`), this skill:
 
 1. Calls `account_research` for the non-prospect data sources: tenant
    config + derived use cases, 10-K extracts, LinkedIn footprint, intent
@@ -35,9 +35,9 @@ All data plumbing lives inside the Onfire MCP.
 
 | Input | Required | Example |
 |-------|----------|---------|
-| `company_website` | Yes | `capitalone.com` |
-| `tenant_id` | Yes | `fortinet` |
-| `company_linkedin_url` | Optional | `https://www.linkedin.com/company/capital-one/` |
+| `company_website` | Yes | `meridianbank.com` |
+| `tenant_id` | Yes | `ironwall` |
+| `company_linkedin_url` | Optional | `https://www.linkedin.com/company/meridian-bank/` |
 
 ---
 
@@ -228,7 +228,7 @@ component snippets.
    source - see `report-structure.md` "Talking-points source citation")
    + prospect rows that map to that use case. The right column is
    brand-named: render its label as "[Tenant Display Name] solution
-   alignment" (e.g. "JFrog solution alignment"). Tag colors come from
+   alignment" (e.g. "Artifex solution alignment"). Tag colors come from
    `render_spec.use_case_palette` keyed by the use case `tag` - never
    invent a color.
 8. **Key contacts per use case** - `break-before: page`, color-coded
@@ -383,7 +383,7 @@ new SQL.
 
 ### Slice already-pulled data (zero-cost follow-ups)
 
-For questions like "break down signals by source", "show me only RSA
+For questions like "break down signals by source", "show me only SecureCon
 attendees", "give me all the prospects, not just the top 10":
 
 ```
@@ -397,7 +397,7 @@ query_datasets(
 
 Common patterns:
 - Signal source mix: `SELECT source_name, COUNT(*) FROM dataset GROUP BY 1`
-- Filter signals by event: `WHERE source_name = 'RSA Conference 2026'`
+- Filter signals by event: `WHERE source_name = 'SecureCon 2026'`
 - Filter prospects by team: `WHERE LOWER(TITLE_NAME) LIKE '%cloud%'`
 - Pull a specific 10-K paragraph: `SELECT FULL_MARKDOWN FROM dataset` then
   substring locally.

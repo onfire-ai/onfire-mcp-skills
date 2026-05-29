@@ -535,7 +535,7 @@ sentiment cross-tabs.
 
 ### Page 7 - Complication 2A (`.act`)
 
-The customer-acquisition motion page. Conventions learned from Sonatype:
+The customer-acquisition motion page. Conventions learned from Nexagon:
 
 - 3 hero cards:
   - Net-new accounts (12 months)
@@ -595,8 +595,8 @@ Layout:
 - 3-card hero row:
   - **Captured attendances** (positive green): total signals captured.
   - **Distinct events** (positive green): number of unique events, with
-    a compact event list in the subtext (e.g. "KubeCon NA 2025 (3);
-    AWS Cloud Day Dublin (1)").
+    a compact event list in the subtext (e.g. "ContainerCon NA 2025 (3);
+    Cloudvault Cloud Day Dublin (1)").
   - **Region of attendees**: short text like "US only" or "EMEA-led"
     with the city / country breakdown in the subtext.
 - Full-width **detail card** with a table: one row per attendance.
@@ -776,7 +776,7 @@ Outputs are saved as:
 - `{competitor_lc}-brief.html`
 - `{competitor_lc}-brief.pdf`
 
-E.g. `sonatype-brief.html`, `snyk-brief.html`.
+E.g. `nexagon-brief.html`, `codeshield-brief.html`.
 
 Save first to the cowork outputs folder, then present via
 `mcp__cowork__present_files`.

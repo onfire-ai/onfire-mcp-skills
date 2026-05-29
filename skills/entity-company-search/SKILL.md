@@ -1,6 +1,6 @@
 ---
 name: entity-company-search
-description: Search for companies directly from Onfire's LinkedIn company entity table (ONFIRE.COMPANIES) using the `query_onfire` tool. Use when the user wants company firmographics, technology stacks, funding data, or social URLs — phrases like "find fintech companies in Israel with 50-200 employees", "look up Stripe's company data", "which companies in our list are publicly traded", "get the Discord URL for JFrog", or any company lookup that can be answered with SQL filters on LinkedIn company data.
+description: Search for companies directly from Onfire's LinkedIn company entity table (ONFIRE.COMPANIES) using the `query_onfire` tool. Use when the user wants company firmographics, technology stacks, funding data, or social URLs — phrases like "find fintech companies in Israel with 50-200 employees", "look up Northwind's company data", "which companies in our list are publicly traded", "get the Discord URL for Artifex", or any company lookup that can be answered with SQL filters on LinkedIn company data.
 ---
 
 # entity-company-search
@@ -12,9 +12,9 @@ funding, social channels, and enriched metadata in one place.
 ## When to use this
 
 - "Find cybersecurity companies in Germany with 200-500 employees"
-- "Look up Stripe's company record — give me their LinkedIn, size, industry"
+- "Look up Northwind's company record — give me their LinkedIn, size, industry"
 - "Which of these companies are B2B? Filter by IS_B2B = true"
-- "Get the GitHub and Discord URLs for JFrog"
+- "Get the GitHub and Discord URLs for Artifex"
 - "Find companies that recently raised a Series B"
 - Any company lookup expressible as column filters on company firmographics
 
@@ -72,7 +72,7 @@ SELECT
     FUNDING_ROUNDS_LAST_ROUND_TYPE, FUNDING_ROUNDS_LAST_ROUND_DATE
 FROM ONFIRE.COMPANIES
 WHERE DELETED_AT IS NULL
-  AND DOMAIN = 'stripe.com'
+  AND DOMAIN = 'northwind.com'
 LIMIT 1
 ```
 
@@ -126,7 +126,7 @@ SELECT
     EMPLOYEE_COUNT, IS_B2B, COMPANY_TYPE
 FROM ONFIRE.COMPANIES
 WHERE DELETED_AT IS NULL
-  AND DOMAIN IN ('stripe.com', 'twilio.com', 'datadog.com', 'snowflake.com')
+  AND DOMAIN IN ('northwind.com', 'sendline.com', 'pathwatch.com', 'frostbyte.com')
 LIMIT 50
 ```
 
@@ -137,7 +137,7 @@ SELECT
     REDDIT_URL, WEBSITE
 FROM ONFIRE.COMPANIES
 WHERE DELETED_AT IS NULL
-  AND DOMAIN = 'jfrog.com'
+  AND DOMAIN = 'artifex.com'
 LIMIT 1
 ```
 
@@ -156,5 +156,5 @@ LIMIT 1
 - **Forgetting `DELETED_AT IS NULL`** — always include it.
 - **Using `SIZE` as a number** — it's a TEXT bucket ("201-500"). Use `IN (...)`.
 - **`TECHNOLOGIES` is an ARRAY** — use `ARRAY_CONTAINS('Kubernetes'::VARIANT, TECHNOLOGIES)`.
-- **`DOMAIN` vs `WEBSITE`** — `DOMAIN` is just the bare domain ("stripe.com"); `WEBSITE` may include the protocol. Prefer `DOMAIN` for exact matching.
+- **`DOMAIN` vs `WEBSITE`** — `DOMAIN` is just the bare domain ("northwind.com"); `WEBSITE` may include the protocol. Prefer `DOMAIN` for exact matching.
 - **Re-running for "now add the GitHub URLs"** — enrich with `query_datasets` on the existing `dataset_id`.

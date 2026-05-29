@@ -1,13 +1,13 @@
 ---
 name: competitor-report
-description: Generate a full client-grade Competitor Intelligence Brief for a single competitor company. The window is configurable: either the last completed calendar quarter (default) or the trailing 12 months ending the last completed quarter. Produces an A4 HTML and an optional PDF using a McKinsey-style consulting layout (Pyramid Principle lead, SCR narrative arc, action titles). The brief covers org reshape (title movement by leadership vs department, paired swaps vs net-new functions, departed-no-backfill recoverability check), hires with geo + function + origin-company size, leavers with destinations, open job postings, customer acquisition motion (12-month measured motion from the insights pipeline, monthly stacked by industry), market sentiment split (owned brand surfaces vs external developer communities), GitHub footprint snapshot, vendor-trust events, an evidence wall of verbatim third-party-only quotes (target competitor and prepared-for tenant employees both excluded), an Assumptions and Definitions back matter, and a Company Reference Card exhibit. Use this skill whenever the user asks to "build a competitor brief", "competitive intelligence on X", "deep dive on competitor X", "Sonatype-style report on X", "scan competitor X for the last quarter", "12-month view of competitor Y", "what's happening at competitor Y", or any phrasing that mixes a vendor name with a request for an analytical multi-section report on their org and market posture.
+description: Generate a full client-grade Competitor Intelligence Brief for a single competitor company. The window is configurable: either the last completed calendar quarter (default) or the trailing 12 months ending the last completed quarter. Produces an A4 HTML and an optional PDF using a McKinsey-style consulting layout (Pyramid Principle lead, SCR narrative arc, action titles). The brief covers org reshape (title movement by leadership vs department, paired swaps vs net-new functions, departed-no-backfill recoverability check), hires with geo + function + origin-company size, leavers with destinations, open job postings, customer acquisition motion (12-month measured motion from the insights pipeline, monthly stacked by industry), market sentiment split (owned brand surfaces vs external developer communities), GitHub footprint snapshot, vendor-trust events, an evidence wall of verbatim third-party-only quotes (target competitor and prepared-for tenant employees both excluded), an Assumptions and Definitions back matter, and a Company Reference Card exhibit. Use this skill whenever the user asks to "build a competitor brief", "competitive intelligence on X", "deep dive on competitor X", "Nexagon-style report on X", "scan competitor X for the last quarter", "12-month view of competitor Y", "what's happening at competitor Y", or any phrasing that mixes a vendor name with a request for an analytical multi-section report on their org and market posture.
 ---
 
 # Competitor Intelligence Brief
 
 ## What this skill does
 
-Given a **competitor company name** (e.g. `Sonatype`, `Snyk`, `JFrog`),
+Given a **competitor company name** (e.g. `Nexagon`, `Codeshield`, `Artifex`),
 this skill produces a **13-page A4 PDF analytical brief** by default.
 The page count can flex to 14 when Complication 1B is split into a
 geographic page (page 5) and a departmental-change page (new page 6) -
@@ -45,11 +45,11 @@ tenant is the reader.
 
 | Input | Required | Example | Default |
 |-------|----------|---------|---------|
-| `competitor_name` | Yes | `Sonatype` | - |
-| `company_linkedin_url` | Optional | `linkedin.com/company/sonatype` | resolved via `match_company` |
+| `competitor_name` | Yes | `Nexagon` | - |
+| `company_linkedin_url` | Optional | `linkedin.com/company/nexagon` | resolved via `match_company` |
 | `window_mode` | Optional | `quarter` or `12_month` | `quarter` |
 | `quarter` | Optional | `Q1 2026` | the last fully completed calendar quarter |
-| `prepared_for_tenant` | Optional | `jfrog` | from `get_current_tenant` |
+| `prepared_for_tenant` | Optional | `artifex` | from `get_current_tenant` |
 | `brand_cover` | Optional | `true` | `false` - cover line reads "Prepared for the requesting tenant" by default; opt in to name the tenant on the cover |
 
 If `quarter` is not supplied, the skill computes it from today's date.
@@ -302,13 +302,13 @@ the assembled report.
 See `references/snowflake-queries.md` → query 07.
 
 **Methodology — first-ever, not any-mention.** The cohort is companies
-whose **first-ever** Cloudsmith mention in the insights pipeline (across
+whose **first-ever** Packmint mention in the insights pipeline (across
 all time, not just the window) falls inside the 12-month window.
 Companies with any prior mention before the window start are excluded.
 This is the canonical "true new mentioner" cohort.
 
 The naive "any mention in window" query over-counts dramatically:
-on the canonical Cloudsmith run the naive query returned 87 companies,
+on the canonical Packmint run the naive query returned 87 companies,
 of which only **63** were truly first-ever-in-window; 24 of the 87 had
 earlier mentions and should not have been counted as "new". Use this
 template:
@@ -320,7 +320,7 @@ WITH external_mentions AS (
   WHERE insight_value ILIKE '{competitor_name}'        -- ILIKE handles canonical capitalisation
     AND company_linkedin_url IS NOT NULL
     AND company_linkedin_url NOT ILIKE '%/company/{competitor_slug}'
-    AND company_linkedin_url NOT ILIKE '%/company/{competitor_slug}s'  -- guard against same-named consultancies (Cloudsmiths)
+    AND company_linkedin_url NOT ILIKE '%/company/{competitor_slug}s'  -- guard against same-named consultancies (Packmints)
     AND start_date IS NOT NULL
 ),
 first_ever AS (
@@ -410,7 +410,7 @@ Onfire MCP: community_messages_sentiment(
 ```
 
 Persists as `ds_sentiment`. **Always score the full quarter universe**,
-never a sample. The brief makes claims like "every Sonatype-mentioning
+never a sample. The brief makes claims like "every Nexagon-mentioning
 public message from Q1 2026" - that's only true if the call is
 unsampled.
 
@@ -557,8 +557,8 @@ LIMIT 500
 ```
 
 Persist as `ds_location_distribution`. The `JOB_COMPANY_LINKEDIN_ID`
-guard is required when the slug is ambiguous (e.g. `cloudsmith` vs
-`cloudsmiths`) — otherwise the query pollutes with the wrong company.
+guard is required when the slug is ambiguous (e.g. `packmint` vs
+`packmints`) — otherwise the query pollutes with the wrong company.
 
 **Use the headcount snapshot (from Phase 1.1) as the denominator** for
 the % column, not the sum of the distribution rows. People with a null
@@ -614,7 +614,7 @@ ORDER BY insight_name, contact_country
 ```
 
 Use `company_linkedin_id` (numeric) — slug-only matches pollute the
-result with same-named companies (e.g. `cloudsmith` vs `cloudsmiths`).
+result with same-named companies (e.g. `packmint` vs `packmints`).
 `insight_name` is always prefixed `Event - `.
 
 Then enrich with names + titles by joining to `ONFIRE.PEOPLE` on
@@ -774,7 +774,7 @@ creates:
 - **Page 3**: 0 net-new, 0 now-gone (title pre-existed)
 - **Pages 5/6**: +1 joiner stint, +1 headcount
 
-This is why on a typical Cloudsmith-scale 12-month window, page 3 will
+This is why on a typical Packmint-scale 12-month window, page 3 will
 show ~35 net-new titles while page 5 shows ~60 joiner stints. The page
 3 number is always smaller because it dedupes within title; page 5 is
 larger because every hire-into-existing-title still counts.
@@ -868,7 +868,7 @@ at 13 pages (the split absorbs the freed slot).
 
 ### 3.2 Hard layout rules
 
-These come from the canonical Sonatype brief. Violate at peril:
+These come from the canonical Nexagon brief. Violate at peril:
 
 - **A4 paged media.** `@page` block with 18mm margins.
 - **Fonts.** Inter for body, Source Serif Pro for `.action-title`
@@ -1287,8 +1287,8 @@ After delivery, the user often asks:
 
 `ONFIRE.INSIGHTS_2_EVIDENCES.INSIGHT_VALUE` stores the competitor brand
 in its **canonical capitalisation** which may not match the friendly
-`competitor_name` (e.g. `CloudSmith` not `Cloudsmith`, `JFrog` not
-`Jfrog`). Use `ILIKE` or canonicalise both sides of the comparison.
+`competitor_name` (e.g. `PackMint` not `Packmint`, `Artifex` not
+`artifex`). Use `ILIKE` or canonicalise both sides of the comparison.
 A naive `INSIGHT_VALUE = '{competitor_name}'` filter will return zero
 rows even when the data is there.
 
@@ -1301,7 +1301,7 @@ rows even when the data is there.
 The single biggest defect ever shipped from this skill was the
 acquisition-motion methodology. Phase 1.7 was using "any mention in
 the 12-month window" — which counts companies as "new" even if they
-had Cloudsmith mentions years earlier. On the canonical Cloudsmith
+had Packmint mentions years earlier. On the canonical Packmint
 run, that naive query returned **87** companies; the true first-ever-
 in-window cohort is **63**. The 24-company gap was being framed in
 the brief as "new external accounts" when they were not new.
@@ -1311,17 +1311,17 @@ the brief as "new external accounts" when they were not new.
   time, then filter `first_ever_date BETWEEN window_start AND window_end`.
 - Production-depth threshold (≥ 2 distinct mentioners in window) is
   applied to the first-ever cohort only — on the canonical run this
-  collapses production-depth from 6 to **1** (Endor Labs). Sysdig,
-  AWS, Wiz, NVIDIA, BotConsulting were all in the old "production-
+  collapses production-depth from 6 to **1** (Bastion Labs). Cloudsift,
+  Cloudvault, Cloudward, Voltaic, BotConsulting were all in the old "production-
   depth 6" list because they had prior mentions; under the corrected
   methodology they are excluded.
 - A validation check query is included so the agent can quantify the
   gap between any-mention and first-ever counts on every run, and
   surface it in the brief.
 - Same-named-consultancy guard: the SQL now excludes
-  `linkedin.com/company/{slug}s` (e.g. `cloudsmiths`) in addition to
+  `linkedin.com/company/{slug}s` (e.g. `packmints`) in addition to
   the competitor's own company URL. The `s` suffix pattern catches
-  the Cloudsmith vs Cloudsmiths trap and analogous cases.
+  the Packmint vs Packmints trap and analogous cases.
 - Assumptions definition rewritten to be explicit about "first-ever",
   not "earliest first-seen in window" — the old phrasing was ambiguous
   enough to mis-implement.
@@ -1334,9 +1334,9 @@ the sowhat must reflect that floor honestly. The dominant story in the
 corrected acquisition data is the breadth of the single-touch evaluator
 pool, not the production-depth cluster.
 
-### 2026-05-27 (v3) — Cloudsmith re-edit round 2: snapshot delta, external-only joiners, event-attendance page, Phase 3.5 self-validation
+### 2026-05-27 (v3) — Packmint re-edit round 2: snapshot delta, external-only joiners, event-attendance page, Phase 3.5 self-validation
 
-Continuation of the in-session edit pass on the Cloudsmith 12-month
+Continuation of the in-session edit pass on the Packmint 12-month
 brief. Every change below was triggered by a real inconsistency a
 reader caught in the rendered PDF.
 
@@ -1428,8 +1428,8 @@ snapshot delta**
 - Action sub now references the correct evidence-wall page number
   (13, not 11) after the event-attendance insertion.
 
-**Page 14 Exhibit A — drop unsupported "Cloudsmith 2.0" claim**
-- Sowhat claimed "Cloudsmith 2.0 platform build (cited explicitly in
+**Page 14 Exhibit A — drop unsupported "Packmint 2.0" claim**
+- Sowhat claimed "Packmint 2.0 platform build (cited explicitly in
   4+ active job postings)" — but the page 7 postings table contains
   no such citation. Removed the parenthetical; replaced with the
   general "this platform-and-GTM build".
@@ -1462,9 +1462,9 @@ snapshot delta**
 - Action title verb: "surfaced indications from" not "acquired" /
   "first-seen".
 
-### 2026-05-27 — Cloudsmith re-edit: page 2 geo card, leavers logic fix, page 12/13 swap
+### 2026-05-27 — Packmint re-edit: page 2 geo card, leavers logic fix, page 12/13 swap
 
-All changes shaken out by an in-session edit pass on the Cloudsmith
+All changes shaken out by an in-session edit pass on the Packmint
 12-month brief.
 
 **Page 2 — Geographic footprint card (new)**
@@ -1531,9 +1531,9 @@ All changes shaken out by an in-session edit pass on the Cloudsmith
   feeding the page 2 Geographic footprint card.
 - Use `JOB_COMPANY_LINKEDIN_ID = {company_linkedin_id}` in the location
   query alongside the slug `ILIKE` — slug-only matches pollute the
-  result with same-named companies (e.g. `cloudsmith` vs `cloudsmiths`).
+  result with same-named companies (e.g. `packmint` vs `packmints`).
 
-### 2026-05-26 (v2) — Page 5/6 layout overhaul from Cloudsmith post-review
+### 2026-05-26 (v2) — Page 5/6 layout overhaul from Packmint post-review
 
 **Page 5 hero stats — math must close**
 - The three hero cards are now: **People joined** (`+N`, green) /
@@ -1574,9 +1574,9 @@ All changes shaken out by an in-session edit pass on the Cloudsmith
   by department".
 - Legend shows three swatches (green / amber / red).
 
-### 2026-05-26 — Cloudsmith / JFrog brief learnings
+### 2026-05-26 — Packmint / Artifex brief learnings
 
-Folded in from the Cloudsmith × JFrog session. Every change below was
+Folded in from the Packmint × Artifex session. Every change below was
 shaken out by a real brief that exposed a gap.
 
 **Editorial / tenant policy**
@@ -1614,7 +1614,7 @@ shaken out by a real brief that exposed a gap.
   column.
 - **`INSIGHT_VALUE` casing pitfall** on `ONFIRE.INSIGHTS_2_EVIDENCES`.
   The competitor brand may be stored in canonical capitalisation
-  (`CloudSmith`, `JFrog`) that doesn't match `competitor_name`. Use
+  (`PackMint`, `Artifex`) that doesn't match `competitor_name`. Use
   `ILIKE`, never exact-match equality. (Casing notes section + Query
   07.)
 

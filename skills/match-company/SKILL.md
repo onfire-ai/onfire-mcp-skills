@@ -72,7 +72,7 @@ Results are returned **in the same order** as the input — index alignment matt
 
 **Single name → LinkedIn URL.**
 ```
-match_company(companies=[{"names": ["Datadog"]}])
+match_company(companies=[{"names": ["Pathwatch"]}])
 ```
 Use the returned `linkedin_url` as the input to `ai_prospecting`.
 

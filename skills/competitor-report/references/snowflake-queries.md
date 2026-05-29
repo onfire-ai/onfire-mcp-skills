@@ -8,12 +8,12 @@ Template variables:
 
 | Variable | Example | Source |
 |---|---|---|
-| `{company_linkedin_url}` | `linkedin.com/company/sonatype` | Phase 0 `match_company` |
-| `{competitor_name}` | `Sonatype` | Phase 0 user input |
+| `{company_linkedin_url}` | `linkedin.com/company/nexagon` | Phase 0 `match_company` |
+| `{competitor_name}` | `Nexagon` | Phase 0 user input |
 | `{q_start}` | `2026-01-01` | Phase 0 quarter math |
 | `{q_end}` | `2026-03-31` | Phase 0 quarter math |
 | `{rolling_12mo_start}` | `2025-04-01` | `DATEADD(MONTH, -12, '{q_end}')` |
-| `{tenant_linkedin_url}` | `linkedin.com/company/jfrog` | Phase 0 `get_current_tenant` |
+| `{tenant_linkedin_url}` | `linkedin.com/company/artifex` | Phase 0 `get_current_tenant` |
 
 ---
 
@@ -357,7 +357,7 @@ series.
 
 **Casing pitfall.** `INSIGHT_VALUE` stores the competitor name in its
 canonical capitalisation, which may not match `{competitor_name}`
-(e.g. `CloudSmith` not `Cloudsmith`, `JFrog` not `Jfrog`). Use
+(e.g. `PackMint` not `Packmint`, `Artifex` not `artifex`). Use
 `ILIKE` to be safe. A naive `INSIGHT_VALUE = '{competitor_name}'` will
 return zero rows even when data exists.
 

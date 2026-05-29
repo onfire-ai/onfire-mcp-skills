@@ -469,15 +469,15 @@ deliberately, not for decoration.
 | 10-K / annual filing | `([Company] 10-K, March 2, 2026)` · `(annual filing, [Month Year])` |
 | LinkedIn profile (current role) | `(LinkedIn profile evidence, current role)` · `(LinkedIn profile, in seat since [Month Year])` |
 | LinkedIn company-change record | `(company-change records, [Month Year])` |
-| Conference / event | `(RSA Conference 2026, April 2026)` · `(KubeCon NA 2025, November 2025)` |
-| Community Slack / Discord | `(SPIFFE community Slack, June 2025)` |
+| Conference / event | `(SecureCon 2026, April 2026)` · `(ContainerCon NA 2025, November 2025)` |
+| Community Slack / Discord | `(Meshwork community Slack, June 2025)` |
 | LinkedIn post / digital signal | `(LinkedIn post, [Date])` |
 
 ### Required citation structure per point
 
 1. **Bold title carries the source-and-date stamp** — either as a
    parenthetical at the end of the bold or inside the bold itself if the
-   source IS the headline (`<strong>...spoke at RSA Conference 2026...</strong>`).
+   source IS the headline (`<strong>...spoke at SecureCon 2026...</strong>`).
 2. **Body prose names the specific person, document, or event** — not a
    generic "annual filing" or "a current employee."
 3. **No date-less claims.** If a claim has no date, do not include it
@@ -486,7 +486,7 @@ deliberately, not for decoration.
    LinkedIn profile → "in seat since [Month Year]". Slack message → exact
    post date. Event → "[Event Name] [Year]" with month if known.
 5. **Multi-source points cite all sources** semicolon-separated:
-   `(KubeCon NA 2025, November 2025; SPIFFE community Slack, June 2025)`.
+   `(ContainerCon NA 2025, November 2025; Meshwork community Slack, June 2025)`.
 6. **Never cite internal tool names.** See "Forbidden internal tool names".
 
 ---
@@ -629,9 +629,9 @@ Never frame a contractor as an "internal champion" or "in seat".
 
 | Raw `source_name` / `source_type` | Display tag |
 |---|---|
-| RSA Conference | "RSA Conference [Year]" |
-| KubeCon, CloudNativeCon | "[Conference] [Year]" |
-| NVIDIA GTC | "NVIDIA GTC [Year]" |
+| SecureCon | "SecureCon [Year]" |
+| ContainerCon, CloudNativeSummit | "[Conference] [Year]" |
+| Voltaic GTC | "Voltaic GTC [Year]" |
 | Slack | "Professional community" |
 | Discord | "Community engagement" |
 | LinkedIn | "Digital intent signal" |
@@ -724,8 +724,8 @@ reads as a self-contained heading without a separate title/subtitle pair.
       <!-- Brand-side talking points, drawn from
            tenant_config.derived_use_cases[].evidence. The label is
            rendered uppercase by the .lbl class; spell the tenant name
-           the way it appears in tenant_config (e.g. "JFrog solution
-           alignment" -> "JFROG SOLUTION ALIGNMENT"). -->
+           the way it appears in tenant_config (e.g. "Artifex solution
+           alignment" -> "ARTIFEX SOLUTION ALIGNMENT"). -->
     </div>
   </div>
   <span class="lbl">Talking points</span>
@@ -861,7 +861,7 @@ Acceptable abstractions in customer-facing prose:
 - "intent signals"
 - "industry research"
 - "market intelligence"
-- "[Conference Name] [Year]" (real events, e.g. "RSA Conference 2026")
+- "[Conference Name] [Year]" (real events, e.g. "SecureCon 2026")
 - "[Community channel] community Slack / Discord"
 
 Snowflake CAN appear as a CUSTOMER product (e.g. "Snowflake Cortex AI is

@@ -29,12 +29,12 @@ Pass either a single URL or a batch list.
 
 ```python
 # Single company
-ai_prospecting(action="run", company_linkedin_url="https://linkedin.com/company/datadog")
+ai_prospecting(action="run", company_linkedin_url="https://linkedin.com/company/pathwatch")
 
 # Batch
 ai_prospecting(action="run", linkedin_urls=[
-    "https://linkedin.com/company/datadog",
-    "https://linkedin.com/company/snowflake",
+    "https://linkedin.com/company/pathwatch",
+    "https://linkedin.com/company/frostbyte",
     ...
 ])
 ```
@@ -50,7 +50,7 @@ ai_prospecting(action="run", linkedin_urls=[
 ```python
 ai_prospecting(
     action="get_prospect",
-    company_linkedin_url="https://linkedin.com/company/snowflake",
+    company_linkedin_url="https://linkedin.com/company/frostbyte",
     person_linkedin="https://linkedin.com/in/lana-patel"
 )
 ```
@@ -322,10 +322,10 @@ On preview shape, after rendering top_picks + preview_rows, pull the remaining r
 
 ### Worked example — what a rendered prospect card actually looks like
 
-For a JFrog-tenant run against Bank of America, the third prospect's card should look like:
+For an Artifex-tenant run against Continental Bank, the third prospect's card should look like:
 
 > **3. Karthik Velayudhasamy** — SVP, Senior Tech Manager – Application Development (California, United States)
-> [linkedin.com/in/karthikeyan-velayudhasamy](https://linkedin.com/in/karthikeyan-velayudhasamy) · **GOLD** warm intro via Rick Borden (Bank of America) · Composite 712
+> [linkedin.com/in/karthikeyan-velayudhasamy](https://linkedin.com/in/karthikeyan-velayudhasamy) · **GOLD** warm intro via Rick Borden (Continental Bank) · Composite 712
 >
 > Score breakdown: buyer 80, tech champion 312, receptiveness 60, urgency 50. Authority 5/5.
 > Persona match: engineering 12.2, architect 12.2, devsecops 8.1.
@@ -333,11 +333,11 @@ For a JFrog-tenant run against Bank of America, the third prospect's card should
 > Past employers with relevant tech: cdk global | jpmorgan chase | northern trust.
 >
 > - **[summary]** A strategic technology leader with extensive experience driving enterprise-scale cloud migrations and building complex integration platforms — "adept at leveraging cutting-edge technologies and building high-performing teams to achieve business objectives." Making him a critical stakeholder for large-scale modernization initiatives.
-> - **[buyer]** He has proven oversight of major legacy-to-vendor migrations valued at hundreds of millions of dollars and designed custom patented integration services — "Successfully oversaw the migration of a large in-house legacy mortgage servicing operation worth $500 million to a vendor platform" — "Designed and patented a revolutionary Dynamic Data Integration Services solution on the MuleSoft platform." Demonstrating his capacity to manage high-stakes financial budgets and lead complex architectural integrations.
-> - **[technical]** His technical background spans the modernization of core bank applications using OpenShift and Kafka while integrating disparate manufacturing ecosystems via MuleSoft — "Leading cloud migration of internal bank applications to RHEL, OpenShift Container Platform" — "Building new platform for Auto loans to integrate with EV manufacturers like Lucid leveraging MuleSoft, Pega, Kafka, Oracle tech stack." Highlighting his deep hands-on expertise.
-> - **[warm]** He maintains a professional connection to JFrog through Rick Borden, with whom he overlapped for 45 months as a senior leader at Bank of America.
+> - **[buyer]** He has proven oversight of major legacy-to-vendor migrations valued at hundreds of millions of dollars and designed custom patented integration services — "Successfully oversaw the migration of a large in-house legacy mortgage servicing operation worth $500 million to a vendor platform" — "Designed and patented a revolutionary Dynamic Data Integration Services solution on the Conduit platform." Demonstrating his capacity to manage high-stakes financial budgets and lead complex architectural integrations.
+> - **[technical]** His technical background spans the modernization of core bank applications using OpenShift and Kafka while integrating disparate manufacturing ecosystems via Conduit — "Leading cloud migration of internal bank applications to RHEL, OpenShift Container Platform" — "Building new platform for Auto loans to integrate with EV manufacturers like Lucid leveraging Conduit, Pega, Kafka, Datacore tech stack." Highlighting his deep hands-on expertise.
+> - **[warm]** He maintains a professional connection to Artifex through Rick Borden, with whom he overlapped for 45 months as a senior leader at Continental Bank.
 >
-> Talking point: Artifactory's binary repo + SBOM management for OpenShift-deployed core bank applications.
+> Talking point: Artifex Registry's binary repo + SBOM management for OpenShift-deployed core bank applications.
 
 This is what every card should look like — not a one-line summary, not a paraphrase, not a "see ai_reasoning for details." If you render this for the top 3, you render it for prospects 4 through 9 too.
 
@@ -393,7 +393,7 @@ If the user already asked for a file (any phrasing — "send", "export", "downlo
 
 **Single company by name.**
 ```
-1. match-company on "Datadog" → linkedin_url
+1. match-company on "Pathwatch" → linkedin_url
 2. ai_prospecting(action="run", company_linkedin_url=<url>)
 3. If still_running, call again until status="completed" — pass back `run_ids` from the previous response when present.
 4. Detect the shape:
@@ -415,7 +415,7 @@ If the user already asked for a file (any phrasing — "send", "export", "downlo
 
 **Score a specific person.**
 ```
-1. match-person on "Lana Patel, VP Eng at Snowflake" → person + company linkedin urls
+1. match-person on "Lana Patel, VP Eng at Frostbyte" → person + company linkedin urls
 2. ai_prospecting(action="get_prospect", company_linkedin_url=..., person_linkedin=...)
 3. Show score + reasoning (inline, no dataset). Make the enrichment offer.
 ```

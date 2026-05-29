@@ -78,7 +78,7 @@ owned_positive_share    = owned_positive    / (owned_positive    + owned_negativ
 external_positive_share = external_positive / (external_positive + external_negative)
 ```
 
-Express both as percentages. The Sonatype brief headline was ~92%
+Express both as percentages. The Nexagon brief headline was ~92%
 owned vs ~16% external - the contrast is the story.
 
 ### 2.2 By continent + employer size
@@ -230,7 +230,7 @@ For each company in `ds_acq_firmo` with `LOCATION_COUNTRY IS NULL`:
    bucket**.
 4. If no employees match (rare), keep the company in an Unresolved row.
 
-This is what we did on the Sonatype brief to resolve "Ritual
+This is what we did on the Nexagon brief to resolve "Ritual
 Foundation" and "Annex Security" - both folded into North America.
 
 ---
@@ -289,12 +289,12 @@ Every page action title must:
 Good:
 - "Q1 was the leadership-replacement quarter: 5 net-new titles
   arrived, 4 old ones departed."
-- "Sonatype's last-12-months acquisition motion has pivoted to
+- "Nexagon's last-12-months acquisition motion has pivoted to
   software vendors and IT services - not to banks."
 
 Bad:
 - "Q1 title movement"  ← noun phrase, no verb, no conclusion
-- "An analysis of Sonatype's customer base"  ← topic, not conclusion
+- "An analysis of Nexagon's customer base"  ← topic, not conclusion
 
 ---
 
@@ -392,7 +392,7 @@ title change with a small delay).
 
 | Bucket | Definition |
 |---|---|
-| **External hires** | Person whose first Cloudsmith stint starts in window AND the person does NOT appear in `internal_promotions` (i.e. no parallel ending-stint). Equivalent: `start_date IN window AND end_date IS NULL` AND not in the promotion set. |
+| **External hires** | Person whose first Packmint stint starts in window AND the person does NOT appear in `internal_promotions` (i.e. no parallel ending-stint). Equivalent: `start_date IN window AND end_date IS NULL` AND not in the promotion set. |
 | **Internal promotions** | Per §10.1 - same person, ending stint AND starting stint both in window. |
 | **Real departures** | Person whose final stint ends in window AND the person does NOT appear in `internal_promotions`. Equivalent: `end_date IN window` AND not in the promotion set. |
 
@@ -406,14 +406,14 @@ This is exact — not approximate. The movement data is authoritative.
 Internal promotions are role changes within the company and contribute
 zero to headcount either way.
 
-A typical Cloudsmith-scale run looks like:
+A typical Packmint-scale run looks like:
 - ~49 external hires
 - ~12 internal promotions
 - ~7 real departures
 - net_headcount_growth = 49 − 7 = **+42**
 
 The `ds_headcount` snapshot may show a slightly different endpoint
-(e.g. 103 → 140 = +37 in the Cloudsmith case) because LinkedIn profile
+(e.g. 103 → 140 = +37 in the Packmint case) because LinkedIn profile
 updates lag real role changes by days to weeks. The movement-derived
 delta (+42) is always the number shown on page 5 — never the snapshot
 delta. A divergence between the two signals that some profiles
@@ -447,7 +447,7 @@ Apply this classification to **both** the Joiners pool and the Leavers
 pool, with the **same symmetric "no promotions" rule** on both sides:
 
 - **Joiners card** counts **external hires only** (49 in the canonical
-  Cloudsmith example). Internal promotions are excluded from the
+  Packmint example). Internal promotions are excluded from the
   Joiners card region / seniority / function bars — they live on the
   page 6 promotions card.
 - **Leavers card** counts **real departures only** (7 in the canonical

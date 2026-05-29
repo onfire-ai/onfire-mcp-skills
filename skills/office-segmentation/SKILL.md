@@ -1,6 +1,6 @@
 ---
 name: office-segmentation
-description: Build a geographic office segmentation for any company — where are the offices and how many employees work near each one. Orchestrates four tools in sequence: search_offices (discover office locations from Onfire's market intelligence), match_company (resolve LinkedIn URL), get_company_headcount (current employee count), and query_onfire (location distribution from ONFIRE.PEOPLE). Use when the user asks anything like "how are employees distributed across offices?", "how many people work in the London office?", "what's the geographic footprint of Stripe?", "which office is the biggest?", "map employees to office locations", or "where does the bulk of the workforce sit?".
+description: Build a geographic office segmentation for any company — where are the offices and how many employees work near each one. Orchestrates four tools in sequence: search_offices (discover office locations from Onfire's market intelligence), match_company (resolve LinkedIn URL), get_company_headcount (current employee count), and query_onfire (location distribution from ONFIRE.PEOPLE). Use when the user asks anything like "how are employees distributed across offices?", "how many people work in the London office?", "what's the geographic footprint of Northwind?", "which office is the biggest?", "map employees to office locations", or "where does the bulk of the workforce sit?".
 ---
 
 # Office Segmentation
@@ -21,8 +21,8 @@ Given a company name (and optionally a website), this skill:
 
 | Input | Required | Example |
 |-------|----------|---------|
-| `company_name` | Yes | `"NVIDIA"` |
-| `company_website` | Optional | `"nvidia.com"` |
+| `company_name` | Yes | `"Voltaic"` |
+| `company_website` | Optional | `"voltaic.com"` |
 
 If the user provides a LinkedIn URL directly, skip Step 2.
 
@@ -64,7 +64,7 @@ match_company(
 
 Extract `results[0].linkedin_url`. This is used as the filter key for Steps 3 and 4.
 
-Parse the slug from the URL (e.g. `https://linkedin.com/company/nvidia` → slug = `nvidia`).
+Parse the slug from the URL (e.g. `https://linkedin.com/company/voltaic` → slug = `voltaic`).
 
 ---
 

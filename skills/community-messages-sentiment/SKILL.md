@@ -5,13 +5,13 @@ description: Run aspect-based sentiment analysis over the Onfire community-messa
 
 # community_messages_sentiment
 
-Snowflake-backed retrieval + Vertex (Gemini) per-message aspect scoring over the Onfire community-messages corpus. Company enrichment via `silver.explorium.explorium_people_full` + `gold.entities.companies` resolves each sender's employer so you get a by-company breakdown in addition to the by-community one.
+Snowflake-backed retrieval + Vertex (Gemini) per-message aspect scoring over the Onfire community-messages corpus. Company enrichment via `silver.dataspring.dataspring_people_full` + `gold.entities.companies` resolves each sender's employer so you get a by-company breakdown in addition to the by-community one.
 
 ## When to use this
 
-- "What does the Slack community feel about Sonatype?"
-- "Find positive vs negative discussions of Snyk in the last 90 days."
-- "Who's complained about Wiz POCs? Get me their LinkedIns."
+- "What does the Slack community feel about Nexagon?"
+- "Find positive vs negative discussions of Codeshield in the last 90 days."
+- "Who's complained about Cloudward POCs? Get me their LinkedIns."
 - "Pull buzz around vendor X across communities since March."
 - "Which companies have the most employees complaining about <product>?"
 - Any question that mixes a **keyword or topic** + a **date range** + an **opinion angle**.
@@ -25,38 +25,38 @@ Skip this for:
 
 **Always do this before passing `exclude_companies`.**
 
-The exclusion filter joins against `silver.explorium.explorium_people_full` using `JOB_COMPANY_LINKEDIN_URL`. Name-based matching is unreliable (explorium may store "Sonatype, Inc." while you pass "Sonatype"). The only safe key is the canonical company LinkedIn URL.
+The exclusion filter joins against `silver.dataspring.dataspring_people_full` using `JOB_COMPANY_LINKEDIN_URL`. Name-based matching is unreliable (dataspring may store "Nexagon, Inc." while you pass "Nexagon"). The only safe key is the canonical company LinkedIn URL.
 
 **Rule: if the user supplies a company name (or domain) for exclusion, call `match_company` for each one first and use the returned LinkedIn URL.**
 
 ```python
-# User says: "exclude Sonatype employees"
-match_company("Sonatype")
-# → { "linkedin_url": "linkedin.com/company/sonatype", "name": "Sonatype", ... }
+# User says: "exclude Nexagon employees"
+match_company("Nexagon")
+# → { "linkedin_url": "linkedin.com/company/nexagon", "name": "Nexagon", ... }
 
 # Then pass the LinkedIn URL to the tool:
 community_messages_sentiment(
     ...,
-    exclude_companies=["linkedin.com/company/sonatype"],
+    exclude_companies=["linkedin.com/company/nexagon"],
 )
 ```
 
 If `match_company` returns no result for a name, skip that entry and tell the user it couldn't be resolved. Never pass a bare company name as a fallback — it will silently fail to exclude anyone.
 
-If the user already provides a company LinkedIn URL (e.g. `"linkedin.com/company/sonatype"`), skip the `match_company` call for that entry.
+If the user already provides a company LinkedIn URL (e.g. `"linkedin.com/company/nexagon"`), skip the `match_company` call for that entry.
 
 ## Input shape
 
 ```python
 community_messages_sentiment(
-    keywords=["Sonatype"],                                        # 1-10 tokens, whole-word, case-insensitive
-    sentiment_subject="Positive or negative experience with Sonatype",
+    keywords=["Nexagon"],                                        # 1-10 tokens, whole-word, case-insensitive
+    sentiment_subject="Positive or negative experience with Nexagon",
     date_from="2026-02-20",                                       # ISO date
     date_to="2026-05-20",
     keyword_mode="all",                                           # "all" (AND) or "any" (OR). Default "all".
     max_messages=500,                                             # default 500, hard cap 5000
     concurrency=None,                                             # optional; defaults to server ceiling (1000)
-    exclude_companies=["linkedin.com/company/sonatype"],          # resolved LinkedIn URLs only
+    exclude_companies=["linkedin.com/company/nexagon"],          # resolved LinkedIn URLs only
 )
 ```
 
@@ -66,11 +66,11 @@ This is the **aspect** the LLM judges against. Be specific — don't just pass t
 
 | Bad | Good |
 |---|---|
-| `"Sonatype"` | `"Positive or negative experience with Sonatype's vulnerability data"` |
-| `"POC"` | `"Trust and friction during Wiz POCs"` |
-| `"AI tools"` | `"Whether Cursor saves engineering time vs. Copilot"` |
+| `"Nexagon"` | `"Positive or negative experience with Nexagon's vulnerability data"` |
+| `"POC"` | `"Trust and friction during Cloudward POCs"` |
+| `"AI tools"` | `"Whether CodeQuill saves engineering time vs. CodeAssist"` |
 
-The subject framing is what makes this aspect-based: "I love Slack but Sonatype's UI is terrible" gets correctly classified as **negative toward Sonatype**, not mixed-overall.
+The subject framing is what makes this aspect-based: "I love Slack but Nexagon's UI is terrible" gets correctly classified as **negative toward Nexagon**, not mixed-overall.
 
 ## Output shape
 
@@ -118,7 +118,7 @@ The subject framing is what makes this aspect-based: "I love Slack but Sonatype'
 
 The persisted CSV includes: `linkedin_url`, `sender_name`, `sender_job_title`, `company_linkedin_url`, `company_name`, `company_industry`, `company_size`, `company_country`, `community_type`, `community_name`, `message_timestamp`, `message_text`, `sentiment_subject`, `sentiment_value`, `confidence`, `reason`, `message_id`.
 
-Company fields are populated for senders whose LinkedIn URL matches a record in `silver.explorium.explorium_people_full`. Senders not found there have null company fields.
+Company fields are populated for senders whose LinkedIn URL matches a record in `silver.dataspring.dataspring_people_full`. Senders not found there have null company fields.
 
 ## The post-call playbook (READ THIS)
 
@@ -126,7 +126,7 @@ Company fields are populated for senders whose LinkedIn URL matches a record in 
 
 After every successful call, do these four things in order:
 
-1. **State the headline.** One sentence from `counts` + `by_community` + `by_company`, e.g. *"Sentiment toward Sonatype skewed negative — 188 negative vs 142 positive across 263 unique authors from 87 companies, heaviest in r/devops and the DevSecOps Slack; Acme Corp and Beta Inc employees are the most vocal critics."* If `truncated_to_limit` is true, **say so explicitly**.
+1. **State the headline.** One sentence from `counts` + `by_community` + `by_company`, e.g. *"Sentiment toward Nexagon skewed negative — 188 negative vs 142 positive across 263 unique authors from 87 companies, heaviest in r/devops and the DevSecOps Slack; Acme Corp and Beta Inc employees are the most vocal critics."* If `truncated_to_limit` is true, **say so explicitly**.
 
 2. **Quote 1-2 exemplars from `top_positive` and `top_negative`** with the author's LinkedIn URL, job title, and company. These are sorted by confidence — they're the most defensible quotes you have.
 
@@ -150,10 +150,10 @@ Only re-run `community_messages_sentiment` when the user genuinely changes the i
 
 ## Reading the counts honestly
 
-- `irrelevant` ≠ noise to hide. Report it: *"...86 messages mentioned Sonatype but didn't express an opinion about it."*
+- `irrelevant` ≠ noise to hide. Report it: *"...86 messages mentioned Nexagon but didn't express an opinion about it."*
 - `error` rows are Vertex failures. If > ~5% of total, mention it as a caveat.
 - `unique_senders_with_linkedin` is the people reach number — how many authors you can follow up with.
-- `unique_companies_resolved` tells you how many employers are represented. A high ratio of resolved companies means the `by_company` breakdown is reliable; a low ratio means many senders weren't in explorium.
+- `unique_companies_resolved` tells you how many employers are represented. A high ratio of resolved companies means the `by_company` breakdown is reliable; a low ratio means many senders weren't in dataspring.
 - `total_matched > total_scored` means you sampled. **Always disclose the sample.**
 
 ## Hard rules
@@ -162,44 +162,44 @@ Only re-run `community_messages_sentiment` when the user genuinely changes the i
 - When `truncated_to_limit` is true, **lead with the sampling caveat** before quoting numbers.
 - For drill-downs, use `query_datasets` — never re-run for slicing.
 - Don't quote `message_text` as gospel — it's truncated to 500 chars. Tell the user if they want the full text of a specific message it isn't available.
-- Company fields are null for senders not found in explorium. Don't claim company-level insight for messages where `company_name` is null.
+- Company fields are null for senders not found in dataspring. Don't claim company-level insight for messages where `company_name` is null.
 
 ## Common pitfalls
 
 - **Stopping at the inline counts.** The user will ask follow-ups. Surface the dataset_id.
 - **Re-running for "show me only negatives".** Wasteful. Use `query_datasets`.
-- **Using a vague `sentiment_subject` like `"Sonatype"`.** The aspect framing is what makes this worth the LLM cost.
+- **Using a vague `sentiment_subject` like `"Nexagon"`.** The aspect framing is what makes this worth the LLM cost.
 - **Forgetting date math.** "Last 3 months" → convert before calling.
 - **Treating `top_positive`/`top_negative` as exhaustive.** They are 5 exemplars sorted by confidence.
 - **Ignoring null company fields.** `unique_companies_resolved` < `unique_senders_with_linkedin` means some senders weren't resolved — the by_company breakdown is a subset, not the full picture.
-- **Passing a bare company name to `exclude_companies`.** Name matching against explorium is unreliable. Always resolve via `match_company` first and pass the LinkedIn URL. Passing a name will silently exclude nobody.
+- **Passing a bare company name to `exclude_companies`.** Name matching against dataspring is unreliable. Always resolve via `match_company` first and pass the LinkedIn URL. Passing a name will silently exclude nobody.
 
 ## Worked examples
 
-### "What's the community saying about Sonatype lately?"
+### "What's the community saying about Nexagon lately?"
 
 ```python
 community_messages_sentiment(
-    keywords=["Sonatype"],
-    sentiment_subject="Positive or negative experience with Sonatype",
+    keywords=["Nexagon"],
+    sentiment_subject="Positive or negative experience with Nexagon",
     date_from="<today minus 90d>",
     date_to="<today>",
-    exclude_companies=["Sonatype", "sonatype.com"],  # strip insider voices
+    exclude_companies=["Nexagon", "nexagon.com"],  # strip insider voices
 )
 ```
 
 Then:
-1. *"Across the last 3 months, sentiment toward Sonatype skewed negative — 188 negative vs 142 positive across 263 unique authors from 87 companies, based on the latest 500 of 2,412 matching messages. Negative discussion concentrated in r/devops and the DevSecOps Slack; employees at Acme Corp (31 negative) and Beta Inc (22 negative) are the most vocal critics."*
+1. *"Across the last 3 months, sentiment toward Nexagon skewed negative — 188 negative vs 142 positive across 263 unique authors from 87 companies, based on the latest 500 of 2,412 matching messages. Negative discussion concentrated in r/devops and the DevSecOps Slack; employees at Acme Corp (31 negative) and Beta Inc (22 negative) are the most vocal critics."*
 2. Quote 1 positive + 1 negative exemplar with LinkedIn URL, job title, and company.
 3. `download_dataset(dataset_id="...")` → surface link.
 4. *"The dataset (`ds_...`) is queryable for 7 days — ask me 'which industries complain most', 'show me only the Slack threads', or anything else."*
 
-### "Which companies have the most employees complaining about Wiz POCs?"
+### "Which companies have the most employees complaining about Cloudward POCs?"
 
 ```python
 community_messages_sentiment(
-    keywords=["Wiz", "POC"],
-    sentiment_subject="Friction or dissatisfaction during Wiz POCs",
+    keywords=["Cloudward", "POC"],
+    sentiment_subject="Friction or dissatisfaction during Cloudward POCs",
     date_from="<today minus 180d>",
     date_to="<today>",
     keyword_mode="all",
@@ -214,7 +214,7 @@ query_datasets("SELECT company_name, company_industry, linkedin_url, sender_name
                 ORDER BY company_name, confidence DESC")
 ```
 
-### "How does sentiment compare for Sonatype vs Snyk?"
+### "How does sentiment compare for Nexagon vs Codeshield?"
 
 Two **separate** calls (different keywords, different subject framing), then narrate both headlines side by side and offer both download links.
 

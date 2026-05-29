@@ -1,6 +1,6 @@
 ---
 name: employee-footprint
-description: Find employees at a target company whose LinkedIn profiles mention specific technology or competitor keywords using the `query_onfire` tool against ONFIRE.PEOPLE. Use when the user wants proof a product is deployed at an account, wants a competitor footprint cut, or needs evidence sentences from employee profiles — phrases like "who at Capital One mentions CrowdStrike", "find FortiGate users at Cisco", "do any Stripe engineers mention Kubernetes in their profile", "show me the CrowdStrike footprint at Palo Alto Networks", or any keyword-based employee profile lookup at a specific company.
+description: Find employees at a target company whose LinkedIn profiles mention specific technology or competitor keywords using the `query_onfire` tool against ONFIRE.PEOPLE. Use when the user wants proof a product is deployed at an account, wants a competitor footprint cut, or needs evidence sentences from employee profiles — phrases like "who at Meridian Bank mentions Sentinex", "find Ironwall users at Nornet", "do any Northwind engineers mention Kubernetes in their profile", "show me the Sentinex footprint at Skywall Networks", or any keyword-based employee profile lookup at a specific company.
 ---
 
 # employee-footprint
@@ -12,10 +12,10 @@ the strongest signal of in-production deployment at an account.
 
 ## When to use this
 
-- "Who at Capital One mentions CrowdStrike in their profile?"
-- "Find engineers at Cisco whose job summary mentions Kubernetes"
-- "Does anyone at Stripe have Zscaler in their LinkedIn?"
-- "Show me the CrowdStrike footprint at Palo Alto Networks"
+- "Who at Meridian Bank mentions Sentinex in their profile?"
+- "Find engineers at Nornet whose job summary mentions Kubernetes"
+- "Does anyone at Northwind have Cloudgate in their LinkedIn?"
+- "Show me the Sentinex footprint at Skywall Networks"
 - "Find employees at these accounts who mention our product"
 - Any keyword-based employee profile lookup at a specific company
 
@@ -62,11 +62,11 @@ SELECT
     JOB_START_DATE
 FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
-  AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/capital-one%'
+  AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/meridian-bank%'
   AND (
-      LOWER(JOB_SUMMARY) LIKE '%crowdstrike%'
-   OR LOWER(SUMMARY)     LIKE '%crowdstrike%'
-   OR LOWER(JOB_TITLE)   LIKE '%crowdstrike%'
+      LOWER(JOB_SUMMARY) LIKE '%sentinex%'
+   OR LOWER(SUMMARY)     LIKE '%sentinex%'
+   OR LOWER(JOB_TITLE)   LIKE '%sentinex%'
   )
 ORDER BY JOB_START_DATE DESC NULLS LAST
 LIMIT 50
@@ -82,11 +82,11 @@ SELECT
     LOCATION_NAME
 FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
-  AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/cisco%'
+  AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/nornet%'
   AND (
-      LOWER(JOB_SUMMARY) LIKE '%fortinet%'   OR LOWER(SUMMARY) LIKE '%fortinet%'   OR LOWER(JOB_TITLE) LIKE '%fortinet%'
-   OR LOWER(JOB_SUMMARY) LIKE '%fortigate%'  OR LOWER(SUMMARY) LIKE '%fortigate%'  OR LOWER(JOB_TITLE) LIKE '%fortigate%'
-   OR LOWER(JOB_SUMMARY) LIKE '%fortisase%'  OR LOWER(SUMMARY) LIKE '%fortisase%'  OR LOWER(JOB_TITLE) LIKE '%fortisase%'
+      LOWER(JOB_SUMMARY) LIKE '%ironwall%'   OR LOWER(SUMMARY) LIKE '%ironwall%'   OR LOWER(JOB_TITLE) LIKE '%ironwall%'
+   OR LOWER(JOB_SUMMARY) LIKE '%ironwall%'  OR LOWER(SUMMARY) LIKE '%ironwall%'  OR LOWER(JOB_TITLE) LIKE '%ironwall%'
+   OR LOWER(JOB_SUMMARY) LIKE '%ironwall sase%'  OR LOWER(SUMMARY) LIKE '%ironwall sase%'  OR LOWER(JOB_TITLE) LIKE '%ironwall sase%'
   )
 ORDER BY JOB_START_DATE DESC NULLS LAST
 LIMIT 100
@@ -96,19 +96,19 @@ LIMIT 100
 ```sql
 SELECT
     CASE
-        WHEN LOWER(JOB_SUMMARY) LIKE '%crowdstrike%' OR LOWER(SUMMARY) LIKE '%crowdstrike%' THEN 'crowdstrike'
-        WHEN LOWER(JOB_SUMMARY) LIKE '%sentinelone%' OR LOWER(SUMMARY) LIKE '%sentinelone%' THEN 'sentinelone'
-        WHEN LOWER(JOB_SUMMARY) LIKE '%zscaler%'     OR LOWER(SUMMARY) LIKE '%zscaler%'     THEN 'zscaler'
+        WHEN LOWER(JOB_SUMMARY) LIKE '%sentinex%' OR LOWER(SUMMARY) LIKE '%sentinex%' THEN 'sentinex'
+        WHEN LOWER(JOB_SUMMARY) LIKE '%vanguard%' OR LOWER(SUMMARY) LIKE '%vanguard%' THEN 'vanguard'
+        WHEN LOWER(JOB_SUMMARY) LIKE '%cloudgate%'     OR LOWER(SUMMARY) LIKE '%cloudgate%'     THEN 'cloudgate'
         ELSE 'other'
     END                                    AS matched_keyword,
     COUNT(DISTINCT LINKEDIN_URL)           AS employee_count
 FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
-  AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/capital-one%'
+  AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/meridian-bank%'
   AND (
-      LOWER(JOB_SUMMARY) LIKE '%crowdstrike%' OR LOWER(SUMMARY) LIKE '%crowdstrike%'
-   OR LOWER(JOB_SUMMARY) LIKE '%sentinelone%' OR LOWER(SUMMARY) LIKE '%sentinelone%'
-   OR LOWER(JOB_SUMMARY) LIKE '%zscaler%'     OR LOWER(SUMMARY) LIKE '%zscaler%'
+      LOWER(JOB_SUMMARY) LIKE '%sentinex%' OR LOWER(SUMMARY) LIKE '%sentinex%'
+   OR LOWER(JOB_SUMMARY) LIKE '%vanguard%' OR LOWER(SUMMARY) LIKE '%vanguard%'
+   OR LOWER(JOB_SUMMARY) LIKE '%cloudgate%'     OR LOWER(SUMMARY) LIKE '%cloudgate%'
   )
 GROUP BY 1
 ORDER BY employee_count DESC
@@ -122,13 +122,13 @@ SELECT
 FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
   AND JOB_COMPANY_LINKEDIN_URL IN (
-      'https://www.linkedin.com/company/stripe',
-      'https://www.linkedin.com/company/twilio',
-      'https://www.linkedin.com/company/datadog'
+      'https://www.linkedin.com/company/northwind',
+      'https://www.linkedin.com/company/sendline',
+      'https://www.linkedin.com/company/pathwatch'
   )
   AND (
-      LOWER(JOB_SUMMARY) LIKE '%crowdstrike%'
-   OR LOWER(SUMMARY)     LIKE '%crowdstrike%'
+      LOWER(JOB_SUMMARY) LIKE '%sentinex%'
+   OR LOWER(SUMMARY)     LIKE '%sentinex%'
   )
 GROUP BY 1
 ORDER BY employees_mentioning_keyword DESC
@@ -144,10 +144,10 @@ SELECT
     LOCATION_NAME
 FROM ONFIRE.PEOPLE
 WHERE DELETED_AT IS NULL
-  AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/capital-one%'
+  AND JOB_COMPANY_LINKEDIN_URL ILIKE '%/meridian-bank%'
   AND (
-      LOWER(JOB_SUMMARY) LIKE '%crowdstrike%'
-   OR LOWER(SUMMARY)     LIKE '%crowdstrike%'
+      LOWER(JOB_SUMMARY) LIKE '%sentinex%'
+   OR LOWER(SUMMARY)     LIKE '%sentinex%'
   )
   AND (
       LOWER(JOB_TITLE) LIKE '%director%'
