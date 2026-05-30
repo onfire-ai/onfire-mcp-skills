@@ -5,7 +5,7 @@ description: Identify the person and company behind a list of email addresses â€
 
 # deanonymize_emails (atomic)
 
-Reverse-enriches email addresses into people: name, LinkedIn URL, current title, employer, location. Works on personal addresses (Gmail, iCloud, Yahoo) as well as work email. **Paid: 1 credit per successful match. Misses are free.**
+Reverse-enriches email addresses into people: name, LinkedIn URL, current title, employer, location. Works on personal addresses (Gmail, iCloud, Yahoo) as well as work email. **Paid: 5 credits per successful match. Misses are free.**
 
 ## Communication style
 
