@@ -38,9 +38,10 @@ Skip this for:
 | `IS_B2B` | BOOLEAN | Enriched B2B flag |
 | `LOCATION_COUNTRY` | TEXT | HQ country |
 | `LOCATION_REGION` | TEXT | HQ state/region |
-| `LOCATION_NAME` | TEXT | HQ city, state |
+| `LOCATION_LOCALITY` | TEXT | HQ city |
+| `LOCATION_NAME` | TEXT | HQ display string (city, state) |
 | `FOUNDED` | TEXT | Year founded |
-| `TECHNOLOGIES` | ARRAY | Tech stack tags |
+| `TECHNOLOGIES` | ARRAY | Array of objects `{technology, first_verified_at, last_verified_at}` — expand with `LATERAL FLATTEN`, filter on `f.value:technology::string`. NOT an array of strings (so `ARRAY_CONTAINS` won't match). |
 | `DESCRIPTION` | TEXT | Company description |
 | `ENRICHED_SUMMARY` | TEXT | AI-enriched description |
 | `ENRICHED_CATEGORY` | TEXT | Product category |
@@ -91,14 +92,18 @@ LIMIT 100
 ```
 
 ### By technology stack
+`TECHNOLOGIES` is an ARRAY of objects `{technology, first_verified_at,
+last_verified_at}` — not an array of strings — so `ARRAY_CONTAINS` does NOT
+work. Expand it with `LATERAL FLATTEN` and filter on the `technology` field:
 ```sql
 SELECT
-    LINKEDIN_URL, NAME, WEBSITE, SIZE, INDUSTRY,
-    TECHNOLOGIES, LOCATION_COUNTRY
-FROM ONFIRE.COMPANIES
-WHERE DELETED_AT IS NULL
-  AND ARRAY_CONTAINS('Kubernetes'::VARIANT, TECHNOLOGIES)
-  AND IS_B2B = TRUE
+    c.LINKEDIN_URL, c.NAME, c.WEBSITE, c.SIZE, c.INDUSTRY,
+    c.LOCATION_COUNTRY
+FROM ONFIRE.COMPANIES c,
+     LATERAL FLATTEN(input => c.TECHNOLOGIES) f
+WHERE c.DELETED_AT IS NULL
+  AND LOWER(f.value:technology::string) = 'kubernetes'
+  AND c.IS_B2B = TRUE
 LIMIT 100
 ```
 
