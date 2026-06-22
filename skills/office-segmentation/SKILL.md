@@ -1,6 +1,6 @@
 ---
 name: office-segmentation
-description: Build a geographic office segmentation for any company — where are the offices and how many employees work near each one. Orchestrates four tools in sequence: search_offices (discover office locations from Onfire's market intelligence), match_company (resolve LinkedIn URL), get_company_headcount (current employee count), and query_onfire (location distribution from ONFIRE.PEOPLE). Use when the user asks anything like "how are employees distributed across offices?", "how many people work in the London office?", "what's the geographic footprint of Northwind?", "which office is the biggest?", "map employees to office locations", or "where does the bulk of the workforce sit?".
+description: Build a geographic office segmentation for any company — where are the offices and how many employees work near each one. Orchestrates four tools in sequence: search_offices (discover office locations from Onfire's market intelligence), match_company (resolve LinkedIn URL), get_company_headcount (current employee count), and ask_onfire (per-office employee counts from the contact entity / ONFIRE.PEOPLE). Use when the user asks anything like "how are employees distributed across offices?", "how many people work in the London office?", "what's the geographic footprint of Northwind?", "which office is the biggest?", "map employees to office locations", or "where does the bulk of the workforce sit?".
 ---
 
 # Office Segmentation
@@ -12,8 +12,8 @@ Given a company name (and optionally a website), this skill:
 1. Discovers all worldwide office locations from Onfire's market intelligence.
 2. Resolves the company's LinkedIn URL via Matchbox.
 3. Gets the current employee headcount snapshot.
-4. Pulls a location-distribution summary from `ONFIRE.PEOPLE`.
-5. Matches location clusters to the nearest office and produces a ranked table: offices sorted by employee count, regional totals, and % of workforce per office.
+4. Counts employees near each office from `ONFIRE.PEOPLE` (one `ask_onfire` count per office).
+5. Assembles a ranked table: offices sorted by employee count, regional totals, and % of workforce per office.
 
 ---
 
@@ -87,49 +87,79 @@ Use `months=1` — you only need the current snapshot, not historical trends.
 
 ---
 
-## Step 4 — Get location distribution
+## Step 4 — Get the per-office employee counts
 
-Query `ONFIRE.PEOPLE` grouped by location to get a compact distribution
-(counts per city/country) without loading thousands of individual rows.
+`ONFIRE.PEOPLE` is the `contact` entity in `ask_onfire`. You query it with a
+structured **QueryIR** (NOT SQL) — `ask_onfire(query={entity, select, filters, ...})`.
+
+> **No GROUP BY.** `ask_onfire` cannot return a grouped location distribution
+> (one query that buckets every employee into a location and counts each
+> bucket). The `contact` entity has no per-location grouped measure. So instead
+> of one distribution query, run **one count query per office** discovered in
+> Step 1 — you already know the office list, so this covers the real need.
+
+For **each** office from Step 1, run one count query. Filter `contact` to the
+company's people (`current_company_url eq <linkedin_url>`) AND to that office's
+location, and select the `contact_count` measure:
 
 ```
-query_onfire(
-  sql="""
-    SELECT
-        LOCATION_COUNTRY,
-        LOCATION_REGION,
-        LOCATION_NAME,
-        COUNT(*) AS employee_count
-    FROM ONFIRE.PEOPLE
-    WHERE JOB_COMPANY_LINKEDIN_URL ILIKE '%/company/<slug>%'
-      AND DELETED_AT IS NULL
-    GROUP BY LOCATION_COUNTRY, LOCATION_REGION, LOCATION_NAME
-    ORDER BY employee_count DESC
-    LIMIT 500
-  """,
+ask_onfire(query={
+  entity: "contact",
+  select: ["contact_count"],          # = COUNT(DISTINCT LINKEDIN_URL)
+  filters: [
+    {dimension: "current_company_url", op: "eq", value: "<linkedin_url>"},
+    {dimension: "location_region", op: "eq", value: "<office region/state>"}
+    # or, for a city-level office: {dimension: "location_locality", op: "eq", value: "<office city>"}
+  ],
+  limit: 1,
   telemetry={intent: "..."}
-)
+})
 ```
 
-Replace `<slug>` with the slug extracted in Step 2.
+- Pass the full `<linkedin_url>` from Step 2 — any URL format is normalized
+  server-side (no `ILIKE '%/company/<slug>%'` needed).
+- `location_region` / `location_locality` are **free text stored lowercase** —
+  pass lowercased literals (e.g. `value: "california"`, `value: "austin"`).
+  `op: "contains"` is available if you need a looser substring match.
+- One query per office. The returned `contact_count` is that office's employee
+  count; use it directly in Step 6 (no Step 5 location-cluster matching needed
+  when you count per office this way).
 
-This returns up to 500 distinct location clusters with their employee counts.
+> **Billing / row budget.** `ask_onfire` bills **1 credit per row returned**.
+> Each per-office count query returns a single row, so keep `limit: 1`. If a
+> call comes back `needs_confirmation` (stage `row_budget`), nothing was billed
+> and no rows returned — lower the budget and resubmit; do **not** reflexively
+> set `confirmed: true`.
+
+**Capability gap — full grouped distribution is not expressible.** If you need
+the complete location distribution across *all* cities/regions (the old
+GROUP BY that bucketed every employee into an arbitrary location, including ones
+with no known office), `ask_onfire` cannot produce it: there is no grouped
+location measure on `contact`. Flag this to the user and fall back to the
+per-office counts above. A "Remote / Unknown" residual (total headcount from
+Step 3 minus the summed per-office counts) approximates the employees not near
+any known office.
 
 ---
 
-## Step 5 — Match locations to offices
+## Step 5 — Assemble per-office counts (and the residual)
 
-For each location cluster from Step 4, find the best-matching office from Step 1 using this priority order:
+With one `contact_count` per office from Step 4, you already have employees per
+office directly — no location-cluster matching is needed. Build the table from:
 
-1. **City match** — office `city` (case-insensitive) appears anywhere in `LOCATION_NAME`.  
-   Example: office city = `"Austin"`, location_name = `"Austin, Texas, United States"` → match.
-2. **Country match** — office `country` matches `LOCATION_COUNTRY` (case-insensitive).  
-   Use this only when no city match exists, and only if a single office exists in that country.
-3. **No match** → assign to `"Remote / Unknown"`.
+1. **Per-office count** — the `contact_count` returned for each office query.
+2. **Choosing the office filter** — use `location_locality` (city) for a
+   city-named office; use `location_region` (state/region) when the office is
+   identified by its broader area. Pass lowercased literals.
+3. **Remote / Unknown residual** — total headcount from Step 3 minus the summed
+   per-office counts. This approximates employees not near any known office
+   (fully remote, or in cities with no official office).
 
-Sum `employee_count` per assigned office to get employees per office.
-
-**Conflict rule (multiple offices in the same country):** When two or more offices share a country and only a country match is available (no city hit), assign the cluster to `"Remote / Unknown"` rather than guessing.
+**Conflict rule (multiple offices in the same country/region):** if two offices
+would both match the same `location_region`, prefer the narrower
+`location_locality` (city) filter for each so their counts don't overlap. If you
+cannot separate them by city, count them together and note the office cluster
+rather than guessing a split.
 
 ---
 
@@ -166,9 +196,10 @@ Sum `employee_count` per assigned office to get employees per office.
 
 ## Common pitfalls
 
-- **Don't use `get_company_headcount` for the location breakdown** — its roster can be large and isn't pre-grouped. Use `query_onfire` with GROUP BY for the distribution.
-- **`LOCATION_NAME` format varies** — it's typically `"City, Region, Country"` but not always. Use substring match, not an exact equality check.
-- **Multiple offices in the same country** — don't assign a location cluster to a country's only big city if the cluster says e.g. `"Germany"` with no city. Assign to Remote / Unknown.
-- **`LOCATION_COUNTRY` can be null** — exclude nulls from location matching; they count toward Remote / Unknown.
+- **Don't use `get_company_headcount` for the location breakdown** — use it only for the total snapshot. Per-office counts come from `ask_onfire` `contact_count` queries (Step 4).
+- **`ask_onfire` cannot GROUP BY** — there is no single grouped location-distribution query. Run one count per known office; flag the full grouped distribution as a capability gap (see Step 4).
+- **Location dimensions are free text, lowercase** — pass `location_region` / `location_locality` filter values lowercased (e.g. `"california"`, `"london"`). Use `op: "contains"` for a looser match when the office area doesn't map cleanly to a single locality/region string.
+- **Multiple offices in the same region** — prefer the narrower `location_locality` (city) filter per office so counts don't overlap; if they can't be separated, count them together and note the cluster.
+- **Billing** — `ask_onfire` bills 1 credit per row; per-office count queries return 1 row, so keep `limit: 1`. A `needs_confirmation` (stage `row_budget`) response means nothing was billed — lower the budget rather than setting `confirmed: true`.
 - **Never mention the underlying data source** — always attribute office and employee data to Onfire only. Do not name any third-party provider in any response.
-- **LinkedIn URL normalization** — `match_company` returns a full URL; extract just the slug for the `ILIKE '%/company/<slug>%'` filter in `query_onfire`.
+- **LinkedIn URL normalization** — pass the full URL from `match_company` straight into the `current_company_url` filter; `ask_onfire` normalizes any URL format server-side (no slug extraction or `ILIKE` needed).

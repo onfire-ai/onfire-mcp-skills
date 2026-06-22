@@ -161,11 +161,30 @@ exclusions use it:
 
 ## Phase 1 - Data gathering
 
-Each query runs through `query_onfire` and persists its result as a
-dataset. Track the dataset IDs - the analysis phase joins them.
+Each warehouse pull runs through **`ask_onfire`** — a structured
+**QueryIR** (`query={entity, select, filters, insight_filters, joins,
+order_by, distinct_by, limit, confirmed}`), **not** raw SQL. (The
+removed `query_onfire` raw-SQL tool no longer exists.) Each pull persists
+its result as a dataset; track the dataset IDs - the analysis phase joins
+them with `query_datasets`. See `references/snowflake-queries.md` for the
+per-slice QueryIR recipes and the table→entity map, and
+`account-research/references/ask-onfire-signals.md` for the worked
+patterns.
 
-**Important:** all `query_onfire` calls must use 3-part `ONFIRE.*` table
-names and include a `DELETED_AT IS NULL` filter where applicable.
+**Important — billing + capability:** `ask_onfire` **bills 1 credit per
+row returned**, so set a small explicit `limit` on every call; an unset
+or over-threshold budget returns `needs_confirmation` (`stage:
+"row_budget"` — a free COUNT, nothing billed) so you can settle the count
+with the user and resubmit with `confirmed: true`. Several brief slices
+are full-cohort pulls feeding a downstream `query_datasets` analysis —
+expect to hit and deliberately clear the confirmation gate. ask_onfire
+**cannot** express GROUP-BY distributions beyond a single declared COUNT
+measure, window functions, month-over-month / first-ever temporal cohort
+logic, multi-field free-text OR-scans, `PAYLOAD:` JSON, or multi-hop
+joins; for those slices (title movement, acquisition cohort, modal-
+country, departed-no-backfill free-text scan) pull the constrained rows
+with a QueryIR and do the analysis client-side (see snowflake-queries.md
+for which is which).
 
 ### 1.1 Headcount trend + employee roster (single call — primary source for org-growth changes)
 
@@ -175,15 +194,17 @@ A single `get_company_headcount` call is the **primary source for all
 org-growth changes** in the brief — monthly headcount trend, joiners,
 leavers, joiner origins, and leaver destinations. It powers Phase 1.1
 (headcount), Phase 1.3 (Q-hires), and Phase 1.12 (leavers + their
-destinations). No separate `query_onfire` is needed for any of those.
+destinations). No separate `ask_onfire` pull is needed for any of those.
 
 Headcount is derived from tenure intervals in
 `ONFIRE.PEOPLE_GRAND_EXPERIENCES`; the employee roster joins each
 tenure to `ONFIRE.PEOPLE_GRAND` for location and to **symmetric
 self-joins** on `ONFIRE.PEOPLE_GRAND_EXPERIENCES` for both the
 immediately-prior company (joiner origin) and the immediately-next
-company (leaver destination). Both tables are tool-managed —
-do **not** attempt to query them via `query_onfire`.
+company (leaver destination). **Neither `PEOPLE_GRAND` nor
+`PEOPLE_GRAND_EXPERIENCES` has an `ask_onfire` semantic entity** — they
+are tool-managed and reachable only through `get_company_headcount`; do
+**not** attempt to author a QueryIR against them.
 
 ```
 Onfire MCP: get_company_headcount(
@@ -215,7 +236,7 @@ Because joiners and leavers are derived from the same `ds_employees`
 source as the headcount counts, the joiner / leaver math reconciles
 with the MoM headcount delta within snapshot-lag tolerance — this is
 the canonical pattern; do not re-derive these slices from
-`PEOPLE_EXPERIENCES` via `query_onfire`.
+`people_experiences` via `ask_onfire`.
 
 ### 1.2 Title movement (window-bound)
 
@@ -308,25 +329,62 @@ Companies with any prior mention before the window start are excluded.
 This is the canonical "true new mentioner" cohort.
 
 The naive "any mention in window" query over-counts dramatically:
-on the canonical Packmint run the naive query returned 87 companies,
+on the canonical Packmint run the naive cut returned 87 companies,
 of which only **63** were truly first-ever-in-window; 24 of the 87 had
-earlier mentions and should not have been counted as "new". Use this
-template:
+earlier mentions and should not have been counted as "new".
+
+**The first-ever-in-window cohort is NOT expressible in `ask_onfire`**
+— it needs `MIN(start_date)` per company **across all time**, then a
+keep-if-first-ever-date-in-window filter, then `COUNT(DISTINCT person)`
+per company **inside** the window, plus a same-named-consultancy URL
+guard. That is multi-stage GROUP-BY + `COUNT(DISTINCT)` keyed by
+company + a `NOT ILIKE` exclusion, none of which a QueryIR can express.
+So **pull the constrained `insight_evidence` rows with a bounded
+`ask_onfire` QueryIR, persist them, then run all of the cohort logic
+client-side in `query_datasets` (DuckDB).** `insight_value` is bound
+and resolved server-side (`resolve_insights` shares the
+persona/technology vocabulary), so the old `ILIKE` casing workaround
+is gone — pass the competitor name and the resolver canonicalises it.
+`insight_evidence` is ~1B rows, so the `insight_value` + `start_date`
+window is what keeps the pull bounded; the row budget bills 1 credit
+per row, so set `limit` to the cohort size and confirm against the
+free COUNT when the `needs_confirmation` gate fires.
+
+```
+ask_onfire(query={
+  entity: "insight_evidence",
+  select: ["person_url", "company_url", "evidence_type", "start_date"],
+  filters: [
+    {dimension: "insight_value", op: "eq", value: "{competitor_name}"},   // resolved server-side
+    {dimension: "start_date", op: "gte", value: "{rolling_12mo_start}"},
+    {dimension: "start_date", op: "lte", value: "{q_end}"}
+  ],
+  limit: <window cohort size>     // large — hits the row-budget gate; confirm against the COUNT
+})
+```
+
+The QueryIR above fetches in-window rows only. The first-ever cohort
+also needs each company's earliest mention **across all time** to
+exclude companies that had pre-window mentions. Get that either with a
+second per-candidate-company pull (`insight_value` + `company_url` eq,
+selecting the `first_seen` measure = `MIN(start_date)`), or pull a
+wider date range and compute `MIN` client-side. Persist the rows, then
+in `query_datasets` (DuckDB) build the cohort:
 
 ```sql
+-- runs in query_datasets over the persisted insight_evidence rows, NOT in Snowflake
 WITH external_mentions AS (
-  SELECT company_linkedin_url, person_linkedin_url, start_date
-  FROM ONFIRE.INSIGHTS_2_EVIDENCES
-  WHERE insight_value ILIKE '{competitor_name}'        -- ILIKE handles canonical capitalisation
-    AND company_linkedin_url IS NOT NULL
-    AND company_linkedin_url NOT ILIKE '%/company/{competitor_slug}'
-    AND company_linkedin_url NOT ILIKE '%/company/{competitor_slug}s'  -- guard against same-named consultancies (Packmints)
+  SELECT company_url, person_url, start_date
+  FROM ds_evidence_rows
+  WHERE company_url IS NOT NULL
+    AND company_url NOT ILIKE '%/company/{competitor_slug}'
+    AND company_url NOT ILIKE '%/company/{competitor_slug}s'  -- guard against same-named consultancies (Packmints)
     AND start_date IS NOT NULL
 ),
-first_ever AS (
-  SELECT company_linkedin_url, MIN(start_date) AS first_ever_date
+first_ever AS (   -- MIN across ALL time (from the all-time pull)
+  SELECT company_url, MIN(start_date) AS first_ever_date
   FROM external_mentions
-  GROUP BY company_linkedin_url
+  GROUP BY company_url
 ),
 first_in_window AS (
   SELECT * FROM first_ever
@@ -334,12 +392,12 @@ first_in_window AS (
 ),
 mentioner_counts AS (
   SELECT
-    fiw.company_linkedin_url,
+    fiw.company_url,
     fiw.first_ever_date,
-    COUNT(DISTINCT em.person_linkedin_url) AS distinct_mentioners_in_window
+    COUNT(DISTINCT em.person_url) AS distinct_mentioners_in_window
   FROM first_in_window fiw
   JOIN external_mentions em
-    ON em.company_linkedin_url = fiw.company_linkedin_url
+    ON em.company_url = fiw.company_url
    AND em.start_date BETWEEN '{window_start}' AND '{window_end}'
   GROUP BY 1, 2
 )
@@ -349,27 +407,29 @@ SELECT * FROM mentioner_counts
 Persists as `ds_acquisition`. **Production-depth = `distinct_mentioners_in_window >= 2`; evaluator = 1.**
 
 **Validation check.** Compare the result against the naive "any mention
-in window" count by running an extra check query:
+in window" count. Run this client-side over the same persisted rows
+(the in-window pull alone is enough — no all-time `MIN` needed):
 
 ```sql
--- naive (over-counts; informational only)
-SELECT COUNT(DISTINCT company_linkedin_url)
-FROM ONFIRE.INSIGHTS_2_EVIDENCES
-WHERE insight_value ILIKE '{competitor_name}'
-  AND start_date BETWEEN '{window_start}' AND '{window_end}'
-  AND company_linkedin_url NOT ILIKE '%/company/{competitor_slug}'
-  AND company_linkedin_url NOT ILIKE '%/company/{competitor_slug}s';
+-- naive (over-counts; informational only) — query_datasets, not Snowflake
+SELECT COUNT(DISTINCT company_url)
+FROM ds_evidence_rows
+WHERE start_date BETWEEN '{window_start}' AND '{window_end}'
+  AND company_url NOT ILIKE '%/company/{competitor_slug}'
+  AND company_url NOT ILIKE '%/company/{competitor_slug}s';
 ```
 
 If `naive_count > first_ever_count`, the gap is companies with prior
 mentions that the brief MUST NOT count. Surface the gap in the brief
 as a footnote so the reader trusts the methodology.
 
-Legacy template (any-mention in window — **DO NOT USE for the brief**;
-kept here as a reference for what the brief is *not* doing):
+Legacy template (any-mention in window, raw Snowflake — **DO NOT USE
+for the brief**; the `query_onfire` raw-SQL tool that ran it no longer
+exists; kept here only as a reference for what the brief is *not*
+doing):
 
 ```sql
--- WRONG / over-counting — kept for diff reference only
+-- WRONG / over-counting / removed-tool syntax — kept for diff reference only
 SELECT PERSON_LINKEDIN_URL, COMPANY_LINKEDIN_URL, MIN(START_DATE) AS first_seen
 FROM ONFIRE.INSIGHTS_2_EVIDENCES
 WHERE INSIGHT_VALUE = '{competitor_name}'
@@ -377,11 +437,26 @@ WHERE INSIGHT_VALUE = '{competitor_name}'
 GROUP BY PERSON_LINKEDIN_URL, COMPANY_LINKEDIN_URL
 ```
 
-If the table is NOT allowlisted, fall back to a `PEOPLE`-based static
-snapshot (any company with employees whose `JOB_SUMMARY` mentions the
-competitor as a whole word) and label the section as "snapshot, not
-motion" in the brief. The fallback **must** be flagged in the
-Assumptions and Definitions block.
+If `ask_onfire` rejects the `insight_evidence` entity (it is gated
+per-tenant), fall back to a `contact` static snapshot — current
+employees-of-other-companies who carry the competitor as a derived
+**technology insight** (the curated catalog that superseded the raw
+`PEOPLE` / `JOB_SUMMARY` free-text scan; ask_onfire has no
+regex/word-boundary op):
+
+```
+ask_onfire(query={
+  entity: "contact",
+  select: ["full_name", "job_title", "current_company_name", "current_company_url"],
+  insight_filters: [{kind: "technology", value: "{competitor_name}"}],   // resolved server-side
+  limit: <snapshot budget>
+})
+```
+
+This is a footprint snapshot, not a dated motion (no `first_seen`), so
+label the section as "snapshot, not motion" in the brief — the Customer
+Acquisition page becomes a Customer Footprint snapshot. The fallback
+**must** be flagged in the Assumptions and Definitions block.
 
 If the caller uploads a CSV with `(person_linkedin_url,
 company_linkedin_url, first_seen)`, use that instead of the live
@@ -489,10 +564,11 @@ in the title — call those out separately from real departures.
 
 `ds_leavers` is a single dataset; destination columns live on the same
 row. If a destination size / industry / country breakdown is needed,
-join the distinct `next_company_linkedin_url` values to
-`ONFIRE.COMPANIES` via a follow-up `query_onfire` call (batch in groups
-of 30-50). Many leavers will not have a captured next role — call the
-gap out explicitly ("6 of 18 destinations captured").
+pull the distinct `next_company_linkedin_url` values from the `company`
+entity via a follow-up `ask_onfire` call (the Query 08 shape:
+`linkedin_url op=in`, batch in groups of 30-50, `limit` = batch size).
+Many leavers will not have a captured next role — call the gap out
+explicitly ("6 of 18 destinations captured").
 
 Used in: Complication 1B leavers card; Phase 2 strategic-thread
 synthesis ("where are senior people going?").
@@ -504,11 +580,15 @@ See `references/snowflake-queries.md` → query 13.
 For each title classified as `departed-no-backfill` in Phase 2.1, run
 two checks:
 
-1. **Current-holder scan.** Query `ONFIRE.PEOPLE_EXPERIENCES.SUMMARY`
-   and `ONFIRE.PEOPLE.HEADLINE` / `JOB_SUMMARY` for current target
-   employees whose free-text mentions the function's work (not just
-   keyword on title). A title-keyword search misses people doing the
-   work under a different title.
+1. **Current-holder scan.** ask_onfire cannot OR-scan the free-text
+   `SUMMARY` / `HEADLINE` / `JOB_SUMMARY` columns (they are returnable
+   attributes, not filterable dimensions). Use the insight-native
+   substitute instead: map the departed function to a curated persona
+   (via `resolve_insights`) and scan current `contact` employees of the
+   target with that `insight_filter` (see snowflake-queries.md → query
+   13a). If the function does not resolve to any curated persona, the
+   free-text "doing the work under a different title" scan has **no
+   ask_onfire expression** — flag it and lean on check 2 alone.
 2. **Open-job-posting check.** Filter `ds_open_jobs_active` for the
    same function keywords.
 
@@ -539,26 +619,33 @@ Onfire MCP: search_offices(
 Returns `offices` (list of `{city, country, state, region, is_hq}`)
 and `total_offices`. Persist as `ds_offices`.
 
-Then pull the location distribution from the company's people table:
+Then pull the company's employee locations. The per-location
+`COUNT(*)` roll-up across `(country, region, name)` is a GROUP-BY
+distribution **ask_onfire cannot return** (it exposes one declared
+`contact_count` measure, not a multi-dimension group-by-with-count), so
+pull the raw employee location rows with a QueryIR and aggregate in
+`query_datasets`:
 
-```sql
-SELECT
-    LOCATION_COUNTRY,
-    LOCATION_REGION,
-    LOCATION_NAME,
-    COUNT(*) AS employee_count
-FROM ONFIRE.PEOPLE
-WHERE JOB_COMPANY_LINKEDIN_URL ILIKE '%/company/{slug}%'
-  AND JOB_COMPANY_LINKEDIN_ID = {company_linkedin_id}
-  AND DELETED_AT IS NULL
-GROUP BY LOCATION_COUNTRY, LOCATION_REGION, LOCATION_NAME
-ORDER BY employee_count DESC, LOCATION_NAME, LOCATION_REGION NULLS LAST
-LIMIT 500
+```
+ask_onfire(query={
+  entity: "contact",
+  select: ["location_country", "location_region", "location_name"],
+  filters: [{dimension: "current_company_url", op: "eq", value: "{company_linkedin_url}"}],
+  limit: <headcount-sized budget; hits the row-budget gate — confirm against the COUNT>
+})
 ```
 
-Persist as `ds_location_distribution`. The `JOB_COMPANY_LINKEDIN_ID`
-guard is required when the slug is ambiguous (e.g. `packmint` vs
-`packmints`) — otherwise the query pollutes with the wrong company.
+Then in `query_datasets`: `GROUP BY location_country, location_region,
+location_name`, `COUNT(*) AS employee_count`, `ORDER BY employee_count
+DESC`. Persist the aggregated result as `ds_location_distribution`.
+
+The old numeric `JOB_COMPANY_LINKEDIN_ID` disambiguation guard (needed
+when the slug was ambiguous, e.g. `packmint` vs `packmints`) is no
+longer available — ask_onfire has no numeric-ID dimension on `contact`.
+Pass the **verified `company_linkedin_url`** from Phase 0
+`match_company` as `current_company_url`; it is normalized server-side
+and resolves to the one canonical company, so it does not pollute with a
+same-named neighbour the way a bare slug `ILIKE` did.
 
 **Use the headcount snapshot (from Phase 1.1) as the denominator** for
 the % column, not the sum of the distribution rows. People with a null
@@ -595,44 +682,46 @@ Persist the rolled-up table as `ds_office_segmentation`:
 
 ### 1.15 Event attendance signals (conditional Complication 2D)
 
-Powers the **Event attendance** page (Complication 2D). Source:
-`ONFIRE.EVENTS_CONTACTS` — every captured signal of an actively-employed
+Powers the **Event attendance** page (Complication 2D). Source entity:
+`event_contact` (`ONFIRE.EVENTS_CONTACTS`) — every captured signal of a
 competitor person attending a conference, summit, webinar or industry
 event.
 
-```sql
-SELECT
-    contact_linkedin_url,
-    insight_name,
-    contact_country,
-    contact_region,
-    active_employment
-FROM ONFIRE.EVENTS_CONTACTS
-WHERE deleted_at IS NULL
-  AND company_linkedin_id = {competitor_linkedin_id}
-ORDER BY insight_name, contact_country
+The brief wants the attendees **with names + titles**, which the raw
+query got by joining `EVENTS_CONTACTS` to `PEOPLE`. In ask_onfire that
+is the documented inverse: query the `contact` entity (so you can SELECT
+profile fields) and apply `event_contact` as a **filter-only join**
+(`event_contact` exposes no profile fields to select):
+
+```
+ask_onfire(query={
+  entity: "contact",
+  select: ["full_name", "job_title", "location_name", "location_country"],
+  filters: [{dimension: "current_company_url", op: "eq", value: "{company_linkedin_url}"}],
+  joins: [{entity: "event_contact", filters: [
+    // optionally pin one event: {dimension: "event", op: "eq", value: "RSAC 2026"}
+    {dimension: "active_employment", op: "eq", value: true}   // attendee still at the company
+  ]}],
+  limit: <captured-attendances budget>
+})
 ```
 
-Use `company_linkedin_id` (numeric) — slug-only matches pollute the
-result with same-named companies (e.g. `packmint` vs `packmints`).
-`insight_name` is always prefixed `Event - `.
+Two capability notes vs the raw query:
 
-Then enrich with names + titles by joining to `ONFIRE.PEOPLE` on
-`linkedin_url`:
-
-```sql
-SELECT
-    ec.contact_linkedin_url, ec.insight_name, ec.contact_country,
-    ec.contact_region, ec.active_employment,
-    p.full_name, p.job_title, p.location_name
-FROM ONFIRE.EVENTS_CONTACTS ec
-LEFT JOIN ONFIRE.PEOPLE p
-  ON p.linkedin_url = ec.contact_linkedin_url
- AND p.deleted_at IS NULL
-WHERE ec.deleted_at IS NULL
-  AND ec.company_linkedin_id = {competitor_linkedin_id}
-ORDER BY ec.insight_name, ec.contact_country
-```
+- **No numeric-ID disambiguation.** The raw query keyed on
+  `company_linkedin_id` (numeric) to avoid same-named-company pollution.
+  ask_onfire has no numeric-ID dimension — pass the **verified
+  `company_linkedin_url`** from Phase 0 `match_company` (normalized
+  server-side, resolves to the one canonical company).
+- **Per-event grouping is client-side.** This single QueryIR cannot also
+  return a per-event attendee `COUNT` and the named attendees at once. To
+  list which events the company showed up at with counts, run a separate
+  `event_company` pull (`select: ["event", "attendee_count"]`,
+  `company_url eq`) — `attendee_count` is pre-aggregated, read it
+  directly. If you instead want per-event grouping over the named-
+  attendee rows, group `ds_events_contacts` by event in `query_datasets`.
+  The stored event names are prefixed `Event - ` and resolved
+  server-side from the human wording.
 
 Persist as `ds_events_contacts`. **Include the Complication 2D page
 only if at least one attendance signal is captured.** Below 5 captured
@@ -1603,7 +1692,7 @@ shaken out by a real brief that exposed a gap.
 - **Page 3 (titles) and Pages 5/5b (people) both source `ds_employees`
   returned by `get_company_headcount`** - which is backed by
   `ONFIRE.PEOPLE_GRAND_EXPERIENCES` + `ONFIRE.PEOPLE_GRAND` (tool-
-  managed, not exposed via `query_onfire`). Same source, different
+  managed; no `ask_onfire` semantic entity). Same source, different
   units (title strings vs person-stints) - they're complementary not
   reconcilable. Each page must state its unit in the action-sub.
 - **Open job postings: `SILVER.JOB_POST.STG_JOB_POSTS`** (Query 04).

@@ -113,9 +113,9 @@ itself.** Catch it here.
 - [ ] **No specific channel names** (LinkedIn, Twitter, individual
       Slack community names) anywhere in customer-facing copy. Use
       "owned brand surfaces" and "external developer communities".
-- [ ] **No internal tool names** (Snowflake, Phoenix, MCP, query_onfire,
-      Onfire dataset IDs) in customer-facing copy. Use "market
-      intelligence", "intent signals", "CRM records".
+- [ ] **No internal tool names** (Snowflake, Phoenix, MCP, ask_onfire,
+      QueryIR, entity names, Onfire dataset IDs) in customer-facing copy.
+      Use "market intelligence", "intent signals", "CRM records".
 - [ ] **Action titles are full sentences**, not noun phrases. Every
       page's `<h2 class="action-title">` must have a subject + verb.
 - [ ] **Every page closes with a `.sowhat` synthesis block** (or a

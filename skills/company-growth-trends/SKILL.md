@@ -1,27 +1,30 @@
 ---
 name: company-growth-trends
-description: Analyse monthly headcount growth and technology/persona adoption trends for companies. For total company headcount use `get_company_headcount`; for technology or persona growth use `query_onfire` against ONFIRE.GROWTH_INSIGHT_MONTHLY. Use when the user wants to know if a company is hiring or contracting, whether a specific technology is spreading within a company, or how headcount growth compares to tech adoption — phrases like "is Acme growing?", "is EDR adoption growing at these accounts?", "compare Sentinex vs total headcount trend at Skywall Networks", "which accounts are shrinking?", "is the data engineering team at Frostbyte expanding?", or any month-over-month growth question.
+description: Analyse monthly headcount growth and technology/persona adoption trends for companies. For total company headcount use `get_company_headcount` (or the `headcount_monthly` entity via `ask_onfire`); for technology or persona growth use `ask_onfire` against the `growth_insight_monthly` entity. Use when the user wants to know if a company is hiring or contracting, whether a specific technology is spreading within a company, or how headcount growth compares to tech adoption — phrases like "is Acme growing?", "is EDR adoption growing at these accounts?", "compare Sentinex vs total headcount trend at Skywall Networks", "which accounts are shrinking?", "is the data engineering team at Frostbyte expanding?", or any month-over-month growth question.
 ---
 
 # company-growth-trends
 
-Two complementary data sources accessed via separate tools:
+Two complementary data sources:
 
-| What you need | Tool to use | Source |
+| What you need | Tool to use | Source / entity |
 |---|---|---|
-| **Total company headcount** over time + (optional) employee roster with prior-company | `get_company_headcount` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` (tenure-based) + `ONFIRE.PEOPLE_GRAND` (profile enrichment). Tool-managed; never exposed via `query_onfire`. |
-| **Technology / persona growth** (e.g. Sentinex, data engineer) | `query_onfire` → `ONFIRE.GROWTH_INSIGHT_MONTHLY` | Pre-computed monthly % change |
+| **Total company headcount** over time + employee roster with prior/next-company | `get_company_headcount` | Tenure-based + profile enrichment, tool-managed (see flag below) |
+| **Total company headcount** trend only (no roster, structured) | `ask_onfire` → entity `headcount_monthly` | Monthly total headcount + pre-computed MoM `growth_rate` |
+| **Technology / persona growth** (e.g. Sentinex, data engineer) | `ask_onfire` → entity `growth_insight_monthly` | Pre-computed monthly count + `growth_rate` |
 
-> **Rule:** Never use `query_onfire` for total headcount questions. Always use `get_company_headcount`.
+> **Rule:** For the **employee roster** (who joined/left, prior/next company), only `get_company_headcount` returns it — `ask_onfire`'s `headcount_monthly` is trend-only. For a pure headcount trend you can use either.
+
+> **Note:** The raw-SQL `query_onfire` tool has been **removed**. Growth/headcount queries now go through `ask_onfire`, which takes a structured **QueryIR** (not SQL). `insight` values are resolved server-side — see `resolve_insights`.
 
 ---
 
 ## When to use this
 
-- "Is Meridian Bank's Sentinex footprint growing?" → `query_onfire` (insight)
+- "Is Meridian Bank's Sentinex footprint growing?" → `ask_onfire` (`growth_insight_monthly`, insight)
 - "Compare EDR adoption to total headcount at these 5 accounts" → both tools, then compare
 - "Which of our target accounts are shrinking overall?" → `get_company_headcount`
-- "Is the data engineering persona expanding at Frostbyte?" → `query_onfire` (insight)
+- "Is the data engineering persona expanding at Frostbyte?" → `ask_onfire` (`growth_insight_monthly`, insight)
 - "Who joined Northwind in the last 12 months and where did they come from?" → `get_company_headcount` (roster is always returned)
 - "Who left Northwind in the last quarter and where did they go?" → `get_company_headcount` (roster includes leavers + next-company)
 - Any month-over-month growth / trend question for companies
@@ -33,6 +36,13 @@ Skip this for:
 ---
 
 ## `get_company_headcount` — total headcount + employee roster
+
+> **Flag — no semantic entity:** `get_company_headcount` is backed by
+> `ONFIRE.PEOPLE_GRAND_EXPERIENCES` (tenure rows) + `ONFIRE.PEOPLE_GRAND`
+> (profile enrichment). **Neither table is in the semantic model**, so there is
+> **no `ask_onfire` entity** for them — the roster (joiners/leavers, prior/next
+> company, profile fields) is only reachable through this dedicated tool. Do not
+> try to author an `ask_onfire` QueryIR against PEOPLE_GRAND* — it does not exist.
 
 Headcount is **derived from tenure rows** in `ONFIRE.PEOPLE_GRAND_EXPERIENCES`:
 for each month M in the window, the tool counts distinct people whose tenure
@@ -51,8 +61,8 @@ Each row is joined to `ONFIRE.PEOPLE_GRAND` for profile fields (name,
 country, region, current title) and self-joined to
 `ONFIRE.PEOPLE_GRAND_EXPERIENCES` for the person's immediately-prior AND
 immediately-next company. `next_*` is only populated for stints that
-ended (`end_date IS NOT NULL`). Both tables are tool-managed —
-`query_onfire` cannot read them.
+ended (`end_date IS NOT NULL`). Both tables are tool-managed and have no
+semantic entity — `ask_onfire` cannot read them.
 
 ### Parameters
 
@@ -138,86 +148,86 @@ get_company_headcount(
 
 ---
 
-## `query_onfire` → `GROWTH_INSIGHT_MONTHLY` — technology / persona growth
+## `ask_onfire` → entity `growth_insight_monthly` — technology / persona growth
 
-### Table structure
+`ask_onfire` takes a structured **QueryIR** (not SQL). One row per
+`(company_url, insight, month)` — `num_on_insight` is how many of the company's
+contacts carried the insight that month, `growth_rate` is the **pre-computed**
+month-over-month change (positive = growing). Coverage is a trailing ~12 months.
 
-| Column | Type | Notes |
+### Entity fields (`growth_insight_monthly`)
+
+| Field | Kind | Notes |
 |---|---|---|
-| `company_linkedin_url` | TEXT | Company identifier |
-| `company_website` | TEXT | Company website |
-| `insight_name` | TEXT | Technology/persona slug, always prefixed `growth-` (e.g. `growth-EDR`, `growth-data_analyst`) |
-| `time_period` | DATE | First day of the month |
-| `str_value` | TEXT | Growth % as a string (e.g. `"12.5"` = +12.5%). NULL on the first data point. |
-| `deleted_at` | TEXT | Always filter `IS NULL` |
+| `company_url` | dimension | Company identifier. Pass a LinkedIn URL in any format — normalized server-side. |
+| `insight` | dimension (bound) | Persona OR technology **concept**, resolved server-side. Pass the human/canonical value (e.g. `Sentinex`, `data engineer`) — **do not add a `growth-` prefix**; the server scopes it to the growth series. |
+| `month` | dimension (date) | First day of the month. Filter a window with `gte` / `lte`. |
+| `num_on_insight` | attribute (numeric) | Contacts carrying the insight that month. TEXT-stored; compiler casts numerically. |
+| `growth_rate` | attribute (numeric) | Pre-computed MoM change. TEXT-stored; compiler casts numerically. Read it directly. |
 
-Key derived value: `TRY_CAST(str_value AS FLOAT)` to get numeric %.
+> **Resolve the concept first.** `insight` is a bound concept, not a literal.
+> Pass the human term and the server resolves it (bouncing suggestions if it
+> can't), or confirm the canonical value with `resolve_insights`. The old
+> `growth-<slug>` stored prefix and `LOWER(insight_name) = ...` matching are
+> gone — never pass a prefix yourself.
 
-### Required WHERE clause
+> **Billing / row budget.** `ask_onfire` **bills 1 credit per row returned**.
+> Always set a small explicit `limit` — `12` covers a year of monthly rows. If
+> you leave `limit` unset or set it above the confirmation threshold, the call
+> returns `needs_confirmation` (stage `row_budget`) with the matching row count
+> and **bills nothing** — lower the limit and resubmit rather than reflexively
+> setting `confirmed: true`.
 
-```sql
-WHERE deleted_at IS NULL
-  AND str_value IS NOT NULL   -- excludes first-month baseline rows
-  AND company_linkedin_url IN (...)
+### QueryIR templates
+
+#### Tech/persona insight growth for one company
+```python
+ask_onfire(query={
+  "entity": "growth_insight_monthly",
+  "select": ["month", "num_on_insight", "growth_rate"],
+  "filters": [
+    {"dimension": "company_url", "op": "eq", "value": "linkedin.com/company/meridian-bank"},
+    {"dimension": "insight", "op": "eq", "value": "Sentinex"}   # resolved server-side
+  ],
+  "order_by": [{"field": "month", "direction": "desc"}],
+  "limit": 12
+})
 ```
 
-### SQL templates
-
-#### Tech insight growth for one company
-```sql
-SELECT
-    company_linkedin_url,
-    insight_name,
-    time_period,
-    TRY_CAST(str_value AS FLOAT) AS growth_pct
-FROM ONFIRE.GROWTH_INSIGHT_MONTHLY
-WHERE deleted_at IS NULL
-  AND str_value IS NOT NULL
-  AND company_linkedin_url ILIKE '%/company/meridian-bank%'
-  AND LOWER(insight_name) = 'growth-sentinex'
-ORDER BY time_period DESC
-LIMIT 13
+#### Recent window for one company (last few months)
+```python
+ask_onfire(query={
+  "entity": "growth_insight_monthly",
+  "select": ["month", "num_on_insight", "growth_rate"],
+  "filters": [
+    {"dimension": "company_url", "op": "eq", "value": "linkedin.com/company/frostbyte"},
+    {"dimension": "insight", "op": "eq", "value": "Sentinex"},
+    {"dimension": "month", "op": "gte", "value": "2026-04-01"}   # explicit window bound
+  ],
+  "order_by": [{"field": "month", "direction": "desc"}],
+  "limit": 6
+})
 ```
 
-#### All tech insights for a company (last 3 months)
-```sql
-SELECT
-    insight_name,
-    time_period,
-    TRY_CAST(str_value AS FLOAT) AS growth_pct
-FROM ONFIRE.GROWTH_INSIGHT_MONTHLY
-WHERE deleted_at IS NULL
-  AND str_value IS NOT NULL
-  AND company_linkedin_url ILIKE '%/company/frostbyte%'
-  AND time_period >= DATEADD(month, -3, CURRENT_DATE())
-ORDER BY insight_name, time_period DESC
-LIMIT 200
-```
+> **Limitation — no relative dates / no compiler date math.** QueryIR has no
+> `DATEADD`/`CURRENT_DATE` equivalent: bound `month` with an explicit
+> `YYYY-MM-01` value (`gte`/`lte`), or just pull the trailing window and slice
+> client-side. **FLAG:** the old "all insights, last 3 months" template relied
+> on `DATEADD(month, -3, CURRENT_DATE())` — not expressible as-is; compute the
+> cutoff date yourself and pass it as a literal `month gte`.
 
 #### Multiple companies — which insight is growing fastest?
-```sql
-SELECT
-    company_linkedin_url,
-    insight_name,
-    time_period,
-    TRY_CAST(str_value AS FLOAT) AS growth_pct
-FROM ONFIRE.GROWTH_INSIGHT_MONTHLY
-WHERE deleted_at IS NULL
-  AND str_value IS NOT NULL
-  AND company_linkedin_url IN (
-      'linkedin.com/company/northwind',
-      'linkedin.com/company/sendline',
-      'linkedin.com/company/pathwatch'
-  )
-  AND insight_name ILIKE 'growth-edr%'
-  AND time_period = (
-      SELECT MAX(time_period)
-      FROM ONFIRE.GROWTH_INSIGHT_MONTHLY
-      WHERE deleted_at IS NULL
-  )
-ORDER BY growth_pct DESC NULLS LAST
-LIMIT 50
-```
+
+> **FLAG — not expressible in one query.** The old SQL keyed off a correlated
+> `time_period = (SELECT MAX(time_period) ...)` subquery and a multi-company
+> `IN (...)`. QueryIR supports neither a "latest month" subquery nor a numeric
+> rank over a multi-company pull, and `month`'s latest value isn't known
+> client-side without a read. Do it in steps: run **one query per company**
+> (`company_url eq`, `insight eq`, `order_by month desc`, `limit 1`) to grab
+> each company's most-recent `month` + `growth_rate`, then **rank the
+> `growth_rate` values yourself** across the returned rows. (`op: "in"` on
+> `company_url` is grammar-valid, but you still cannot pin "latest month" or
+> sort by `growth_rate` across companies in a single call without over-pulling.)
 
 ---
 
@@ -225,58 +235,84 @@ LIMIT 50
 
 Call both tools and merge the results in your response.
 
-**Step 1** — get total headcount:
+**Step 1** — get total headcount (roster + trend):
 ```python
 get_company_headcount(
     company_linkedin_urls=["linkedin.com/company/skywall-networks"],
     months=13,
 )
 ```
+(or, for the trend only via `ask_onfire`, use entity `headcount_monthly` — see below.)
 
-**Step 2** — get tech insight growth via `query_onfire`:
-```sql
-SELECT
-    time_period,
-    TRY_CAST(str_value AS FLOAT) AS growth_pct
-FROM ONFIRE.GROWTH_INSIGHT_MONTHLY
-WHERE deleted_at IS NULL
-  AND str_value IS NOT NULL
-  AND company_linkedin_url ILIKE '%/company/skywall-networks%'
-  AND insight_name ILIKE 'growth-edr%'
-ORDER BY time_period DESC
-LIMIT 13
+**Step 2** — get tech insight growth via `ask_onfire`:
+```python
+ask_onfire(query={
+  "entity": "growth_insight_monthly",
+  "select": ["month", "num_on_insight", "growth_rate"],
+  "filters": [
+    {"dimension": "company_url", "op": "eq", "value": "linkedin.com/company/skywall-networks"},
+    {"dimension": "insight", "op": "eq", "value": "Sentinex"}
+  ],
+  "order_by": [{"field": "month", "direction": "desc"}],
+  "limit": 13
+})
 ```
 
-**Step 3** — narrate the comparison aligned by `time_period`.
+**Step 3** — narrate the comparison aligned by `month` / `time_period`.
+
+### Headcount trend via `ask_onfire` (entity `headcount_monthly`)
+
+For a structured total-headcount **trend** (no roster), `headcount_monthly` is
+the `ask_onfire` alternative to `get_company_headcount`. One series per company —
+**no `insight` filter needed**.
+
+```python
+ask_onfire(query={
+  "entity": "headcount_monthly",
+  "select": ["month", "headcount", "growth_rate"],
+  "filters": [
+    {"dimension": "company_url", "op": "eq", "value": "linkedin.com/company/skywall-networks"}
+  ],
+  "order_by": [{"field": "month", "direction": "desc"}],
+  "limit": 13
+})
+```
 
 ---
 
 ## Interpreting results
 
-- **Positive `growth_pct`** → company / tech is growing that month.
-- **Negative `growth_pct`** → contracting.
-- **`growth_pct IS NULL`** → first data point in the series. Filter out for charting.
-- `insight_name` always has the `growth-` prefix in stored values. Use `ILIKE 'growth-%edr%'` for fuzzy matching.
+- **Positive `growth_rate`** → company / tech is growing that month.
+- **Negative `growth_rate`** → contracting.
+- **`growth_rate` is the pre-computed MoM change** — read the latest row
+  directly; do not recompute it. The oldest row in the window has no prior month
+  to diff against, so its rate may be absent — drop it before averaging/charting.
+- **No MoM math in the query.** `ask_onfire` cannot compute month-over-month
+  deltas, windowed `LAG`, or any trend arithmetic in SQL. It only SELECTs
+  `month` + `num_on_insight` + `growth_rate` and ORDERs by `month`. Any
+  comparison the stored `growth_rate` doesn't already give you (e.g. first-vs-last
+  month, multi-month averages) you compute **yourself over the pulled rows**.
+- `insight` is resolved server-side — pass the human/canonical concept, never a
+  `growth-` prefix or a stored slug.
 
 ---
 
 ## Output handling
 
-Both tools return a `dataset` handle + `preview_rows` (first 20).
+`get_company_headcount` returns `dataset` handles + `preview_rows` (first 20).
+`ask_onfire` returns the rows directly (subject to the row budget / `limit`).
 
 1. Narrate the trend: *"Skywall Networks' total headcount grew +3.2% MoM in April 2025, while Sentinex persona adoption grew +8.5% — outpacing overall hiring."*
-2. For time-series questions, show a table of `time_period → growth_pct`.
-3. Offer `download_dataset` for the full CSV.
-4. Follow-up slices → use `query_datasets` against the existing `dataset_id`.
+2. For time-series questions, show a table of `month → growth_rate`.
+3. For `get_company_headcount`, offer `download_dataset` for the full CSV and use `query_datasets` against the existing `dataset_id` for follow-up slices.
 
 ---
 
 ## Common pitfalls
 
-- **Using `query_onfire` for total headcount** — always use `get_company_headcount` instead.
+- **Trying to read total headcount or the roster via `ask_onfire`** — use `get_company_headcount` (full roster) or entity `headcount_monthly` (trend only). The PEOPLE_GRAND* tables have **no semantic entity**.
+- **Expecting `ask_onfire` to compute MoM deltas / trend math in SQL** — it can't. Read the stored `growth_rate`; compute anything else yourself over the pulled rows.
 - **Treating `next_company_name` as "current employer"** — it's the *next* stint after this one. For still-active people (`end_date IS NULL`) it's NULL. Use `current_company_name` for "where they work now".
-- **`str_value` is TEXT** in GROWTH_INSIGHT_MONTHLY — always use `TRY_CAST(str_value AS FLOAT)` for arithmetic.
-- **Forgetting `str_value IS NOT NULL`** — NULL rows are baseline-only and distort averages.
-- **`insight_name` must have the `growth-` prefix** — use `ILIKE 'growth-%edr%'` for fuzzy matching.
-- **`growth_pct` NULL on oldest row** — the LAG window has no prior month. Filter it out before computing averages.
+- **Adding a `growth-` prefix or stored slug to `insight`** — pass the human/canonical concept; the server resolves and scopes it. Use `resolve_insights` if unsure.
+- **Leaving `limit` unset / pushing a big pull through** — `ask_onfire` bills 1 credit/row. Set a small explicit `limit` (e.g. 12); on `needs_confirmation` (stage `row_budget`) lower it, don't reflexively set `confirmed: true`.
 - **`start_date` / `end_date` in the employee roster are `YYYY-MM` strings**, not full dates. Treat them as month granularity.
