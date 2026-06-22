@@ -1,24 +1,40 @@
 ---
 name: community-messages-sentiment
-description: Run aspect-based sentiment analysis over the Onfire community-messages corpus (Slack, Discord, Reddit, etc.) using the `community_messages_sentiment` tool. Use whenever the user asks how a community feels about a product, vendor, or topic — phrases like "sentiment about X", "what does the community think of Y", "positive/negative feedback on Z", "POC sentiment", "buzz around a vendor", "who's complained about a product", "find advocates for a topic", or any question that combines a keyword/topic with a date range and an opinion angle. The tool returns a small inline summary plus a persisted CSV dataset of every scored message — this skill enforces the post-call playbook so the dataset (not the inline numbers) becomes the deliverable.
+description: Run aspect-based SENTIMENT analysis over the Onfire community-messages corpus (Slack, Discord, Reddit, etc.) using the `community_messages_sentiment` tool. USE ONLY when the question has an explicit OPINION / FEELING angle — how a community feels about a product, vendor, or topic: positive vs negative, complaints, praise, advocacy, satisfaction, frustration. Trigger phrases: "sentiment about <X>", "what does the community think of <Y>", "positive/negative feedback on <Z>", "who's complaining about <product>", "find advocates for <topic>", "are people frustrated with <vendor>", "POC sentiment". Do NOT use this to merely FIND or discover people/messages that MENTION or discuss a topic with no opinion angle (e.g. "find relevant people talking about my competitors", "who's discussing <topic>", "companies whose employees mentioned <X>") — that is message discovery: use the community-message-search skill (the `search_community_messages` tool). Decision rule: if there is NO positive/negative angle, this is the WRONG skill. The tool returns a small inline summary plus a persisted CSV dataset of every scored message — this skill enforces the post-call playbook so the dataset (not the inline numbers) becomes the deliverable.
 ---
 
 # community_messages_sentiment
 
 Snowflake-backed retrieval + Vertex (Gemini) per-message aspect scoring over the Onfire community-messages corpus. Company enrichment via `silver.dataspring.dataspring_people_full` + `gold.entities.companies` resolves each sender's employer so you get a by-company breakdown in addition to the by-community one.
 
+## Routing gate — answer this BEFORE using this skill
+
+> **Does the request name an OPINION / FEELING** — positive/negative,
+> complaint, praise, advocacy, satisfaction, frustration?
+
+- **No** → this is the WRONG skill. If they want to FIND people/messages that
+  merely MENTION or discuss a topic (e.g. *"relevant people talking about my
+  competitors"*, *"who's discussing X"*, *"companies whose employees mentioned
+  Y"*), use **`community-message-search`** (the `search_community_messages`
+  tool). If they want who JOINED a community, use **`community-join-signals`**.
+- **Yes** → continue here. This tool spends LLM time scoring polarity; only pay
+  that when the opinion angle is the point.
+
 ## When to use this
 
 - "What does the Slack community feel about Nexagon?"
 - "Find positive vs negative discussions of Codeshield in the last 90 days."
 - "Who's complained about Cloudward POCs? Get me their LinkedIns."
-- "Pull buzz around vendor X across communities since March."
+- "Find advocates / detractors for vendor X across communities since March."
 - "Which companies have the most employees complaining about <product>?"
 - Any question that mixes a **keyword or topic** + a **date range** + an **opinion angle**.
 
 Skip this for:
 
-- Pure keyword search with no sentiment angle — use Snowflake directly via `septer_query` / `connect_query` / `query_datasets` (this tool spends LLM time you don't need).
+- **Plain mention/discovery with no opinion angle** ("find people talking about
+  X", "who's discussing Y") — use **`community-message-search`**
+  (`search_community_messages`); this tool would waste LLM time scoring opinion
+  you didn't ask for.
 - Sentiment toward a person rather than a product/topic — the people here are the **authors** of the messages, not the subjects.
 
 ## Pre-step: resolve company names via `match_company` before calling
