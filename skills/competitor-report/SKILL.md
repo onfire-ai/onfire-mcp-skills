@@ -177,14 +177,38 @@ or over-threshold budget returns `needs_confirmation` (`stage:
 "row_budget"` — a free COUNT, nothing billed) so you can settle the count
 with the user and resubmit with `confirmed: true`. Several brief slices
 are full-cohort pulls feeding a downstream `query_datasets` analysis —
-expect to hit and deliberately clear the confirmation gate. ask_onfire
-**cannot** express GROUP-BY distributions beyond a single declared COUNT
-measure, window functions, month-over-month / first-ever temporal cohort
-logic, multi-field free-text OR-scans, `PAYLOAD:` JSON, or multi-hop
-joins; for those slices (title movement, acquisition cohort, modal-
-country, departed-no-backfill free-text scan) pull the constrained rows
-with a QueryIR and do the analysis client-side (see snowflake-queries.md
-for which is which).
+expect to hit and deliberately clear the confirmation gate.
+
+Two capabilities the brief now uses (read snowflake-queries.md for the
+per-slice recipes):
+
+- **Aggregate mode in a QueryIR** — `group_by`, `aggregations`
+  (`count` / `count_distinct` / `sum` / `avg` / `min` / `max`), date
+  `buckets` (`month` / `quarter` / `year`, works on `'YYYY-MM'` TEXT),
+  and `having`. In aggregate mode `select` MUST be empty; result columns
+  are the `group_by` keys plus the aggregations, and it bills 1 credit
+  per **group** — set a `limit`. This now expresses the per-distribution,
+  per-month, distinct-count cuts the brief used to compute client-side:
+  hires/leavers per month by title, modal-country, location
+  distribution, open-posting / event distributions.
+- **Extended-pool entities** — the full employment-history pool
+  (`experiences_pool`, ~5x `people_experiences`, one row per stint — the
+  source for hires / leavers / title movement / roster) and the full
+  people pool (`people_pool`, ~5x `contact`). Both are **gated** and have
+  **no insight search**: query them with `allow_extended_pool: true` and
+  the entity named explicitly. These supersede the old `PEOPLE_GRAND` /
+  `PEOPLE_GRAND_EXPERIENCES` "tool-managed, no entity" tables.
+
+ask_onfire **still cannot** express window functions, self-joins
+(prior / next employer), first-ever-across-all-time cohort logic, true
+month-over-month deltas in SQL, multi-field free-text OR-scans,
+`PAYLOAD:` JSON, or multi-hop joins; for those slices (title-string
+net-new / now-gone + paired-swap classification, acquisition first-ever
+cohort, departed-no-backfill free-text scan, leaver destinations) pull
+the constrained rows with a QueryIR (aggregate-or-row,
+`allow_extended_pool: true` where the pool is needed), persist, and do
+the window / cohort / self-join logic client-side (see snowflake-
+queries.md for which is which).
 
 ### 1.1 Headcount trend + employee roster (single call — primary source for org-growth changes)
 
@@ -196,15 +220,19 @@ leavers, joiner origins, and leaver destinations. It powers Phase 1.1
 (headcount), Phase 1.3 (Q-hires), and Phase 1.12 (leavers + their
 destinations). No separate `ask_onfire` pull is needed for any of those.
 
-Headcount is derived from tenure intervals in
-`ONFIRE.PEOPLE_GRAND_EXPERIENCES`; the employee roster joins each
-tenure to `ONFIRE.PEOPLE_GRAND` for location and to **symmetric
-self-joins** on `ONFIRE.PEOPLE_GRAND_EXPERIENCES` for both the
-immediately-prior company (joiner origin) and the immediately-next
-company (leaver destination). **Neither `PEOPLE_GRAND` nor
-`PEOPLE_GRAND_EXPERIENCES` has an `ask_onfire` semantic entity** — they
-are tool-managed and reachable only through `get_company_headcount`; do
-**not** attempt to author a QueryIR against them.
+Headcount is derived from tenure intervals in the extended employment-
+history pool; the employee roster joins each tenure to the extended
+people pool for location and to **symmetric self-joins** on the
+employment-history pool for both the immediately-prior company (joiner
+origin) and the immediately-next company (leaver destination). Those
+pools ARE now queryable as the gated `experiences_pool` /
+`people_pool` entities (set `allow_extended_pool: true`), but
+`get_company_headcount` stays the canonical path **for this slice**
+because it bundles the monthly headcount, the roster, AND the
+prior / next self-joins (window functions a standalone QueryIR cannot
+express) into one call. Reach for the pool entities directly only for a
+cut the tool does not pre-compute — e.g. the aggregate-mode reshape
+counts in Phase 1.2.
 
 ```
 Onfire MCP: get_company_headcount(
@@ -242,14 +270,31 @@ the canonical pattern; do not re-derive these slices from
 
 See `references/snowflake-queries.md` → query 02.
 
-Classify every in-window event into:
+Sourced from the gated `experiences_pool` entity (the whole-pool
+employment history; `allow_extended_pool: true`). Two complementary
+cuts:
+
+**Title-string classification (client-side).** Pull every stint at the
+company from `experiences_pool`, then classify every in-window event in
+`query_datasets`:
 - **Net-new title** - title string had no prior holder
 - **Now-gone title** - last remaining holder of an existing title departed
 
+The `NOT EXISTS` "no remaining active holder" guard and the
+paired-swap pairing are self-referential, so this stays client-side.
 Persists as `ds_title_movement`. **Strictly bounded to the window** -
 any event outside `window_start` / `window_end` is excluded.
 
-For `12_month` mode the same query runs against the 12-month
+**Per-month reshape counts (aggregate mode).** The hires-per-month and
+leavers-per-month by `title_role` counts ARE now expressible directly:
+a date `bucket` on `start_date` (hires) / `end_date` (leavers), grouped
+with `title_role`, `count_distinct` of `person_url`. Run those as
+aggregate-mode `experiences_pool` queries (query 02b) instead of
+re-deriving them from the row pull. These feed the page 3 / page 6
+by-function reshape counts; they count person-stints per month, which is
+a different unit from the title-string classification (see §2.5.b).
+
+For `12_month` mode the same queries run against the 12-month
 predicate; expect ~5x more events than a single quarter.
 
 ### 1.3 Quarter hires with geo + function (derived from `ds_employees`)
@@ -512,9 +557,12 @@ evidence wall.
 
 See `references/snowflake-queries.md` → query 10.
 
-For any company in `ds_acq_firmo` with NULL `LOCATION_COUNTRY`, query
-`ONFIRE.PEOPLE` for that company's employees and use the **modal
-country** as the inferred country. Persists as `ds_geo_fallback`.
+For any company in `ds_acq_firmo` with NULL `LOCATION_COUNTRY`, get the
+per-(company, country) employee distribution via an **aggregate-mode**
+`contact` query (`group_by: ["current_company_url", "location_country"]`,
+`count_distinct` of people) and take the **modal country** per company
+as the inferred country. Persists as `ds_geo_fallback`. This bills per
+(company × country) group, not per employee, so the budget is small.
 
 ### 1.12 Leavers and their destinations (derived from `ds_employees`)
 
@@ -620,24 +668,26 @@ Returns `offices` (list of `{city, country, state, region, is_hq}`)
 and `total_offices`. Persist as `ds_offices`.
 
 Then pull the company's employee locations. The per-location
-`COUNT(*)` roll-up across `(country, region, name)` is a GROUP-BY
-distribution **ask_onfire cannot return** (it exposes one declared
-`contact_count` measure, not a multi-dimension group-by-with-count), so
-pull the raw employee location rows with a QueryIR and aggregate in
-`query_datasets`:
+`COUNT(*)` roll-up across `(country, region, name)` IS now an
+**aggregate-mode** query — `group_by` the three location dimensions and
+`count` people, server-side, instead of pulling every employee row and
+rolling up in `query_datasets`. This bills one credit per location
+group, not per employee:
 
 ```
 ask_onfire(query={
   entity: "contact",
-  select: ["location_country", "location_region", "location_name"],
   filters: [{dimension: "current_company_url", op: "eq", value: "{company_linkedin_url}"}],
-  limit: <headcount-sized budget; hits the row-budget gate — confirm against the COUNT>
+  group_by: ["location_country", "location_region", "location_name"],
+  aggregations: [{name: "employee_count", fn: "count_distinct", field: "linkedin_url"}],
+  order_by: [{field: "employee_count", direction: "desc"}],
+  limit: <distinct location groups>
 })
 ```
 
-Then in `query_datasets`: `GROUP BY location_country, location_region,
-location_name`, `COUNT(*) AS employee_count`, `ORDER BY employee_count
-DESC`. Persist the aggregated result as `ds_location_distribution`.
+Persist the result directly as `ds_location_distribution` (the
+group-by keys plus `employee_count` are exactly the columns the old
+client-side roll-up produced — no `query_datasets` aggregation needed).
 
 The old numeric `JOB_COMPANY_LINKEDIN_ID` disambiguation guard (needed
 when the slug was ambiguous, e.g. `packmint` vs `packmints`) is no
@@ -713,15 +763,19 @@ Two capability notes vs the raw query:
   ask_onfire has no numeric-ID dimension — pass the **verified
   `company_linkedin_url`** from Phase 0 `match_company` (normalized
   server-side, resolves to the one canonical company).
-- **Per-event grouping is client-side.** This single QueryIR cannot also
-  return a per-event attendee `COUNT` and the named attendees at once. To
-  list which events the company showed up at with counts, run a separate
-  `event_company` pull (`select: ["event", "attendee_count"]`,
-  `company_url eq`) — `attendee_count` is pre-aggregated, read it
-  directly. If you instead want per-event grouping over the named-
-  attendee rows, group `ds_events_contacts` by event in `query_datasets`.
-  The stored event names are prefixed `Event - ` and resolved
-  server-side from the human wording.
+- **Per-event grouping.** The named-attendee pull above cannot also
+  return a per-event `COUNT` in the same call (aggregate mode requires
+  an empty `select`, so you can't have both the named rows and the
+  group counts at once). Two ways to get the per-event distribution:
+  read the pre-aggregated `event_company.attendee_count` (`select:
+  ["event", "attendee_count"]`, `company_url eq`, read directly), or run
+  an **aggregate-mode** query over the same `contact` + `event_contact`
+  join (`group_by: ["event"]`, `aggregations: [{name: "attendees", fn:
+  "count_distinct", field: "linkedin_url"}]`). Either is server-side now;
+  grouping `ds_events_contacts` in `query_datasets` is only needed if you
+  already hold the named rows and want to avoid a second call. The stored
+  event names are prefixed `Event - ` and resolved server-side from the
+  human wording.
 
 Persist as `ds_events_contacts`. **Include the Complication 2D page
 only if at least one attendance signal is captured.** Below 5 captured
@@ -1385,6 +1439,43 @@ rows even when the data is there.
 
 ## Session changelog (most recent first)
 
+### 2026-06-22 — ask_onfire: aggregate mode + extended-pool entities
+
+Two new ask_onfire capabilities folded into the data-gathering phase.
+Report structure, prose, and methodology are unchanged — only how data
+is fetched / computed.
+
+- **Extended-pool entities.** The full employment-history pool and full
+  people pool — previously flagged as `PEOPLE_GRAND` /
+  `PEOPLE_GRAND_EXPERIENCES` ("tool-managed, no ask_onfire entity, never
+  author a QueryIR") — are now the gated `experiences_pool` (~5x
+  `people_experiences`, one row per stint — hires / leavers / title
+  movement / roster) and `people_pool` (~5x `contact`) entities. Both
+  are GATED with NO insight search: query with `allow_extended_pool:
+  true` and the entity named. Every "PEOPLE_GRAND has no entity / never
+  query it" flag updated to point at these. `get_company_headcount`
+  stays the canonical path for Query 01 (it bundles the monthly counts,
+  roster, AND the prior / next self-joins the QueryIR grammar can't
+  express), but the underlying pool is now directly queryable when a cut
+  the tool doesn't pre-compute is needed.
+- **Aggregate mode in a QueryIR.** `group_by` + `aggregations`
+  (`count` / `count_distinct` / `sum` / `avg` / `min` / `max`) + date
+  `buckets` (`month` / `quarter` / `year`, works on `'YYYY-MM'` TEXT) +
+  `having`; `select` must be empty in aggregate mode; bills per group.
+  Slices moved from "pull rows, compute client-side" to server-side
+  aggregate mode: hires/leavers per month by title (Query 02b,
+  `experiences_pool`), modal-country geo fallback (Query 10), office
+  location distribution (Phase 1.14), open-posting and per-event
+  distributions (Query 04, Phase 1.15).
+- **Still client-side (window / self-join / cohort):** title-string
+  net-new / now-gone + paired-swap classification (Query 02), acquisition
+  first-ever-in-window cohort (Query 07), leaver destinations / joiner
+  origins (self-joins, Query 11), departed-no-backfill free-text scan
+  (Query 13a), true month-over-month deltas. For these the pattern is
+  unchanged: pull bounded rows (aggregate-or-row,
+  `allow_extended_pool: true` where the pool is needed), persist, compute
+  the window / cohort logic in `query_datasets`.
+
 ### 2026-05-28 — Acquisition motion: methodology corrected to "first-ever-in-window"
 
 The single biggest defect ever shipped from this skill was the
@@ -1690,11 +1781,13 @@ shaken out by a real brief that exposed a gap.
 
 **Data sources**
 - **Page 3 (titles) and Pages 5/5b (people) both source `ds_employees`
-  returned by `get_company_headcount`** - which is backed by
-  `ONFIRE.PEOPLE_GRAND_EXPERIENCES` + `ONFIRE.PEOPLE_GRAND` (tool-
-  managed; no `ask_onfire` semantic entity). Same source, different
-  units (title strings vs person-stints) - they're complementary not
-  reconcilable. Each page must state its unit in the action-sub.
+  returned by `get_company_headcount`** - which is backed by the
+  extended employment-history + people pools (then tool-managed with no
+  `ask_onfire` semantic entity; **since superseded** — those pools are
+  now the gated `experiences_pool` / `people_pool` entities, see Phase 1
+  capability note and Phase 1.2). Same source, different units (title
+  strings vs person-stints) - they're complementary not reconcilable.
+  Each page must state its unit in the action-sub.
 - **Open job postings: `SILVER.JOB_POST.STG_JOB_POSTS`** (Query 04).
   No `DELETED_AT` column - use `APPLICATION_ACTIVE = 1` for the active
   cut, but the brief currently disowns the active flag because the

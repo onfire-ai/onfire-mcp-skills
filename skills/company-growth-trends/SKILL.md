@@ -9,11 +9,12 @@ Two complementary data sources:
 
 | What you need | Tool to use | Source / entity |
 |---|---|---|
-| **Total company headcount** over time + employee roster with prior/next-company | `get_company_headcount` | Tenure-based + profile enrichment, tool-managed (see flag below) |
+| **Total company headcount** over time + employee roster with prior/next-company | `get_company_headcount` | Tenure-based + profile enrichment; convenient point lookup (see flag below) |
 | **Total company headcount** trend only (no roster, structured) | `ask_onfire` → entity `headcount_monthly` | Monthly total headcount + pre-computed MoM `growth_rate` |
 | **Technology / persona growth** (e.g. Sentinex, data engineer) | `ask_onfire` → entity `growth_insight_monthly` | Pre-computed monthly count + `growth_rate` |
+| **Full employee roster / headcount distribution** (count by title, role, location, …) | `ask_onfire` → gated entity `experiences_pool` (stints) / `people_pool` (profiles) | The extended pool that backs the roster — query directly with `allow_extended_pool=true` |
 
-> **Rule:** For the **employee roster** (who joined/left, prior/next company), only `get_company_headcount` returns it — `ask_onfire`'s `headcount_monthly` is trend-only. For a pure headcount trend you can use either.
+> **Rule:** For the **wired-up roster** (joiners/leavers with prior/next-company self-joins already attached), `get_company_headcount` is the convenient one-call path — `ask_onfire`'s `headcount_monthly` is trend-only. But the underlying rows are **no longer unreachable**: the full roster lives in the gated `experiences_pool` / `people_pool` entities, queryable via `ask_onfire` with `allow_extended_pool=true` (see below) when you need a custom cut (e.g. a distribution by title/location) the tool doesn't give you. For a pure headcount trend, either tool works.
 
 > **Note:** The raw-SQL `query_onfire` tool has been **removed**. Growth/headcount queries now go through `ask_onfire`, which takes a structured **QueryIR** (not SQL). `insight` values are resolved server-side — see `resolve_insights`.
 
@@ -37,12 +38,20 @@ Skip this for:
 
 ## `get_company_headcount` — total headcount + employee roster
 
-> **Flag — no semantic entity:** `get_company_headcount` is backed by
-> `ONFIRE.PEOPLE_GRAND_EXPERIENCES` (tenure rows) + `ONFIRE.PEOPLE_GRAND`
-> (profile enrichment). **Neither table is in the semantic model**, so there is
-> **no `ask_onfire` entity** for them — the roster (joiners/leavers, prior/next
-> company, profile fields) is only reachable through this dedicated tool. Do not
-> try to author an `ask_onfire` QueryIR against PEOPLE_GRAND* — it does not exist.
+> **Flag — now reachable via a gated pool entity (updated):** `get_company_headcount`
+> is backed by `ONFIRE.PEOPLE_GRAND_EXPERIENCES` (tenure/stint rows) +
+> `ONFIRE.PEOPLE_GRAND` (profile enrichment). These rows **are no longer
+> unreachable from `ask_onfire`** — they now exist as the **gated** semantic
+> entities `experiences_pool` (the full employment-history pool, mirrors
+> `PEOPLE_GRAND_EXPERIENCES`) and `people_pool` (the full people pool, mirrors
+> `PEOPLE_GRAND`). To query them you must set `allow_extended_pool=true` **and**
+> name the entity explicitly; they carry **no insight search** (route any
+> persona/technology query to `growth_insight_monthly` / `contact` / `company`).
+> Keep `get_company_headcount` as the convenient point lookup — it returns the
+> monthly counts plus a wired-up roster (prior/next-company self-joins already
+> attached) in one call. Reach for `experiences_pool` / `people_pool` only when
+> you need a custom cut the tool doesn't give you (e.g. a roster **distribution**
+> by title or location via aggregate mode — see below).
 
 Headcount is **derived from tenure rows** in `ONFIRE.PEOPLE_GRAND_EXPERIENCES`:
 for each month M in the window, the tool counts distinct people whose tenure
@@ -61,8 +70,13 @@ Each row is joined to `ONFIRE.PEOPLE_GRAND` for profile fields (name,
 country, region, current title) and self-joined to
 `ONFIRE.PEOPLE_GRAND_EXPERIENCES` for the person's immediately-prior AND
 immediately-next company. `next_*` is only populated for stints that
-ended (`end_date IS NOT NULL`). Both tables are tool-managed and have no
-semantic entity — `ask_onfire` cannot read them.
+ended (`end_date IS NOT NULL`). The tool wires these self-joins up for you in
+one call — that's why it stays the convenient path. The underlying rows are
+also reachable via the gated `experiences_pool` / `people_pool` entities
+(`allow_extended_pool=true`), but the **prior/next-company self-joins are NOT
+expressible in a QueryIR** — author them only for a simpler cut (a roster
+distribution, a current-roster list), and compute any movement math
+client-side.
 
 ### Parameters
 
@@ -148,6 +162,81 @@ get_company_headcount(
 
 ---
 
+## `ask_onfire` → gated entities `experiences_pool` / `people_pool` — the full roster
+
+The roster rows behind `get_company_headcount` are now **queryable** through
+`ask_onfire`, via two **gated** entities:
+
+| Entity | Mirrors | Grain | Use it for |
+|---|---|---|---|
+| `experiences_pool` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | one row per person-stint | roster / org-movement cuts; `is_primary = true` is the current role |
+| `people_pool` | `ONFIRE.PEOPLE_GRAND` | one row per person | whole-pool identity / profile lookups |
+
+> **Gated — opt in explicitly.** Both are withheld from the routing catalog.
+> To query either you MUST (1) name the entity in the QueryIR `entity` field and
+> (2) set **`allow_extended_pool: true`**. They are ~5× the curated `contact` /
+> `people_experiences` pools, so always set a tight `limit` (every row is
+> billed). **No insight search lives here** — for any persona / technology cut
+> stay on `growth_insight_monthly` (or `contact` / `company`).
+
+Use these only when `get_company_headcount` doesn't give you the shape you need —
+typically a roster **distribution** (count by title / role / location) via
+aggregate mode, or a plain current-roster list. For the wired-up joiner/leaver
+roster with prior/next-company attached, keep using `get_company_headcount`.
+
+### Aggregate mode — grouped counts / distributions
+
+QueryIR now has an **aggregate mode**: set `group_by` + `aggregations` (and
+optionally `buckets` for date-truncation, `having` to filter groups). In
+aggregate mode `select` **MUST be empty** — the result columns are the
+`group_by` keys followed by the named aggregations. `order_by` references a
+`group_by` key, a `buckets` name, or an `aggregations` name. Each aggregation is
+`{name, fn, field}` where `fn` is `count` (omit `field` → `COUNT(*)`),
+`count_distinct`, `sum`, `avg`, `min`, or `max`. It still **bills per returned
+row (one per group)** — set a `limit`.
+
+#### Roster headcount distribution by title role (current employees)
+```python
+ask_onfire(query={
+  "entity": "experiences_pool",
+  "allow_extended_pool": True,            # required — gated entity
+  "filters": [
+    {"dimension": "company_url", "op": "eq", "value": "linkedin.com/company/packmint"},
+    {"dimension": "is_primary", "op": "eq", "value": True}   # current roster only
+  ],
+  "group_by": ["title_role"],
+  "aggregations": [{"name": "people", "fn": "count_distinct", "field": "person_url"}],
+  "order_by": [{"field": "people", "direction": "desc"}],
+  "limit": 25                              # one credit per group row
+  # NOTE: select is empty in aggregate mode
+})
+```
+
+#### Current-roster headcount by country (people_pool)
+```python
+ask_onfire(query={
+  "entity": "people_pool",
+  "allow_extended_pool": True,            # required — gated entity
+  "filters": [
+    {"dimension": "current_company_url", "op": "eq", "value": "linkedin.com/company/packmint"}
+  ],
+  "group_by": ["location_country"],
+  "aggregations": [{"name": "people", "fn": "count_distinct", "field": "linkedin_url"}],
+  "order_by": [{"field": "people", "direction": "desc"}],
+  "limit": 20
+})
+```
+
+> **FLAG — movement math stays client-side.** `experiences_pool` exposes the
+> stints but **cannot** compute joiners/leavers-by-month, tenure windows, or the
+> prior/next-employer self-joins inside a QueryIR (`START_DATE` / `END_DATE` are
+> `YYYY-MM` **TEXT**, not real dates, and the compiler emits no date math or
+> self-join). For those, either use `get_company_headcount` (which wires them up)
+> or pull bounded stint rows and derive the movement client-side via
+> `query_datasets`.
+
+---
+
 ## `ask_onfire` → entity `growth_insight_monthly` — technology / persona growth
 
 `ask_onfire` takes a structured **QueryIR** (not SQL). One row per
@@ -228,6 +317,9 @@ ask_onfire(query={
 > `growth_rate` values yourself** across the returned rows. (`op: "in"` on
 > `company_url` is grammar-valid, but you still cannot pin "latest month" or
 > sort by `growth_rate` across companies in a single call without over-pulling.)
+> Aggregate mode doesn't rescue this either — there is no per-group "latest row"
+> selector and `growth_rate` is a stored attribute, not an aggregate — so the
+> per-company pull + client-side rank stays the pattern.
 
 ---
 
@@ -310,7 +402,8 @@ ask_onfire(query={
 
 ## Common pitfalls
 
-- **Trying to read total headcount or the roster via `ask_onfire`** — use `get_company_headcount` (full roster) or entity `headcount_monthly` (trend only). The PEOPLE_GRAND* tables have **no semantic entity**.
+- **Forgetting the gate on the pool entities** — `experiences_pool` / `people_pool` only run when you set `allow_extended_pool: true` AND name the entity; without the flag the query is bounced. Reach for them only for a custom roster cut — `get_company_headcount` (wired-up roster) or `headcount_monthly` (trend only) cover the common cases, and the pools carry **no insight search**.
+- **Expecting `experiences_pool` to compute joiners/leavers or prior/next-company in one query** — it can't (TEXT dates, no self-join/date math in QueryIR). Use `get_company_headcount`, or pull stints and derive movement client-side.
 - **Expecting `ask_onfire` to compute MoM deltas / trend math in SQL** — it can't. Read the stored `growth_rate`; compute anything else yourself over the pulled rows.
 - **Treating `next_company_name` as "current employer"** — it's the *next* stint after this one. For still-active people (`end_date IS NULL`) it's NULL. Use `current_company_name` for "where they work now".
 - **Adding a `growth-` prefix or stored slug to `insight`** — pass the human/canonical concept; the server resolves and scopes it. Use `resolve_insights` if unsure.

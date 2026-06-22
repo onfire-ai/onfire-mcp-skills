@@ -21,13 +21,40 @@ For this brief most slices are full-cohort pulls feeding a downstream
 expect to hit the confirmation gate and confirm deliberately, never
 reflexively.
 
-**What ask_onfire cannot express (this brief leans on it heavily):**
-GROUP BY distributions beyond a single declared COUNT measure, window
-functions, month-over-month / first-ever-across-all-time temporal
-cohort logic, multi-field free-text OR-scans, `PAYLOAD:` JSON
-extraction, and multi-hop joins. Queries that need any of these (02,
-05 in full, 06 owner-match, 07, 10, 13a) are flagged below: pull the
-constrained rows with a QueryIR, then do the aggregation/temporal logic
+**What ask_onfire CAN now express (two capabilities this brief leans on):**
+
+1. **Aggregate mode in a QueryIR.** A query can now GROUP BY and
+   aggregate server-side: `group_by: [<dim/attr or bucket name>, ...]`,
+   `aggregations: [{name, fn, field}]` (`fn` = `count` | `count_distinct`
+   | `sum` | `avg` | `min` | `max`), date `buckets: [{name, field, part}]`
+   (`part` = `month` | `quarter` | `year` — truncates a date OR ISO-date
+   text like `'YYYY-MM'`), and post-aggregation `having: [{measure, op,
+   value}]`. In aggregate mode `select` MUST be empty; the result columns
+   are the `group_by` keys followed by the `aggregations`, and `order_by`
+   references those names. **It still bills 1 credit per returned row (=
+   per group), so set a `limit`.** This unlocks the per-distribution,
+   per-month, distinct-count cuts the brief used to compute client-side
+   (hires/leavers per month by title, modal-country, location
+   distribution, per-event/per-posting counts).
+2. **Extended-pool entities.** The full employment-history pool and full
+   people pool — what this brief used to flag as `PEOPLE_GRAND` /
+   `PEOPLE_GRAND_EXPERIENCES` ("no entity, tool-managed") — are now
+   queryable **gated** entities: `experiences_pool` (the ~5x superset of
+   `people_experiences`, one row per stint — the source for hires /
+   leavers / title movement / roster) and `people_pool` (the ~5x
+   superset of `contact`, profile enrichment). Both are GATED and have
+   **no insight search**: to query either, set `allow_extended_pool:
+   true` in the QueryIR and name the entity explicitly.
+
+**What ask_onfire STILL cannot express (genuinely client-side):**
+window functions, self-joins (prior/next employer), first-ever-across-
+all-time temporal cohort logic, true month-over-month deltas in SQL,
+multi-field free-text OR-scans, `PAYLOAD:` JSON extraction, and multi-
+hop joins. Queries that need any of these (02 paired-swap / now-gone
+classification, 06 owner-match, 07 first-ever cohort, 11 destinations,
+13a free-text scan) are flagged below: pull the constrained rows with a
+QueryIR (aggregate-or-row, `allow_extended_pool: true` where the pool is
+needed), persist them, then do the window / cohort / self-join logic
 client-side over the pulled dataset (`query_datasets`).
 
 Entity mapping (table → ask_onfire entity): `ONFIRE.PEOPLE` = `contact`;
@@ -36,10 +63,15 @@ Entity mapping (table → ask_onfire entity): `ONFIRE.PEOPLE` = `contact`;
 `ONFIRE.GROWTH_INSIGHT_MONTHLY` = `growth_insight_monthly`;
 `ONFIRE.INSIGHTS_2_EVIDENCES` = `insight_evidence`; `ONFIRE.EVIDENCES`
 = `evidence`; `ONFIRE.GITHUB_MEMBERS` = `github_member`;
-`SILVER.JOB_POST.STG_JOB_POSTS` = `job_post`. **`ONFIRE.PEOPLE_GRAND`
-and `ONFIRE.PEOPLE_GRAND_EXPERIENCES` have NO ask_onfire entity** — they
-are reachable only through the `get_company_headcount` tool (Query 01);
-never attempt to author a QueryIR against them.
+`SILVER.JOB_POST.STG_JOB_POSTS` = `job_post`. The full employment-
+history pool (`ONFIRE.EXPERIENCES_FULL`) = `experiences_pool` and the
+full people pool (`ONFIRE.PEOPLE_FULL`) = `people_pool` — **both GATED**:
+author a QueryIR against them only with `allow_extended_pool: true` and
+no insight search. (These supersede the old `PEOPLE_GRAND` /
+`PEOPLE_GRAND_EXPERIENCES` "tool-managed, no entity" tables;
+`get_company_headcount` (Query 01) still wraps the same movement math as
+a one-call convenience, but the underlying pool is now directly
+queryable when you need a cut the tool does not pre-compute.)
 
 Persona / technology / event / evidence-type values are *concepts*, not
 literals — `ask_onfire` resolves them server-side (via `resolve_insights`
@@ -62,14 +94,18 @@ Template variables:
 
 ## Query 01 — Headcount trend + employee roster (single MCP call)
 
-**Not an `ask_onfire` query** — this slice lands via the dedicated
-`get_company_headcount` tool, which reads from
-`ONFIRE.PEOPLE_GRAND_EXPERIENCES` (tenure intervals) and
-`ONFIRE.PEOPLE_GRAND` (profile enrichment) and self-joins on
-`ONFIRE.PEOPLE_GRAND_EXPERIENCES` for **both** the person's prior AND
-next company. **Neither table has an `ask_onfire` semantic entity** —
-they are tool-managed and reachable only through `get_company_headcount`;
-never try to author a QueryIR against `PEOPLE_GRAND*`.
+**Lands via the dedicated `get_company_headcount` tool** — a one-call
+convenience that reads the extended employment-history pool (tenure
+intervals) and the extended people pool (profile enrichment) and
+self-joins the pool for **both** the person's prior AND next company.
+The underlying pools are now directly queryable as the gated
+`experiences_pool` / `people_pool` entities (set `allow_extended_pool:
+true`); the tool stays the canonical path here because it bundles the
+monthly headcount, the roster, AND the prior/next self-joins (window
+functions ask_onfire cannot express) into a single call. Reach for the
+pool entities directly only when you need a cut the tool does not
+pre-compute (e.g. an aggregate roster distribution — Query 02 / 03 / 10
+below).
 
 ```
 get_company_headcount(
@@ -114,14 +150,14 @@ Columns:
 
 | Column | Source | Notes |
 |---|---|---|
-| `person_linkedin_url`, `person_linkedin_id`, `is_primary` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Identity |
-| `start_date`, `end_date` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | `YYYY-MM` strings; NULL end = still in role |
-| `title_name`, `title_role`, `title_sub_role`, `title_levels` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Title classification at the company |
-| `full_name`, `headline` | `ONFIRE.PEOPLE_GRAND` | Latest snapshot |
-| `location_country`, `location_region`, `location_continent`, `location_name` | `ONFIRE.PEOPLE_GRAND` | Geo |
-| `current_job_title`, `current_company_name`, `current_company_linkedin_url` | `ONFIRE.PEOPLE_GRAND` | What they're doing *now* |
-| `prior_company_name`, `prior_company_linkedin_url`, `prior_title`, `prior_start_date`, `prior_end_date` | self-join on `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | The stint immediately before the target one (joiner origin) |
-| `next_company_name`, `next_company_linkedin_url`, `next_title`, `next_start_date`, `next_end_date` | self-join on `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | The stint immediately after the target one (leaver destination). NULL when `end_date IS NULL` |
+| `person_linkedin_url`, `person_linkedin_id`, `is_primary` | `experiences_pool` | Identity (`person_url`, `is_primary`) |
+| `start_date`, `end_date` | `experiences_pool` | `YYYY-MM` strings; NULL end = still in role |
+| `title_name`, `title_role`, `title_sub_role`, `title_levels` | `experiences_pool` | Title classification at the company |
+| `full_name`, `headline` | `people_pool` | Latest snapshot |
+| `location_country`, `location_region`, `location_continent`, `location_name` | `people_pool` | Geo |
+| `current_job_title`, `current_company_name`, `current_company_linkedin_url` | `people_pool` | What they're doing *now* |
+| `prior_company_name`, `prior_company_linkedin_url`, `prior_title`, `prior_start_date`, `prior_end_date` | self-join on `experiences_pool` | The stint immediately before the target one (joiner origin) — the self-join is a window function, so the tool computes it; not expressible in a standalone QueryIR |
+| `next_company_name`, `next_company_linkedin_url`, `next_title`, `next_start_date`, `next_end_date` | self-join on `experiences_pool` | The stint immediately after the target one (leaver destination). NULL when `end_date IS NULL`. Same self-join caveat as `prior_*` |
 
 Used in: Phase 1.3 Q-hires filter (`start_date IN window`), Q-leavers
 filter (`end_date IN window`), talent-flow strategic-thread synthesis
@@ -132,29 +168,35 @@ Complication 1B function/region breakdown.
 
 ## Query 02 — Title movement (target quarter only)
 
-**Not expressible as a single `ask_onfire` query — pull rows, classify
-client-side.** The net-new / now-gone classification is a per-title
-temporal aggregation (`MIN(START_DATE)` and `MAX(END_DATE)` grouped by
-title, with a `NOT EXISTS` "no remaining active holder" guard and a
-window-bounded `HAVING`). ask_onfire exposes no GROUP-BY-per-title with
-MIN/MAX measures, no `NOT EXISTS` correlation, and no UNION — so author
-**one bounded row pull** with a QueryIR, then run the CTE logic in
-`query_datasets` (DuckDB) over the pulled dataset.
+**The net-new / now-gone classification still computes client-side; the
+raw per-month-by-title hire / leaver counts are now an aggregate-mode
+pull.** Whole-pool movement is sourced from the gated `experiences_pool`
+entity (the ~5x superset of `people_experiences`, one row per stint) —
+set `allow_extended_pool: true` on every pull below.
+
+The net-new / now-gone classification is a per-title temporal pattern
+(`MIN(start_date)` and `MAX(end_date)` grouped by title, with a `NOT
+EXISTS` "no remaining active holder" guard and a window-bounded
+`HAVING`). The `NOT EXISTS` correlation and the UNION of the two event
+types are **still not expressible** in a QueryIR, so author the bounded
+row pull, then run that CTE logic in `query_datasets`.
 
 Step 1 — pull every stint at the company (the `all_holders` universe)
-via `ask_onfire`:
+from the extended pool via `ask_onfire`:
 
 ```
 ask_onfire(query={
-  entity: "people_experiences",
-  select: ["title_name", "start_date", "end_date", "is_primary"],
+  entity: "experiences_pool",
+  select: ["title_name", "title_role", "start_date", "end_date", "is_primary"],
   filters: [{dimension: "company_url", op: "eq", value: "{company_linkedin_url}"}],
+  allow_extended_pool: true,    // GATED entity — required
   limit: <cohort size>          // hits the row-budget gate; confirm against the COUNT
 })
 ```
 
 - `company_url` normalizes any URL format server-side (no `LOWER()`
-  needed). `people_experiences` rows are already live-scoped.
+  needed). `experiences_pool` has no insight search — it is firmographic
+  / title columns only, which is all this slice needs.
 - `start_date` / `end_date` are TEXT (`'YYYY-MM'`) on this entity — the
   same string-comparison rule as the raw query.
 - This is a **full-cohort pull** (every stint ever recorded at the
@@ -166,6 +208,62 @@ and `MAX(end_date)`, apply the window `HAVING`, and apply the
 "no row with `end_date IS NULL` for this title" guard for `now_gone`.
 
 **Persists as `ds_title_movement`.**
+
+### 02b — Hires-per-month / leavers-per-month by title (aggregate mode)
+
+The org-reshape *counts* — how many people joined / left each month
+broken down by title function — ARE expressible now: a date bucket on
+`start_date` (hires) or `end_date` (leavers), grouped with `title_role`,
+counting distinct people. Run these directly instead of re-deriving them
+client-side from the Step 1 pull. Each returned row is one
+(month × title_role) group, so set a `limit` that covers the window's
+group count.
+
+```
+// hires per month by title function
+ask_onfire(query={
+  entity: "experiences_pool",
+  filters: [
+    {dimension: "company_url", op: "eq", value: "{company_linkedin_url}"},
+    {dimension: "start_date", op: "gte", value: "{rolling_12mo_start_yyyymm}"},   // '2025-04'
+    {dimension: "start_date", op: "lte", value: "{q_end_yyyymm}"}                 // '2026-03'
+  ],
+  buckets: [{name: "hire_month", field: "start_date", part: "month"}],
+  group_by: ["hire_month", "title_role"],
+  aggregations: [{name: "joiners", fn: "count_distinct", field: "person_url"}],
+  order_by: [{field: "hire_month", direction: "asc"}, {field: "joiners", direction: "desc"}],
+  allow_extended_pool: true,
+  limit: <months × distinct title_roles, e.g. 60>
+})
+
+// leavers per month by title function — same shape, bucket on end_date
+ask_onfire(query={
+  entity: "experiences_pool",
+  filters: [
+    {dimension: "company_url", op: "eq", value: "{company_linkedin_url}"},
+    {dimension: "end_date", op: "gte", value: "{window_start_yyyymm}"},
+    {dimension: "end_date", op: "lte", value: "{window_end_yyyymm}"}
+  ],
+  buckets: [{name: "leave_month", field: "end_date", part: "month"}],
+  group_by: ["leave_month", "title_role"],
+  aggregations: [{name: "leavers", fn: "count_distinct", field: "person_url"}],
+  order_by: [{field: "leave_month", direction: "asc"}, {field: "leavers", direction: "desc"}],
+  allow_extended_pool: true,
+  limit: <months × distinct title_roles>
+})
+```
+
+- `buckets` truncate the `'YYYY-MM'` TEXT date to the month — no
+  client-side date math.
+- These feed the page 3 / page 6 by-function reshape counts directly.
+  The net-new / now-gone *title-string* classification (Step 1 → 2)
+  remains a separate, complementary cut — it dedupes within title, these
+  count person-stints per month (see SKILL.md §2.5.b on why the two
+  views do not arithmetically reconcile).
+- **Still client-side:** paired-swap detection (an old title's departure
+  matched to a new title's arrival in the same function in-window) is a
+  self-referential pairing the aggregate grammar cannot express — keep
+  it in `query_datasets` over the Step 1 pull.
 
 Two event types:
 - `net_new` - title string with no prior holder, first holder started in-quarter
@@ -282,8 +380,37 @@ ask_onfire(query={
 
 **Persists as `ds_open_jobs_active`.**
 
-- "How many roles is the company hiring for" → `select: ["post_count"]`
-  (the COUNT measure) with the same filters and `limit: 1`.
+- "How many roles is the company hiring for" → either `select:
+  ["post_count"]` (the entity's COUNT measure) with the same filters and
+  `limit: 1`, or the aggregate-mode equivalent
+  `aggregations: [{name: "open_roles", fn: "count"}]` (no `group_by`,
+  `select` empty) — both return the single scalar.
+- **Geographic / functional shape of the active set (aggregate mode).**
+  The country and `job_function` × `seniority` distributions of the
+  active postings — which the DuckDB patterns below compute client-side
+  — are a plain GROUP BY + COUNT, so you can get them server-side
+  instead:
+
+  ```
+  // open roles by country
+  ask_onfire(query={
+    entity: "job_post",
+    filters: [
+      {dimension: "company_url", op: "eq", value: "{company_linkedin_url}"},
+      {dimension: "application_active", op: "eq", value: 1}
+    ],
+    group_by: ["country"],
+    aggregations: [{name: "open_roles", fn: "count"}],
+    order_by: [{field: "open_roles", direction: "desc"}],
+    limit: <distinct countries>
+  })
+  ```
+
+  Swap `group_by: ["job_function", "seniority"]` for the functional
+  breakdown. Each returned row is one group — set `limit` to the group
+  count. Reach for this when you only need the distribution; keep the
+  full row pull (04a / 04b) when you also need the per-posting detail
+  table (title, date, URL).
 
 ### Pitfalls
 
@@ -318,16 +445,22 @@ release effort (search `JOB_TEXT` for the product name where relevant).
 
 ### DuckDB join patterns
 
+The two distribution cuts below can be done server-side in aggregate
+mode (see the geographic / functional shape block above); the
+client-side versions are kept for when you already hold the row pull
+(e.g. you need the per-posting detail on the same page) or want to
+cross-cut against the in-window set.
+
 ```sql
 -- datasets: {"q": "ds_open_jobs_quarter", "a": "ds_open_jobs_active"}
 
--- Geographic shape of the active set
+-- Geographic shape of the active set (or use aggregate mode group_by=["country"])
 SELECT country, COUNT(*) AS open_roles
 FROM a
 GROUP BY country
 ORDER BY open_roles DESC;
 
--- Functional breakdown of the active set
+-- Functional breakdown of the active set (or use aggregate mode group_by=["job_function","seniority"])
 SELECT job_function, seniority, COUNT(*) AS n
 FROM a
 GROUP BY job_function, seniority
@@ -623,37 +756,38 @@ unresolvable.
 
 ## Query 10 — Modal-country geo fallback
 
-**The modal-country roll-up is a GROUP-BY distribution — not expressible
-in ask_onfire — so pull the constrained employee rows and compute the
-mode client-side.** ask_onfire declares only a single `contact_count`
-measure on `contact` and cannot GROUP BY `(company, country)` to return
-a per-(company,country) count; the `OR` across two free-text key lists
-(`JOB_COMPANY_NAME` / `JOB_COMPANY_LINKEDIN_URL`) is also not a single
-QueryIR filter.
+**The per-(company, country) roll-up IS expressible now via aggregate
+mode** — `group_by: ["current_company_url", "location_country"]` with a
+`count_distinct` of people. This replaces the old "pull every employee
+row, compute the mode client-side" pattern: instead of billing one row
+per employee, you bill one row per (company × country) group and pick
+the modal country from those counts. (The `OR` across two free-text key
+lists in the raw query is still not a single QueryIR filter — drop the
+name-based branch and key on the clean `current_company_url`.)
 
-For companies in `ds_acq_firmo` with NULL `location_country`, pull their
-employees by **company URL** (the clean key — `current_company_url` with
-`op: "in"`; drop the name-based `OR` branch), then take the modal
-country in `query_datasets`:
+For companies in `ds_acq_firmo` with NULL `location_country`, pull the
+per-company country distribution directly:
 
 ```
 ask_onfire(query={
   entity: "contact",
-  select: ["current_company_name", "current_company_url", "location_country"],
   filters: [{dimension: "current_company_url", op: "in", value: [
     // company URLs from ds_acq_firmo with NULL location_country
   ]}],
-  limit: <employee-row budget across these companies>
+  group_by: ["current_company_url", "location_country"],
+  aggregations: [{name: "people", fn: "count_distinct", field: "linkedin_url"}],
+  order_by: [{field: "people", direction: "desc"}],
+  limit: <distinct (company × country) groups across these companies>
 })
 ```
 
-**Persists as `ds_geo_fallback`** (raw employee rows). Then in
-`query_datasets`: `GROUP BY current_company_url, location_country`,
-`COUNT(*)`, and take the modal `location_country` per company. The pull
-is billed per employee row, so the budget can be sizeable — confirm
-against the COUNT, and consider capping per-company (e.g. only the first
-N employees per company are needed to establish a mode). If no employees
-match, leave the company in the Unresolved bucket (shown muted).
+**Persists as `ds_geo_fallback`** (the per-(company, country) counts).
+Then in `query_datasets`, take the row with the largest `people` count
+per `current_company_url` as the modal country — no second aggregation
+needed, just an argmax per company. The pull is billed per **group**
+(far fewer rows than per-employee), so the budget is small; confirm
+against the COUNT if it still trips the gate. If a company returns no
+groups, leave it in the Unresolved bucket (shown muted).
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: title-movement
 description: >
-  Detect month-by-month title movement (new hires and departures by job title) at any target company using `ONFIRE.PEOPLE_EXPERIENCES` via `ask_onfire`.
+  Detect month-by-month title movement (new hires and departures by job title) at any target company using `ONFIRE.EXPERIENCES_FULL` via `ask_onfire`.
 
   Use this skill whenever the user asks about:
   - "title movement" or "role movement" at a company
@@ -20,12 +20,16 @@ compatibility:
 
 # Title Movement Skill
 
-Detect which job titles are newly entering or permanently leaving a company, month by month. Data source: `ONFIRE.PEOPLE_EXPERIENCES` (entity `people_experiences`) via `ask_onfire`.
+Detect which job titles are newly entering or permanently leaving a company, month by month. Data source: the **extended employment-history pool** — entity `experiences_pool` (alias `ONFIRE.EXPERIENCES_FULL`) via `ask_onfire`. This is the broad superset (~5x) of the curated `people_experiences`, one row per person-stint, and is the right source for *whole-pool* org movement because it covers people regardless of whether they carry curated insights.
 
-**How this skill works in two parts.** `ask_onfire` takes a structured QueryIR, not SQL — it can pull the employment-stint rows for a company, but it **cannot** compute month-over-month diffs, window functions, or temporal "first-ever" / "now-gone" flags. So the flow is:
+> **`experiences_pool` is GATED.** It is withheld from the routing catalog and has **no insight search**. You must name the entity explicitly *and* set `allow_extended_pool: true` in every QueryIR below, or the query will not run. The narrower curated alternative is `people_experiences` — it covers only insight-connected people (a fraction of the pool), so prefer `experiences_pool` here for complete movement coverage; fall back to `people_experiences` only if a caller explicitly wants the curated subset.
 
-1. **Pull the rows** (Step 2) — one bounded `ask_onfire` call returns the company's employment stints (`title_name`, `start_date`, `end_date`, `person_url`, …).
-2. **Compute the movement client-side** (Step 3) — the agent buckets those rows by month and derives joiners, leavers, and the new-to-company / gone-from-company flags itself, over the returned rows. `ask_onfire` does none of this math.
+**How this skill works in two parts.** `ask_onfire` takes a structured QueryIR, not SQL. Two of its capabilities do most of the work for us:
+
+1. **Per-month counts run *inside* `ask_onfire` (aggregate mode).** The month-by-month new-hire and departure counts by title are now AGGREGATE-MODE QueryIR queries — `ask_onfire` buckets `start_date` / `end_date` by month, groups by title, and counts distinct people server-side. No raw rows are pulled for this, and no client-side bucketing is needed.
+2. **The "first-ever / now-gone" flags stay client-side (Step 4).** Whether a title is *genuinely new* to the company (first-ever appearance) or *fully gone* (nobody currently holds it) needs a window/self-join over the title's full history. That is **not** expressible in a QueryIR (confirmed by the entity's own caveats), so it is computed by the agent over one small bounded `query_datasets` pull.
+
+So the flow is: two aggregate `ask_onfire` calls for the monthly hire/departure counts (Step 2 + Step 3), one tiny bounded pull for the flags (Step 4), then merge and format.
 
 ---
 
@@ -34,81 +38,132 @@ Detect which job titles are newly entering or permanently leaving a company, mon
 | Parameter | Default | Notes |
 |---|---|---|
 | `company_linkedin_url` | **required** | e.g. `linkedin.com/company/taskboard`. Infer slug from company name if needed (e.g. "Cloudforce" → `linkedin.com/company/cloudforce`). State the inferred URL explicitly. Passed as a `company_url` filter value (any URL format is normalized server-side). |
-| `start_date` | 12 months ago | Convert natural language: "2 years" → 24 months ago, "since Jan 2024" → `2024-01`, "6 months" → 6 months ago. Format: `YYYY-MM`. Used as the client-side cutoff in Step 3 — **not** a query filter (`start_date` on the entity is TEXT `'YYYY-MM'`, not a real date, so range filtering it in the query is unreliable). |
-| `title_filter` | none | Translate "only engineering titles" or "titles with manager" to a dimension filter: `{dimension: "title_name", op: "contains", value: "engineer"}` (`title_name` is free text; `contains` is a case-insensitive substring match). **One keyword per query.** Multiple OR'd keywords are NOT expressible in a single QueryIR (dimension filters AND together, and there is no OR) — run one pull per keyword and merge the rows client-side, or filter the keywords in Step 3 over an unfiltered pull. |
-| `show_all` | false | Default: in Step 3, only keep months/titles where `title_new_to_company = TRUE` OR `title_gone_from_company = TRUE`. If user says "show everything" or "all movement", keep every month/title bucket. |
+| `start_date` | 12 months ago | Convert natural language: "2 years" → 24 months ago, "since Jan 2024" → `2024-01`, "6 months" → 6 months ago. Format: `YYYY-MM`. Applied as a client-side cutoff on the returned month buckets — **not** as a query filter (`start_date` / `end_date` on the entity are TEXT `'YYYY-MM'`, not real dates, so range filtering them in the query is unreliable). |
+| `title_filter` | none | Translate "only engineering titles" or "titles with manager" to a dimension filter: `{dimension: "title_name", op: "contains", value: "engineer"}` (`title_name` is free text; `contains` is a case-insensitive substring match). **One keyword per query.** Multiple OR'd keywords are NOT expressible in a single QueryIR (dimension filters AND together, and there is no OR) — run one set of calls per keyword and merge the groups client-side. |
+| `group_grain` | `title_role` | The title axis to group hires/departures by. `title_role` is the closed, normalized role taxonomy (cleaner buckets, fewer spelling variants); `title_name` is the free-text raw title. Group by `title_role` by default; switch to (or add) `title_name` when the user wants the raw titles. |
+| `show_all` | false | Default: in the final table (Step 5), only keep months/titles where `title_new_to_company = TRUE` OR `title_gone_from_company = TRUE`. If user says "show everything" or "all movement", keep every month/title bucket. |
 
 ---
 
-## Step 2 — Pull the rows with `ask_onfire`
+## Step 2 — New hires per month by title (aggregate mode, `ask_onfire`)
 
-One bounded call pulls the company's employment stints. This returns **rows only** — the month-by-month movement is computed in Step 3, not here.
+Hires = a month-bucket over `start_date`, grouped by month + title, counting distinct people. This runs entirely inside `ask_onfire` — it returns one row per `(month, title)` group, **not** raw stints.
 
 ```
 ask_onfire(query={
-  entity: "people_experiences",
-  select: ["person_url", "title_name", "title_role", "start_date", "end_date", "is_primary"],
+  entity: "experiences_pool",
+  allow_extended_pool: true,
   filters: [
     {dimension: "company_url", op: "eq", value: "<company_linkedin_url>"}
     /* optional single-keyword title filter:
        {dimension: "title_name", op: "contains", value: "<keyword>"} */
   ],
+  buckets: [{name: "hire_month", field: "start_date", part: "month"}],
+  group_by: ["hire_month", "title_role"],
+  aggregations: [{name: "hires", fn: "count_distinct", field: "person_url"}],
+  order_by: [{field: "hire_month", direction: "desc"}],
   limit: 200
 })
 ```
 
-- **Scope to the company.** `company_url eq <slug>` is what keeps the pull small and on-topic. Any LinkedIn URL format is normalized server-side.
-- **No date filter in the query.** `start_date` / `end_date` are TEXT `'YYYY-MM'` (not real dates) — the `start_date` window from Step 1 is applied client-side in Step 3 so it stays correct. Pulling without a date filter also lets Step 3 see the company's full history, which the "first ever month for this title" flag depends on.
-- **`is_primary = true`** marks the person's current/primary stint; an empty/NULL `end_date` means the stint is ongoing.
-- **Confirm field names if unsure:** `describe_onfire_schema(["people_experiences"])` before authoring. Never guess a field name.
+Result columns: `hire_month`, `title_role`, `hires`. (Swap `title_role` → `title_name` — in both `group_by` and `order_by` if you order on it — to group by the raw title; add both to group by each.)
 
-### Billing & the row budget
+## Step 3 — Departures per month by title (aggregate mode, `ask_onfire`)
 
-`ask_onfire` **bills the client 1 credit per row returned**, so `limit` is a real budget — keep it tight.
+Departures = the **same query bucketed on `end_date`** instead of `start_date`. A non-empty `end_date` is a stint that ended (a departure from that role); ongoing stints have NULL/empty `end_date` and simply don't bucket.
 
-- Always set an explicit `limit`. `200` is a reasonable ceiling for a single mid-size company's stint history; lower it for narrow title filters or short windows.
-- If the response comes back `needs_confirmation` with `stage: "row_budget"`, **nothing was billed and no rows came back** — the match is bigger than your budget. Lower `limit` to what the analysis actually needs and resubmit, or (only once the count is settled with the user) set `confirmed: true`. Do **not** reflexively set `confirmed: true` just to push a large pull through.
-- A larger company may need a higher `limit` to capture full history; trade that against the per-row cost and the window the user asked for.
+```
+ask_onfire(query={
+  entity: "experiences_pool",
+  allow_extended_pool: true,
+  filters: [
+    {dimension: "company_url", op: "eq", value: "<company_linkedin_url>"}
+    /* same optional single-keyword title filter as Step 2 */
+  ],
+  buckets: [{name: "depart_month", field: "end_date", part: "month"}],
+  group_by: ["depart_month", "title_role"],
+  aggregations: [{name: "departures", fn: "count_distinct", field: "person_url"}],
+  order_by: [{field: "depart_month", direction: "desc"}],
+  limit: 200
+})
+```
 
-### Simple lookups (expressible directly, no Step 3 needed)
+Result columns: `depart_month`, `title_role`, `departures`.
 
-These single-shot variants answer narrower questions without any client-side month math:
+### Notes on Steps 2–3
 
-- **Current people by title** — add `{dimension: "is_primary", op: "eq", value: true}`; select `title_name`, `start_date`.
-- **Past roles at the company** — add `{dimension: "is_primary", op: "eq", value: false}`; select `title_name`, `start_date`, `end_date`.
+- **Scope to the company.** `company_url eq <slug>` keeps each query small and on-topic. Any LinkedIn URL format is normalized server-side.
+- **`allow_extended_pool: true` is mandatory** on both calls — `experiences_pool` is gated and the query will not run without it.
+- **No date filter in the query.** `start_date` / `end_date` are TEXT `'YYYY-MM'`, so the month bucket is fine but range-filtering them is not — apply the Step 1 `start_date` window as a client-side cutoff on the returned `*_month` values when you build the final table.
+- **`count_distinct` requires the `field`** (`person_url`) — that is what counts *people*, not stints. (`count` may omit a field; the distinct/sum/avg/min/max functions all require one.)
+- **`select` MUST be empty in aggregate mode** — the result columns are exactly the `group_by` keys followed by the aggregation names. Do not add a `select` list.
+- **Confirm field names if unsure:** `describe_onfire_schema(["experiences_pool"])` before authoring. Never guess a field name.
+
+### Billing & the row budget (aggregate mode)
+
+`ask_onfire` **bills 1 credit per RETURNED row — and in aggregate mode a returned row is a group**, i.e. one `(month, title)` bucket. So `limit` is a real budget on the number of groups.
+
+- Always set an explicit `limit`. `200` groups comfortably covers a year-plus of monthly buckets across the common roles at a mid-size company; lower it for a narrow title filter or a short window.
+- If the response comes back `needs_confirmation` with `stage: "row_budget"`, **nothing was billed and no rows came back** — there are more groups than your budget. Lower `limit` to what the analysis actually needs and resubmit, or (only once the count is settled with the user) set `confirmed: true`. Do **not** reflexively set `confirmed: true` just to push a large pull through.
+- A larger or older company spans more months × more roles; trade a higher `limit` against the per-group cost and the window the user asked for.
+
+### Simple lookups (expressible directly)
+
+These single-shot variants answer narrower questions without the flag step:
+
+- **Current people by title** — drop the buckets/aggregations and pull rows: `filters` add `{dimension: "is_primary", op: "eq", value: true}` (the entity's `current` named filter, `IS_PRIMARY = TRUE`); `select: ["person_url", "title_name", "title_role", "start_date"]`. (Remember to keep `allow_extended_pool: true`.)
+- **Headcount by role right now** — aggregate: `filters` add `is_primary = true`; `group_by: ["title_role"]`; `aggregations: [{name: "people", fn: "count_distinct", field: "person_url"}]`.
 
 ---
 
-## Step 3 — Compute month-by-month movement (client-side, over the pulled rows)
+## Step 4 — The "first-ever / now-gone" flags (client-side, bounded pull)
 
-`ask_onfire` returned raw stint rows; the agent now derives the movement itself. Treat each `start_date` / `end_date` as a `'YYYY-MM'` month string.
+This is the **only** part `ask_onfire` cannot express. Whether a `(month, title)` bucket is *genuinely new* (the first-ever month anyone at the company held that title) or a title is *fully gone* (nobody currently holds it) requires a window / self-join over each title's full history — there is no QueryIR for that, and the `experiences_pool` caveats say so explicitly. So compute these two flags client-side over **one small bounded pull**, then join them onto the aggregate counts from Steps 2–3.
 
-For each row, normalize the title: `title = lower(trim(title_name))`. Skip rows with no `title_name` or no `start_date`.
+Pull just the columns the flags need, over the company's full history (no date cutoff — the "first-ever" flag depends on seeing all of it):
 
-**First, over ALL pulled rows (full history — do not apply the date window yet), per title:**
-- `first_ever_start` = the earliest `start_date` month seen for that title at the company.
-- `currently_active` = count of stints for that title with an empty/NULL `end_date` (still ongoing).
+```
+query_datasets:  pull stints for the company from experiences_pool
+  entity: "experiences_pool", allow_extended_pool: true,
+  filters: [{dimension: "company_url", op: "eq", value: "<company_linkedin_url>"}],
+  select: ["title_role", "title_name", "start_date", "end_date"],
+  limit: <bounded>   /* this is a row pull again — billed per stint, so keep it tight */
+```
 
-**Then bucket by month, applying the `start_date` window from Step 1:**
+Treat `start_date` / `end_date` as `'YYYY-MM'` month strings. For the chosen `group_grain` (default `title_role`), over ALL pulled rows:
 
-- **Joiners** — group rows by (`start_date` month, `title`), counting distinct `person_url`. Keep only months `>= start_date`. A `(month, title)` bucket is `title_new_to_company = TRUE` when that month equals the title's `first_ever_start` (the first ever month anyone at the company held this title).
-- **Leavers** — group rows with a non-empty `end_date` by (`end_date` month, `title`), counting distinct `person_url`. Keep only months `>= start_date`. A title is `title_gone_from_company = TRUE` when its `currently_active` count is 0 (nobody at the company currently holds it).
+- `first_ever_start[title]` = the earliest `start_date` month seen for that title at the company.
+- `currently_active[title]` = count of stints for that title with an empty/NULL `end_date` (still ongoing).
 
-Merge joiners and leavers on (`month`, `title`): `joiners` defaults to 0, `leavers` defaults to 0, and the two flags default to FALSE.
+Then derive the flags:
+
+- `title_new_to_company` is **TRUE** for a `(hire_month, title)` bucket when `hire_month == first_ever_start[title]` — the first-ever month anyone at the company held this title.
+- `title_gone_from_company` is **TRUE** for a title when `currently_active[title] == 0` — nobody at the company currently holds it.
+
+> **This pull is billed per stint** (it is a row pull, not aggregate mode), so keep `limit` tight — only the columns above, only this company. If `limit` truncates the company's stint history, `first_ever_start` / `currently_active` can be off; widen it (mind the per-row cost) if the flags look suspect.
+
+---
+
+## Step 5 — Merge and apply the window
+
+Join the aggregate counts (Steps 2–3) and the flags (Step 4) on `(month, title)`:
+
+- Start from the union of `(hire_month, title)` and `(depart_month, title)` keys.
+- `joiners` = `hires` from Step 2 (default 0); `leavers` = `departures` from Step 3 (default 0).
+- `title_new_to_company` / `title_gone_from_company` from Step 4 (default FALSE).
+- **Apply the `start_date` window from Step 1**: keep only months `>= start_date`. (The window is applied here, not in the query, because the month columns are TEXT.)
 
 **If `show_all = false`**, keep only rows where `title_new_to_company = TRUE` OR `title_gone_from_company = TRUE`. **If `show_all = true`**, keep every bucket.
 
 Order by month descending, then by `joiners + leavers` descending.
 
 **Two flag definitions worth knowing:**
-- `title_new_to_company` — this is the *first ever month* anyone at the company held this title. Computed against full pulled history regardless of the date window.
-- `title_gone_from_company` — current snapshot: nobody at the company currently holds this title (`end_date` is set for all stints of it). Not a point-in-time calculation for historical months.
-
-> **Accuracy note.** Both flags are only as complete as the rows the pull returned. If `limit` truncated the company's stint history, `first_ever_start` and `currently_active` can be off — widen `limit` (mind the per-row billing) if the flags look suspect.
+- `title_new_to_company` — the *first ever month* anyone at the company held this title. Computed against the full Step 4 pull regardless of the date window.
+- `title_gone_from_company` — current snapshot: nobody at the company currently holds this title (`end_date` is set for all its stints). Not a point-in-time calculation for historical months.
 
 ---
 
-## Step 4 — Format the output
+## Step 6 — Format the output
 
 ### Summary line (always first)
 ```
@@ -130,7 +185,7 @@ If `show_all=true`, append: ` · [Z] total move events`
 - Both false → no emoji, blank Signal (only shown when `show_all=true`)
 
 ### No results
-If the pull returns 0 rows, say:
+If the aggregate calls return 0 groups, say:
 > "No title movement found for `[url]` in this window. The LinkedIn URL slug may not match — try a variant (e.g. `linkedin.com/company/cloudforce` vs `linkedin.com/company/cloudforcecom`)."
 
 ---
@@ -138,6 +193,6 @@ If the pull returns 0 rows, say:
 ## Edge cases
 
 - **Inferred URL**: state it — *"Using `linkedin.com/company/cloudforce` — correct me if wrong."*
-- **Title noise**: spelling variants (`mid-market solution engineer` vs `mid-market solutions engineer`) appear as separate rows. Mention if prominent.
-- **Future-dated end_date**: occasional data artifact. Note if it affects results.
-- **Large result sets** (>150 buckets with `show_all=true`): suggest narrowing by title filter or date range — this also lets you lower the `ask_onfire` `limit` and reduce per-row cost.
+- **Title noise**: grouping by `title_role` (default) collapses most spelling variants; if you group by `title_name`, variants (`mid-market solution engineer` vs `mid-market solutions engineer`) appear as separate groups. Mention if prominent.
+- **Future-dated end_date**: occasional data artifact that can produce a departure bucket in the future. Note if it affects results.
+- **Large result sets** (many `(month, title)` groups with `show_all=true`): suggest narrowing by title filter or date range — this also lets you lower the `ask_onfire` `limit` and reduce per-group cost.
