@@ -56,18 +56,29 @@ search_community_messages(
         "...angle 2...",
         "...angle 3...",
     ],
-    threshold=0.75,                        # min cosine similarity [0,1]; default 0.75
+    threshold=0.6,                         # min cosine similarity [0,1]; default 0.6
     community_types=None,                  # e.g. ["Discord","Slack"] to restrict platforms
-    since=None,                            # ISO date YYYY-MM-DD lower bound
+    since=None,                            # ISO date YYYY-MM-DD lower bound; ASK the user for a window if unspecified
     limit=50,                              # max results after consolidation (also per-query k)
 )
 ```
 
-### Compose THREE distinct phrasings (not one repeated)
+### Compose the queries that get vectorized — REQUIRED
 
-The tool runs each phrasing separately and rewards messages that more than one
-phrasing surfaces (`query_hits` 2–3 = strong corroboration). Give three
-genuinely different angles on the same intent, composed from the user's ICP:
+Each string in `query` is embedded verbatim and matched by *meaning*, so match
+quality IS the quality of that text. Write each phrasing as a full, natural-
+language description of the buying intent — a sentence a real person would say or
+post — **not** a bare keyword or a lone vendor list.
+
+Give 1–3 genuinely different angles on the SAME intent (the tool rewards messages
+that more than one phrasing surfaces — `query_hits` 2–3 = strong corroboration).
+Each phrasing should:
+- describe a **situation or question** (evaluating, comparing, migrating off,
+  frustrated with, asking which…), not just nouns strung together;
+- weave in concrete ICP terms — competitor names, pain points, personas — which
+  you pull from `get_tenant_settings` (`account_research`: competitors, hot
+  keywords, personas) **first**;
+- stay grounded in what the user actually asked for.
 
 ```python
 # "people talking about my competitors" (a CNAPP vendor)
@@ -78,14 +89,21 @@ query=[
 ]
 ```
 
-Pull the competitor / keyword / persona terms from the tenant ICP first via
-`get_tenant_settings` (`account_research`: competitors, hot keywords, personas),
-then fold them into the phrasings. Never pass bare keywords — describe the intent
-in natural language.
+Never pass bare keywords or a lone vendor list — describe the intent in natural
+language, or the vector match degrades.
+
+## Time window — REQUIRED: ask before searching
+
+`since` (ISO `YYYY-MM-DD`) bounds how far back to look. If the user did NOT give a
+clear time window, **ASK before calling the tool** — don't silently search all of
+history. e.g. *"How far back should I look — the last 3 months, the last year, or
+all time?"* Translate their answer into `since` (omit it only for an explicit
+"all time" / no limit). Skip the question only when the user already stated a
+window ("in the last quarter", "since January", "this year").
 
 ## Threshold handling — REQUIRED behavior
 
-`threshold` is the minimum similarity (default **0.75**) — internally, how tight
+`threshold` is the minimum similarity (default **0.6**) — internally, how tight
 a match has to be. Think of it as how wide you cast the net: higher = fewer,
 tighter matches; lower = more, looser ones.
 
