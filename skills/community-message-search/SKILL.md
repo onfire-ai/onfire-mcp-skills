@@ -5,12 +5,16 @@ description: Find people and companies by what they SAID in community/social mes
 
 # community-message-search
 
-Semantic (vector) search over the Onfire community-message corpus via the
+Semantic (vector) search over Onfire's community-message data via the
 `search_community_messages` tool. You give 1–3 natural-language phrasings of
-ONE intent; each is embedded and matched by cosine similarity; the tool
-consolidates the runs and returns the **people who sent** the most relevant
-messages (LinkedIn URL, name, the message text, community, and a `query_hits`
-corroboration score). It is the message-as-signal **discovery** tool.
+ONE intent; the tool searches and returns the **people who sent** the most
+relevant messages — their LinkedIn URL, name, what they said, and when. It is
+the message-as-signal **discovery** tool.
+
+Each row also carries internal signals (a corroboration count, a similarity
+score, and the community the message came from). Those are for **your reasoning
+only** — never put them in front of the client. See *Presenting results to the
+client* below.
 
 ## Route here vs. the neighbors — DECIDE THIS FIRST
 
@@ -81,23 +85,68 @@ in natural language.
 
 ## Threshold handling — REQUIRED behavior
 
-`threshold` is the minimum cosine similarity (default **0.75**). If the response
-comes back with `needs_threshold_adjustment: true` (nothing cleared the bar),
-**do not silently retry** — tell the user and ask whether to **lower** it
-(e.g. 0.65 → more but looser matches) or refine the intent. Higher = fewer,
-tighter; lower = more, looser.
+`threshold` is the minimum similarity (default **0.75**) — internally, how tight
+a match has to be. Think of it as how wide you cast the net: higher = fewer,
+tighter matches; lower = more, looser ones.
 
-## Reading the results
+If the response comes back with `needs_threshold_adjustment: true` (nothing
+cleared the bar), **do not silently retry**. Tell the client in plain language —
+*"I didn't find a strong match for that. Want me to widen the search, or should
+we sharpen what we're looking for?"* — and let them choose. Never expose the
+numeric threshold (0.75, 0.65, …) or the word "threshold" to the client; it is
+an internal dial, not something a GTM user should have to reason about.
+
+## Reading the results (internal)
 
 - Each row is a **sender**: `intent_holder_linkedin_url`, `name`,
-  `message_text`, `community_name` / `community_type`, `date`, plus `query_hits`
-  and `score`.
+  `message_text`, `date`, plus internal-only `query_hits`, `score`, and
+  `community_name` / `community_type`.
 - **`query_hits` is the strength signal** — rows hit by 2–3 of your phrasings
-  are the strongest corroborated matches. Lead with those.
-- Results cap at `limit` (default 50). If the user wants more, call again with a
-  higher `limit`.
-- The corpus is **GLOBAL** (not company-partitioned). Relevance comes from your
+  are the strongest corroborated matches. Use it to **order** what you show
+  (best first); do not show the number itself.
+- Every returned sender is already resolved to a real person: the tool only
+  returns senders it could match to a member profile **that has a LinkedIn
+  URL**, and `name` is their real name when known (falling back to the handle).
+  So `intent_holder_linkedin_url` is always populated — there are no "anonymous
+  handle" rows to explain away.
+- Results cap at `limit` (default 50). If the client wants more, call again with
+  a higher `limit`.
+- The data is **GLOBAL** (not company-partitioned). Relevance comes from your
   query; firmographic narrowing happens downstream (next section).
+
+## Presenting results to the client
+
+The client is a GTM / sales person, not an engineer. Translate every result
+into plain business language. **Lead with the people and what they're saying.**
+
+**Always show, per person:**
+- The person's **name** (or their handle if that's all we have).
+- Their **LinkedIn URL** (`intent_holder_linkedin_url`) — always present, since
+  the tool only returns senders it could resolve to a profile. Show it as a
+  clickable link.
+- **What they said** — a short, readable paraphrase or the message itself.
+- The **date** of the message (`date`), formatted readably (e.g. "Mar 2026").
+
+A clean default table:
+
+| Person | LinkedIn | What they're saying | Date |
+| --- | --- | --- | --- |
+| Jane Doe | linkedin.com/in/janedoe | Evaluating SAST tools to replace Snyk | Mar 2026 |
+
+**Never show the client:**
+- The **community / platform** a message came from (e.g. "r/devops", "Reddit",
+  "Discord", "Slack", a channel or subreddit name) — or any breakdown of where
+  results came from ("~77% Reddit"). Drop it entirely.
+- The **`query_hits` / "Hits" column**, the similarity **score**, the
+  **threshold** (0.75 / 0.66 / …), or counts framed as corpus sizes.
+- Internal vocabulary: "corpus", "embedding", "cosine", "vector", "threshold",
+  "tightness", "corroborated by N of my search angles", result counts as
+  "sizes". Speak in terms of *people*, *what they're saying*, and *when*.
+
+If nothing comes back (`needs_threshold_adjustment: true` — either nothing
+matched, or no sender resolved to a contactable profile), say so plainly and
+offer to widen the search. Never expose the threshold number or frame the reason
+in technical terms.
 
 ## Building a prospect list (combine with the entity tools)
 
@@ -124,7 +173,14 @@ the user asks for more.
   angle → `community-messages-sentiment`. This tool does not score opinion.
 - **One phrasing instead of three.** You lose the corroboration ranking.
 - **Bare keywords.** Describe the intent; the match is semantic.
-- **Treating it as tenant-scoped.** Global corpus; narrow firmographically
+- **Treating it as tenant-scoped.** Global data; narrow firmographically
   downstream with the entity tools.
 - **Silently lowering the threshold on an empty result.** Surface
-  `needs_threshold_adjustment` and let the user choose.
+  `needs_threshold_adjustment` and let the client choose — in plain language.
+- **Leaking internal mechanics to the client.** No threshold/score/`query_hits`/
+  "Hits" column, no "corpus"/"embedding"/"vector" talk, no result counts as
+  "sizes". See *Presenting results to the client*.
+- **Naming the community / platform.** Never show "r/devops", "Reddit",
+  "Discord", a channel/subreddit, or a where-it-came-from breakdown.
+- **Hiding the date or LinkedIn URL.** Both go in the client output whenever
+  available.
