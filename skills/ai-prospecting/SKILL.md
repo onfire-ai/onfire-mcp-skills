@@ -1,27 +1,37 @@
 ---
 name: ai-prospecting
-description: Run AI prospecting against a target company (rank likely buyers/champions) or score a single named person at a company using the Onfire `ai_prospecting` tool. Use when the user wants prospects for an account, a ranked list of who to talk to, a score on a specific person ("is X worth a meeting"), or a batch run across multiple companies. Covers both `action='run'` and `action='get_prospect'`, the dataset-backed response and how to query it, the polling pattern for long runs, and the shadow-schema test mode.
+description: Run AI prospecting against a target company to rank the likely buyers/champions to approach at that ACCOUNT, using the Onfire `ai_prospecting` tool. Use when the user wants prospects for an account, a ranked list of who to talk to at a company, or a batch run across multiple companies, and wants the engine to decide who is best. NOT for deterministic title/persona/seniority/location/technology lookups (route those to `ask_onfire` over the contact entity) or single-person "is X worth a meeting" checks. Covers `action='run'`, the dataset-backed response and how to query it, the polling pattern for long runs, and the shadow-schema test mode.
 ---
 
 # ai_prospecting (atomic)
 
-Phoenix is the prospecting engine. This tool either ranks prospects for a company (`action="run"`) or scores one named person at a company (`action="get_prospect"`).
+Phoenix is the prospecting engine. This tool answers ONE question — "who are the best prospects (likely buyers / champions) to approach at this ACCOUNT?" — and lets Phoenix's model decide who. It ranks prospects for a company via the single action `action="run"`. It is **not** a people search and has no single-person scoring path.
 
 ## When to use this
 
 - The user wants buyers / champions / a "who should I talk to" list at a company.
-- The user names a person and asks if they're worth pursuing → `action="get_prospect"`.
 - A batch run across many companies (still uses `action="run"`).
+- In short: the user asks the engine to **surface the best prospects for an account** and leaves the *who* up to the model.
 
 Don't use this for identity resolution alone (use `match-company` / `match-person`) or for emails / phones (use `contact-data-enrichment`).
 
+## When NOT to use this — vs `ask_onfire`
+
+`ai_prospecting` is account-level ranking only. It is the wrong tool when the user has already decided *which* people they want, or names one specific person:
+
+- **The user specifies WHICH people by deterministic criteria** — a title, seniority, persona, location, or technology (e.g. "get me the top-level CISOs at Microsoft", "VPs of Security at US banks", "data engineers at Stripe"). That is a filter query → route to the **`ask_onfire`** tool over the contact entity, NOT `ai_prospecting`. Phoenix doesn't take title/seniority/persona filters; if you feed it one you'll get its own ranked picks, not the filtered set the user asked for.
+- **The user names ONE specific person and asks if they're worth pursuing** ("is Jane Doe worth a meeting?"). `ai_prospecting` has no path for this — there is no single-person scoring. Do not use it.
+- **Identity / LinkedIn URL resolution** → `match_company` / `match_person`.
+- **Emails / phones** → `contact_data_enrichment`.
+
+**Litmus test:** if the request *names the people or their criteria* → `ask_onfire`. If it asks the engine to *surface the best prospects for an account* → `ai_prospecting`.
+
 ## Inputs you need first
 
-Both actions require a **company LinkedIn URL**. `get_prospect` also requires a **person LinkedIn URL**.
+`action="run"` requires a **company LinkedIn URL** (one, or a batch list).
 
-If you don't have them, run the upstream atomic first:
+If you don't have it, run the upstream atomic first:
 - Missing company LinkedIn → `match-company`.
-- Missing person LinkedIn → `match-person` (it usually returns the company LinkedIn URL too — reuse it).
 
 ## action="run" — rank prospects for a company
 
@@ -44,18 +54,6 @@ ai_prospecting(action="run", linkedin_urls=[
 **Optional flags:**
 - `use_cache=True` — let Phoenix return cached results from a recent identical run instead of recomputing. Use only when it's clearly a re-run of something already executed in this conversation. Default `False`.
 - `activate_shadow_run=True` — run against the caller's shadow schema instead of the live team schema. Use when the user is iterating on schema config via `manage-ai-prospecting`. Default `False`. **404 from this means there is no shadow yet — call `create_shadow` first via `manage-ai-prospecting`.**
-
-## action="get_prospect" — score one person
-
-```python
-ai_prospecting(
-    action="get_prospect",
-    company_linkedin_url="https://linkedin.com/company/frostbyte",
-    person_linkedin="https://linkedin.com/in/lana-patel"
-)
-```
-
-Both URLs required. `linkedin_urls`, `use_cache`, and `activate_shadow_run` don't apply here.
 
 ## The polling pattern (don't skip this)
 
@@ -122,43 +120,44 @@ The content is byte-stable within a server version, so re-fetching mid-conversat
     "id": "ds_abc123…",
     "source": "ai_prospecting",
     "row_count": 42,
-    "columns": ["FULL_NAME", "LINKEDIN_URL", "TITLE_NAME", "MASTER_SCORE_PRIORITY", "MASTER_SCORE_REASON", "SCORE_WARM_INTRO", "WORKED_IN_CLIENT_COMPANY_IN_PAST", "CONNECTING_EMPLOYEE_NAME", "product_talking_points", "ai_reasoning", "..."],
+    "columns": ["FULL_NAME", "LINKEDIN_URL", "TITLE_NAME", "HEADLINE", "LOCATION_COUNTRY", "LOCATION_REGION", "COMPANY_NAME_DISPLAY", "COMPANY_LINKEDIN_URL", "CURRENT_PERSONAS", "prospect_tags", "WORKED_IN_CLIENT_COMPANY_IN_PAST", "CONNECTING_EMPLOYEE_NAME", "product_talking_points", "ai_reasoning", "..."],
     "schema": [{"name": "FULL_NAME", "type": "string"}, ...],
     "created_at": "...",
     "expires_at": "...",
-    "facets": { "MASTER_SCORE_PRIORITY": {"1": 38, "2": 4}, "SCORE_WARM_INTRO": {"PLATINUM": 15, "GOLD": 4, "COLD": 23}, ... }
+    "facets": { "WORKED_IN_CLIENT_COMPANY_IN_PAST": {"true": 5, "false": 37}, "CURRENT_PERSONAS": {...}, ... }
   },
-  "top_picks": [ /* ranked "start here" top 5, each row carrying the full broad column set */ ],
+  "top_picks": [ /* "start here" top 5 in Phoenix's native best-first order, each row carrying the full broad column set */ ],
   "priority_summary": {
-    "tier_1_prospects": 38,
-    "platinum_warm_intros": 15,
-    "gold_warm_intros": 4,
     "existing_customer_alumni": 5,
-    "with_named_connector": 39,
-    "tech_champions": 1
+    "with_named_connector": 39
   },
-  "preview_rows": [ /* up to 5 already-projected full prospect rows, scored order */ ],
-  "facets": { "MASTER_SCORE_PRIORITY": {...}, "SCORE_WARM_INTRO": {...}, "WORKED_IN_CLIENT_COMPANY_IN_PAST": {...}, "prospect_tags": {...}, "CURRENT_PERSONAS": {...}, "COMPANY_LINKEDIN_URL": {...} },
+  "preview_rows": [ /* up to 5 already-projected full prospect rows, in returned order */ ],
+  "facets": { "WORKED_IN_CLIENT_COMPANY_IN_PAST": {...}, "prospect_tags": {...}, "CURRENT_PERSONAS": {...}, "COMPANY_LINKEDIN_URL": {...} },
   "total_prospects": 67,
   "filtered_prospects": 42,
   "ranking_method": "individual",
-  "message": "Full AI prospecting results (42 prospect(s)) are available via query_datasets / describe_dataset using dataset_id='ds_abc123…'. Use top_picks for a ranked \"start here\" subset and priority_summary for the tier distribution at a glance."
+  "message": "Full AI prospecting results (42 prospect(s)) are available via query_datasets / describe_dataset using dataset_id='ds_abc123…'. Use top_picks for a \"start here\" subset and priority_summary for the alumni / named-connector counts at a glance."
 }
 ```
 
-### top_picks (preview shape only — the ranked "start here" subset)
+### top_picks (preview shape only — the "start here" subset)
 
-Ranked top-N projection ordered by Phoenix's canonical `rank_position` (which already weights warm-intro tier above raw composite — a PLATINUM direct-alumni connection outranks a higher-composite GOLD). **Each top-pick row carries the full broad column set** — identity, every score component (composite + buyer + tech-champion + receptiveness + urgency + authority), `CURRENT_PERSONAS`, the full warm-intro path, career-momentum signals (`MONTHS_SINCE_LAST_PROMOTION`, `BUDGET_MANAGEMENT_EXPERIENCE`), `PAST_COMPANIES_USED_CLIENT_TECH`, `ai_reasoning` (cleaned, markdown-bolded), `relevancy_reasoning`, and `product_talking_points`.
+Top-N projection in Phoenix's **native best-first order** — Phoenix already returns rows ranked by its model (warm-intro path, persona fit, momentum and the rest weighed internally); the scores themselves are not exposed. **Each top-pick row carries the full broad column set** — identity, `CURRENT_PERSONAS`, `prospect_tags`, the full warm-intro path, career-momentum signals (`MONTHS_SINCE_LAST_PROMOTION`, `BUDGET_MANAGEMENT_EXPERIENCE`), `PAST_COMPANIES_USED_CLIENT_TECH`, signals / events / `product_talking_points`, and `ai_reasoning` (cleaned, markdown-bolded).
 
-Render every row in top_picks as a complete prospect card using the canonical template above — not a one-line paraphrase. Top_picks is the "start here" set; if filtered_prospects > 5 (or whatever the configured `_TOP_PICKS_COUNT` is), `preview_rows` carries the next slice and the dataset has the rest.
+Render every row in top_picks as a complete prospect card using the canonical template above — not a one-line paraphrase. Top_picks is the "start here" set; if filtered_prospects > 5 (or whatever the configured `_TOP_PICKS_COUNT` is), `preview_rows` carries the next rows in returned order and the dataset has the rest.
 
 ### priority_summary (the BDR-facing lede)
 
-Pre-computed count histograms that let you write the one-line summary without re-reading every row. Paraphrase naturally, e.g. "5 PLATINUM warm intros and 5 alumni — start there." All values are integers.
+Pre-computed counts that let you write the one-line summary without re-reading every row. Exactly two keys:
+
+- `existing_customer_alumni` — prospects who used to work at the client company (the highest-value expansion signal).
+- `with_named_connector` — prospects who have a named warm-intro connector you can ping.
+
+Paraphrase naturally, e.g. "5 alumni and 39 with a named connector — start there." Both values are integers.
 
 ### preview_rows (preview shape only — the next slice after top_picks)
 
-Up to 5 full projected prospect rows in scored order (same broad column set as top_picks). Render every row with the same prospect-card template — `preview_rows` is not a "sanity-check sample" to glance at, it's the rows immediately after the top_picks subset and deserves the same treatment.
+Up to 5 full projected prospect rows in returned (best-first) order (same broad column set as top_picks). Render every row with the same prospect-card template — `preview_rows` is not a "sanity-check sample" to glance at, it's the rows immediately after the top_picks subset and deserves the same treatment.
 
 ### prospects (inline shape only — every row, every field)
 
@@ -166,18 +165,18 @@ Present when `filtered_prospects ≤ _SMALL_RUN_INLINE_THRESHOLD` or when the se
 
 ### Full projected field set
 
-Each prospect row in the dataset (and in `preview_rows`) carries the broad field set Phoenix actually computes — identity, ranking + tier, persona classification, warm-intro path, signals + ready-made talking points, career momentum, narrative reasoning, and filter transparency. Notable named fields:
+Each prospect row in the dataset (and in `preview_rows`) carries the broad field set Phoenix exposes — identity, persona classification, warm-intro path, signals + ready-made talking points, career momentum, and narrative reasoning. Rows arrive in Phoenix's native best-first order; the model's internal scores are **not** exposed. Notable named fields:
 
 | Group | Fields |
 |---|---|
 | Identity | `FULL_NAME`, `LINKEDIN_URL`, `TITLE_NAME`, `HEADLINE`, `LOCATION_COUNTRY`, `LOCATION_REGION`, `COMPANY_NAME_DISPLAY`, `COMPANY_LINKEDIN_URL` |
-| Ranking + tier | `rank_position`, `MASTER_SCORE_PRIORITY`, `MASTER_SCORE_REASON`, `AUTHORITY_SCORE`, `COMPOSITE_SCORE`, `SCORE_BUYER`, `SCORE_TECH_CHAMPION`, `SCORE_RECEPTIVENESS`, `SCORE_URGENCY`, `SCORE_WARM_INTRO` |
-| Persona | `CURRENT_PERSONAS`, `prospect_tags`, `RELEVANT_IC` |
+| Persona | `CURRENT_PERSONAS`, `prospect_tags` |
 | Warm-intro path | `WORKED_IN_CLIENT_COMPANY_IN_PAST`, `TITLE_AT_CLIENT_COMPANY`, `PAST_COMPANIES_USED_CLIENT_TECH`, `CONNECTING_EMPLOYEE_NAME`, `SHARED_COMPANY`, `CONNECTION_STRENGTH_SCORE` |
-| Signals + outreach payload | `signals`, `events`, `product_talking_points`, `PROSPECT_CURR_CLIENT_TECH_TEXT` |
+| Signals + outreach payload | `signals`, `events`, `product_talking_points` |
 | Career momentum | `MONTHS_SINCE_LAST_PROMOTION`, `BUDGET_MANAGEMENT_EXPERIENCE` |
-| Narrative | `ai_reasoning`, `relevancy_reasoning` |
-| Filter transparency | `should_filter_reason` |
+| Narrative | `ai_reasoning` |
+
+**No score fields are returned** — there is no `rank_position`, no `MASTER_SCORE_*`, no `COMPOSITE_SCORE` or sub-scores, no `relevancy_reasoning` or `should_filter_reason`. Take rows in the order Phoenix returns them.
 
 **Don't promise fields outside this set** — no emails, no phones, no full tenure history. If the user asks for emails/phones, that's `contact-data-enrichment`.
 
@@ -229,11 +228,7 @@ query_datasets(
 )
 ```
 
-`facets` on the response are pre-computed distribution counts over the prioritization-driving dimensions: `MASTER_SCORE_PRIORITY` (tier histogram), `SCORE_WARM_INTRO` (PLATINUM/GOLD/COLD counts), `WORKED_IN_CLIENT_COMPANY_IN_PAST` (alumni count), `prospect_tags` (which product/category tags appear), `CURRENT_PERSONAS` (persona match distribution), and `COMPANY_LINKEDIN_URL` (per-company breakdown for batch runs). Use these for quick "what's the shape of this run?" answers without a `query_datasets` round-trip. **Location facets were intentionally removed** — `LOCATION_COUNTRY`/`LOCATION_REGION` are still per-row fields in the dataset but aren't what a BDR prioritizes on; if a user really wants a geographic breakdown, run `query_datasets` with `GROUP BY LOCATION_COUNTRY`.
-
-## Output shape (action="get_prospect")
-
-A single scored prospect record returned **inline** (no dataset — it's just one row). Same trimmed field set as the run dataset, plus the AI score and reasoning for that person specifically.
+`facets` on the response are pre-computed distribution counts over the prioritization-driving dimensions: `WORKED_IN_CLIENT_COMPANY_IN_PAST` (alumni count), `prospect_tags` (which product/category tags appear), `CURRENT_PERSONAS` (persona match distribution), and `COMPANY_LINKEDIN_URL` (per-company breakdown for batch runs). Use these for quick "what's the shape of this run?" answers without a `query_datasets` round-trip. There are no score-based facets — Phoenix's internal scores aren't exposed. **Location facets were intentionally removed** — `LOCATION_COUNTRY`/`LOCATION_REGION` are still per-row fields in the dataset but aren't what a BDR prioritizes on; if a user really wants a geographic breakdown, run `query_datasets` with `GROUP BY LOCATION_COUNTRY`.
 
 ## ai_reasoning is already display-ready
 
@@ -254,11 +249,11 @@ Two response shapes; pick the right one and render every prospect as a complete 
 
 Paraphrase `priority_summary` into a single BDR-facing sentence before any list. Examples:
 
-> "5 PLATINUM warm intros and 5 alumni connections to start with — out of 42 total prospects."
-> "No warm intros on this run, but 3 prospects scored as true tech champions."
-> "All 20 are tier-1; warm-intro paths skew GOLD (15) vs. PLATINUM (5)."
+> "5 alumni connections and 39 with a named warm-intro connector — out of 42 total prospects."
+> "No alumni on this run, but 30 of the 42 have a named connector to reach them through."
+> "All 20 have a named connector; 5 are former employees of the client — start there."
 
-Pick whichever count is highest-signal for the run. Order of preference: `existing_customer_alumni` > `platinum_warm_intros` > `gold_warm_intros` > `tech_champions` > `tier_1_prospects`. If everything is zero, just give the total count.
+Pick whichever count is highest-signal for the run. Order of preference: `existing_customer_alumni` > `with_named_connector`. If both are zero, just give the total count.
 
 ### Step 2 — Render every available prospect as a full card
 
@@ -270,9 +265,8 @@ The canonical prospect-card template is below. **Every field in the no-drop list
 
 ```
 **N. {FULL_NAME}** — {TITLE_NAME} ({LOCATION_REGION}, {LOCATION_COUNTRY})
-[{LINKEDIN_URL}]({LINKEDIN_URL}) · {SCORE_WARM_INTRO} warm intro via {CONNECTING_EMPLOYEE_NAME} ({SHARED_COMPANY}) · Composite {COMPOSITE_SCORE:.0f}
+[{LINKEDIN_URL}]({LINKEDIN_URL}) · warm intro via {CONNECTING_EMPLOYEE_NAME} ({SHARED_COMPANY})
 
-Score breakdown: buyer {SCORE_BUYER}, tech champion {SCORE_TECH_CHAMPION}, receptiveness {SCORE_RECEPTIVENESS}, urgency {SCORE_URGENCY}. Authority {AUTHORITY_SCORE}/5.
 Persona match: {top three persona names by weight from CURRENT_PERSONAS, e.g. "devsecops 9.2, engineering 9.2, code_contributor 9.2"}.
 Career momentum: {MONTHS_SINCE_LAST_PROMOTION} months since last promotion{ · budget management experience if BUDGET_MANAGEMENT_EXPERIENCE = true}.
 Past employers with relevant tech: {PAST_COMPANIES_USED_CLIENT_TECH, only if non-empty}.
@@ -285,28 +279,26 @@ Talking point: {first value from product_talking_points dict, only if non-empty}
 If a field is `None`, empty, or `false`, drop **that one line** but keep the rest of the card. Do not collapse the whole card.
 
 Format notes:
-- If `SCORE_WARM_INTRO == "COLD"` and `CONNECTING_EMPLOYEE_NAME` is empty, the warm-intro line becomes `COLD · no warm-intro path available`.
+- If `CONNECTING_EMPLOYEE_NAME` is empty, the warm-intro line becomes `no warm-intro path available`.
 - If `WORKED_IN_CLIENT_COMPANY_IN_PAST` is `true`, prepend the warm-intro line with `**Alumni** — used to work at the client company` (highest-value expansion signal).
 - `CURRENT_PERSONAS` is a JSON-encoded list of single-key dicts like `[{"engineering": 9.2}, {"devops": 4.6}]`. Parse, sort by weight desc, take top 3.
-- `COMPOSITE_SCORE` is bounded 0-1500; render as `{:.0f}` (no decimal noise).
 
 #### No-drop fields list
 
 These fields are sales-actionable. If they are present on the row, they appear in the rendered card. Never silently drop:
 
 1. `FULL_NAME`, `TITLE_NAME`, `LINKEDIN_URL`, `LOCATION_COUNTRY`, `LOCATION_REGION`
-2. `SCORE_WARM_INTRO` + `CONNECTING_EMPLOYEE_NAME` + `SHARED_COMPANY` (the reachability story)
+2. `CONNECTING_EMPLOYEE_NAME` + `SHARED_COMPANY` (the reachability story)
 3. `WORKED_IN_CLIENT_COMPANY_IN_PAST` (alumni flag — call it out explicitly when true)
-4. `COMPOSITE_SCORE` + the four sub-scores (`SCORE_BUYER`, `SCORE_TECH_CHAMPION`, `SCORE_RECEPTIVENESS`, `SCORE_URGENCY`) + `AUTHORITY_SCORE`
-5. Top 3 personas from `CURRENT_PERSONAS` with their weights
-6. `MONTHS_SINCE_LAST_PROMOTION` and `BUDGET_MANAGEMENT_EXPERIENCE` (the "why now" signals)
-7. `PAST_COMPANIES_USED_CLIENT_TECH` (prior-exposure signal — high credibility hook)
-8. `ai_reasoning` verbatim (it is structured + bolded + evidence-quoted already)
-9. `product_talking_points` first entry (Phoenix wrote the opener — don't invent your own)
+4. Top 3 personas from `CURRENT_PERSONAS` with their weights
+5. `MONTHS_SINCE_LAST_PROMOTION` and `BUDGET_MANAGEMENT_EXPERIENCE` (the "why now" signals)
+6. `PAST_COMPANIES_USED_CLIENT_TECH` (prior-exposure signal — high credibility hook)
+7. `ai_reasoning` verbatim (it is structured + bolded + evidence-quoted already)
+8. `product_talking_points` first entry (Phoenix wrote the opener — don't invent your own)
 
 ### Step 3 — Tail block (counts + dataset_id)
 
-After the cards, give one concise paragraph: total surfaced → filtered, tier distribution from `priority_summary`, warm-intro tier counts, and the `dataset_id`. This is the "what's in the rest of the dataset" footer.
+After the cards, give one concise paragraph: total surfaced → filtered, the alumni / named-connector counts from `priority_summary`, and the `dataset_id`. This is the "what's in the rest of the dataset" footer.
 
 ### Step 4 — Make the enrichment + download offers (next section)
 
@@ -318,16 +310,15 @@ The same four-step flow applies, but the lede should mention per-company spread 
 
 ### Long lists / pagination
 
-On preview shape, after rendering top_picks + preview_rows, pull the remaining rows via `query_datasets({"p": dataset_id}, "SELECT * FROM p ORDER BY rank_position LIMIT N OFFSET K")` — note the explicit `ORDER BY rank_position` so pagination respects Phoenix's canonical order, and `SELECT *` so you don't silently drop high-leverage fields. Render those rows with the same prospect-card template. If the user wants the file rather than a paged view, call `download_dataset(dataset_id)` and surface the returned `download_url` — that's the canonical CSV. For a download of just a slice (e.g. "top 50 by score"), run the slice through `query_datasets(..., persist_as_dataset=True)` first to get a new `dataset_id`, then `download_dataset` on that.
+On preview shape, after rendering top_picks + preview_rows, pull the remaining rows via `query_datasets({"p": dataset_id}, "SELECT * FROM p LIMIT N OFFSET K")` — the dataset is already stored in Phoenix's native best-first order, so plain `LIMIT`/`OFFSET` paginates in that order (there is no `rank_position` or score column to sort on). Use `SELECT *` so you don't silently drop high-leverage fields. Render those rows with the same prospect-card template. If the user wants the file rather than a paged view, call `download_dataset(dataset_id)` and surface the returned `download_url` — that's the canonical CSV. For a download of just a slice (e.g. "the first 50"), run the slice through `query_datasets(..., persist_as_dataset=True)` first to get a new `dataset_id`, then `download_dataset` on that.
 
 ### Worked example — what a rendered prospect card actually looks like
 
 For an Artifex-tenant run against Continental Bank, the third prospect's card should look like:
 
 > **3. Karthik Velayudhasamy** — SVP, Senior Tech Manager – Application Development (California, United States)
-> [linkedin.com/in/karthikeyan-velayudhasamy](https://linkedin.com/in/karthikeyan-velayudhasamy) · **GOLD** warm intro via Rick Borden (Continental Bank) · Composite 712
+> [linkedin.com/in/karthikeyan-velayudhasamy](https://linkedin.com/in/karthikeyan-velayudhasamy) · warm intro via Rick Borden (Continental Bank)
 >
-> Score breakdown: buyer 80, tech champion 312, receptiveness 60, urgency 50. Authority 5/5.
 > Persona match: engineering 12.2, architect 12.2, devsecops 8.1.
 > Career momentum: 9 months since last promotion · budget management experience.
 > Past employers with relevant tech: cdk global | jpmorgan chase | northern trust.
@@ -343,7 +334,7 @@ This is what every card should look like — not a one-line summary, not a parap
 
 ## The enrichment offer (required, not optional)
 
-After **every** run — single, batch, get_prospect, no matter what — tell the user they can pull verified emails and phones for any of the returned prospects. Not just the top N you displayed in `preview_rows`; **all** of them are available to enrich. Most of the workflow's value is downstream of contact data, and users frequently assume contact data is gated to whatever's on screen.
+After **every** run — single run or batch run, no matter what — tell the user they can pull verified emails and phones for any of the returned prospects. Not just the top N you displayed in `preview_rows`; **all** of them are available to enrich. Most of the workflow's value is downstream of contact data, and users frequently assume contact data is gated to whatever's on screen.
 
 Phrase it naturally:
 
@@ -365,7 +356,8 @@ If the user already asked for a file (any phrasing — "send", "export", "downlo
 
 - **Never pass `target_tenant_id`.** Tenant comes from OAuth. The override is super-tenant only and will error for everyone else.
 - **Polling is mandatory** — `{"status": "still_running"}` means call again, preferably with `run_ids` from the response (or identical args if no `run_ids` are present yet).
-- **Don't invent fields outside the projected set.** The dataset carries the field set documented in the table above — no emails, no phones, no full tenure history. If the user asks for those, route to `contact-data-enrichment`.
+- **Don't invent fields outside the projected set.** The dataset carries the field set documented in the table above — no emails, no phones, no full tenure history, and no score fields (`rank_position`, `MASTER_SCORE_*`, `COMPOSITE_SCORE` and the like are not returned). If the user asks for emails/phones, route to `contact-data-enrichment`.
+- **Take rows in returned order.** Phoenix returns prospects already in best-first order; there is no score or `rank_position` column to sort or paginate on. Don't tell the agent to sort by a score.
 - **Render every available row as a full prospect card.** On inline shape, render every prospect. On preview shape, render every row in `top_picks` and `preview_rows`. Drop a card-line only when its underlying field is null/empty — never silently skip a no-drop field on row 4 that you showed on row 1. Consistency across rows is the contract.
 - **Render `ai_reasoning` verbatim.** Server already converts the `$$-onfire-bold-$$` sentinels to markdown bold and strips JSON-leak artifacts. Don't paraphrase the bullets into a one-liner — that's where the evidence quotes live.
 - **Use the named warm-intro connector.** If `CONNECTING_EMPLOYEE_NAME` is populated, name them; that's the introduction path.
@@ -383,7 +375,7 @@ If the user already asked for a file (any phrasing — "send", "export", "downlo
 - **Missing the alumni callout.** `WORKED_IN_CLIENT_COMPANY_IN_PAST=TRUE` is the highest-value expansion signal in the response. If any row has it, prepend the warm-intro line with the alumni callout.
 - **Treating `still_running` as an error.** It's the documented async signal. Just call again — pass back the `run_ids` if present.
 - **Forgetting to pass `run_ids` on the retry when they were surfaced.** Both paths work (identical args also dedups server-side), but passing `run_ids` is one round-trip cheaper and signals to the server "I'm resuming, not starting over."
-- **Treating `top_picks` or `preview_rows` as the full list on preview shape.** They're ranked subsets; the rest live in the dataset. Pull more via `query_datasets("SELECT * FROM p ORDER BY rank_position LIMIT N OFFSET K")` and render with the same card template.
+- **Treating `top_picks` or `preview_rows` as the full list on preview shape.** They're the best-first subsets; the rest live in the dataset. Pull more via `query_datasets("SELECT * FROM p LIMIT N OFFSET K")` (the dataset is already in best-first order) and render with the same card template.
 - **Re-running `ai_prospecting` to "see more."** Use the dataset tools instead — the run already produced the full list.
 - **Mixing `linkedin_urls` and `company_linkedin_url`.** Pick one — `linkedin_urls` wins if both are set, but it's clearer to use only the one you need.
 - **Skipping the enrichment offer.** It's the single most important post-run behavior; users keep asking "can I get emails?" because we forgot to tell them yes.
@@ -400,24 +392,25 @@ If the user already asked for a file (any phrasing — "send", "export", "downlo
    - response has ``prospects`` → inline shape, render EVERY row.
    - response has ``top_picks`` + ``preview_rows`` → preview shape,
      render every row in both, then pull the rest via
-     query_datasets("SELECT * FROM p ORDER BY rank_position") if
+     query_datasets("SELECT * FROM p") if
      filtered_prospects > rows-in-hand and the user wants them all.
-5. Open with the priority_summary lede (one line: tier-1 count,
-   warm-intro tier counts, alumni count — whichever is highest-signal).
+5. Open with the priority_summary lede (one line: alumni count,
+   named-connector count — whichever is highest-signal).
 6. Render every prospect using the canonical card template above. Every
    no-drop field on every card where the underlying value is present.
    ai_reasoning rendered verbatim (markdown bold + quoted evidence
    already in place).
-7. Tail block: total surfaced → filtered, tier distribution from
-   priority_summary, dataset_id.
+7. Tail block: total surfaced → filtered, alumni / named-connector
+   counts from priority_summary, dataset_id.
 8. Make the enrichment + download offers.
 ```
 
-**Score a specific person.**
+**Deterministic people lookup — NOT this tool.**
 ```
-1. match-person on "Lana Patel, VP Eng at Frostbyte" → person + company linkedin urls
-2. ai_prospecting(action="get_prospect", company_linkedin_url=..., person_linkedin=...)
-3. Show score + reasoning (inline, no dataset). Make the enrichment offer.
+User: "get me the top-level CISOs at Microsoft"
+→ This names the criteria (title/seniority). Route to ask_onfire over the
+  contact entity, NOT ai_prospecting. ai_prospecting would return its own
+  ranked picks, not the CISO filter the user asked for.
 ```
 
 **Batch run, 30 accounts.**
@@ -431,7 +424,7 @@ If the user already asked for a file (any phrasing — "send", "export", "downlo
    (the cross-account "start here" set). If the user wants per-company
    grouping, query_datasets with GROUP BY COMPANY_LINKEDIN_URL.
 5. For "show me all 42" requests, query_datasets(
-   "SELECT * FROM p ORDER BY rank_position") and render each as a card.
+   "SELECT * FROM p") and render each as a card.
 6. Offer xlsx / CSV export via download_dataset(dataset_id).
 7. Make the enrichment offer.
 ```
@@ -439,15 +432,14 @@ If the user already asked for a file (any phrasing — "send", "export", "downlo
 **Drilling in after a run.**
 ```
 1. ai_prospecting(action="run", ...) → dataset_id="ds_abc"
-2. User: "Just the alumni ones, ranked"
+2. User: "Just the alumni ones"
 3. query_datasets(
      datasets={"p": "ds_abc"},
      sql="""SELECT FULL_NAME, TITLE_NAME, LINKEDIN_URL,
-            MASTER_SCORE_REASON, CONNECTING_EMPLOYEE_NAME, SHARED_COMPANY,
+            CONNECTING_EMPLOYEE_NAME, SHARED_COMPANY,
             ai_reasoning
             FROM p
-            WHERE WORKED_IN_CLIENT_COMPANY_IN_PAST = 'TRUE'
-            ORDER BY rank_position""",
+            WHERE WORKED_IN_CLIENT_COMPANY_IN_PAST = 'TRUE'""",
    )
 4. Render the slice (same prioritization rendering as top_picks).
    Re-iterate the enrichment offer.

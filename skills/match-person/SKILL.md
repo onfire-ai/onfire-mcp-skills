@@ -1,6 +1,6 @@
 ---
 name: match-person
-description: Resolve a person (from name, email, and/or company context) to a verified LinkedIn profile plus current title and employer using the Onfire `match_person` tool. Use when you have a person reference but no LinkedIn URL, when CRM contacts need identity resolution before enrichment, or as the upstream step before `ai_prospecting(action="get_prospect")` or `contact_data_enrichment` on rows missing LinkedIn URLs.
+description: Resolve a person (from name, email, and/or company context) to a verified LinkedIn profile plus current title and employer using the Onfire `match_person` tool. Use when you have a person reference but no LinkedIn URL, when CRM contacts need identity resolution before enrichment, or as the upstream step before `contact_data_enrichment` on rows missing LinkedIn URLs.
 ---
 
 # match_person (atomic)
@@ -9,7 +9,7 @@ Resolves people via Onfire's Matchbox2 engine. Vector search + AI matching, so i
 
 ## When to use this
 
-- You have a person but no LinkedIn URL and need to score them.
+- You have a person but no LinkedIn URL and need to resolve their identity (e.g. before enrichment).
 - A list of CRM contacts needs LinkedIn URLs before enrichment.
 - You want to verify the person at a company (e.g. confirm they still work there).
 
@@ -74,7 +74,7 @@ Same-order alignment with the input. The output already includes `company_linked
 ## Common pitfalls
 
 - **Skipping `company_name` on a name-only lookup.** The tool will refuse — fix the input rather than retrying blindly.
-- **Throwing away the returned `company_linkedin_url`.** It saves you a `match_company` call when you go on to `ai_prospecting(action="get_prospect")`.
+- **Throwing away the returned `company_linkedin_url`.** It saves you a `match_company` call when you go on to `ai_prospecting` or other company-scoped tools.
 - **Conflating low `match_score` with "no such person".** Often it just means the signals were thin. Add `job_title` or company website and retry.
 
 ## Worked examples
@@ -87,7 +87,7 @@ match_person(entities=[{
     "job_title": "VP Eng"
 }])
 ```
-Use the returned `linkedin_url` and `company_linkedin_url` for `ai_prospecting(action="get_prospect", ...)`.
+Use the returned `linkedin_url` for `contact_data_enrichment`, and the `company_linkedin_url` for company-scoped tools.
 
 **Bulk CRM resolve.**
 ```python
@@ -106,6 +106,6 @@ Works without name or company. Useful for inbound lead lists.
 
 ## What this skill does NOT do
 
-- It doesn't score the person — that's `ai-prospecting` (action `get_prospect`).
+- It doesn't score or rank prospects — that's `ai-prospecting` (account-level ranking, not single-person scoring).
 - It doesn't resolve companies on their own — that's `match-company`.
 - It doesn't return emails or phones — that's `contact-data-enrichment`.
