@@ -269,7 +269,7 @@ Before declaring Phase 1 complete, the agent should verify:
 | Check | How |
 |---|---|
 | Title movement has both event types | `ds_title_movement` has ≥ 1 `net_new` and ≥ 1 `now_gone` ideally; if zero events, flag in the brief |
-| Sentiment scored the full universe | `ds_sentiment` row count matches `community_messages_sentiment` returned `row_count` |
+| Sentiment covered the full window | Ran `mode="date_range"` over the quarter; `ds_sentiment` row count = `total_returned`. If `note` flags a >10k truncation, either accept "most-recent 10k" or split by month and concatenate |
 | GitHub footprint has at least one row | `ds_github` row count > 0; if 0, the GitHub page is omitted |
 | Customer acquisition has data in-window | `ds_acquisition` row count > 0; if 0, fall back to snapshot mode |
 | Resolved sentiment authors > 50% | If less than half of opinionated external authors resolve to a current employer, flag the cross-tab as "indicative, not load-bearing" |

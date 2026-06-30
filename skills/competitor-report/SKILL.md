@@ -517,22 +517,33 @@ Join the distinct `company_linkedin_url` values from `ds_acquisition`
 to `ONFIRE.COMPANIES` for `INDUSTRY`, `SIZE`, `LOCATION_COUNTRY`,
 `EMPLOYEE_COUNT`. Persists as `ds_acq_firmo`.
 
-### 1.9 Sentiment scoring (target quarter, full universe)
+### 1.9 Sentiment scoring (target quarter, full window)
+
+Use **`mode="date_range"`** — it scores *every* message that mentions the
+competitor in the quarter (the window is the scope), so the brief keeps its
+"all community sentiment about <competitor> this quarter" claim.
 
 ```
+# First call (no `confirmed`) returns needs_confirmation with `matched_in_window`
+# = the quarter's universe size. Surface that volume, then resubmit confirmed=true.
 Onfire MCP: community_messages_sentiment(
-  keyword="<competitor_name>",
+  keywords=["<competitor_name>"],
+  sentiment_subject="Positive or negative experience with <competitor_name>",
   date_from="{q_start}",
   date_to="{q_end}",
-  sample_size=null,    # full universe; do NOT subsample
-  telemetry={intent: "Sentiment cut for the competitor brief"}
+  mode="date_range",
+  confirmed=true,          # set on the resubmit after the count gate
 )
 ```
 
-Persists as `ds_sentiment`. **Always score the full quarter universe**,
-never a sample. The brief makes claims like "every Nexagon-mentioning
-public message from Q1 2026" - that's only true if the call is
-unsampled.
+Persists as `ds_sentiment`. **`date_range` scores the full quarter window**, so
+claims like "every Nexagon-mentioning public message in Q_" are legitimate —
+*with one caveat*: the run is capped at `max_range_messages` (10k) per call. If
+`matched_in_window` exceeds the cap, the run analyzes the most recent 10k and
+says so in `note`; for very high-volume competitors, run `date_range` **per
+month** and concatenate the `ds_sentiment` datasets for true full coverage. The
+per-message LLM scorer drops off-topic messages (`discarded_off_topic`);
+`total_returned` is the scored, on-topic set persisted to `ds_sentiment`.
 
 ### 1.10 Resolve sentiment authors
 
@@ -1423,7 +1434,7 @@ After delivery, the user often asks:
 | `hide_n_labels` | `false` (sentiment cross-tabs show `n=X` per row) | Set `true` to drop the `n=X` annotations - cleaner cards, but the reader loses the row weight |
 | Vendor-trust threshold | 3 distinct dimensions | The user wants the page included regardless |
 | Customer acquisition source | `INSIGHTS_2_EVIDENCES` if allowed; PEOPLE snapshot otherwise; uploaded CSV if provided | The caller forces a path |
-| Sentiment scope | Full window universe (unsampled) | Never reduce |
+| Sentiment scope | `mode="date_range"` — every competitor-mentioning message in the quarter (capped at 10k/run; split by month if exceeded) | Don't switch to top_k for the brief — the full-window read is the point |
 | Industry buckets | 5 (Software / IT services / Public+Healthcare+Cyber+Financial / Media / Other) | Competitor has a heavy bias the bucketing doesn't expose |
 
 ## Casing notes on insight values
