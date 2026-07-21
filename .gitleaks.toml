@@ -46,6 +46,12 @@ description = "Personal LinkedIn profile URL (possible PII)"
 regex = '''linkedin\.com/in/[A-Za-z0-9%._-]+'''
 tags = ["pii", "linkedin"]
 
+[[rules]]
+id = "hidden-unicode-instruction"
+description = "Hidden/invisible Unicode (zero-width, BiDi override, or Unicode Tag) — can smuggle instructions into a skill"
+regex = '''[\x{200B}-\x{200D}\x{2060}\x{FEFF}\x{202A}-\x{202E}\x{2066}-\x{2069}\x{E0000}-\x{E007F}]'''
+tags = ["skill-safety", "hidden-unicode", "prompt-injection"]
+
 # ---------------------------------------------------------------------------
 # Allowlist — the repo's intentional synthetic placeholders (not real PII).
 # Keep this list tight: only obviously-fake documentation values belong here.
