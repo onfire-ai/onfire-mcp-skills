@@ -1,0 +1,73 @@
+title = "onfire-mcp-skills — secret + PII scan"
+
+# Keep all 160+ built-in gitleaks secret rules (API keys, tokens, private keys, …)
+[extend]
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# PII rules — the class of data surfaced in this repo's pre-publication audit
+# (real personal emails / phone numbers). Regexes are RE2 (Go) compatible and
+# \b-anchored so long numeric ids (e.g. 19-digit Gong flow ids) do not match.
+# ---------------------------------------------------------------------------
+
+[[rules]]
+id = "pii-email-address"
+description = "Email address (possible PII)"
+regex = '''[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}'''
+tags = ["pii", "email"]
+
+[[rules]]
+id = "pii-phone-e164-us"
+description = "US phone number, E.164 (+1XXXXXXXXXX) — possible PII"
+regex = '''\+1\d{10}\b'''
+tags = ["pii", "phone"]
+
+[[rules]]
+id = "pii-phone-formatted"
+description = "US phone number, separated (XXX-XXX-XXXX / (XXX) XXX XXXX) — possible PII"
+regex = '''\b\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b'''
+tags = ["pii", "phone"]
+
+[[rules]]
+id = "pii-ssn-us"
+description = "US Social Security Number"
+regex = '''\b\d{3}-\d{2}-\d{4}\b'''
+tags = ["pii", "ssn"]
+
+[[rules]]
+id = "pii-credit-card"
+description = "Credit-card number (Visa / MC / Amex / Discover)"
+regex = '''\b(?:4\d{12}(?:\d{3})?|5[1-5]\d{14}|3[47]\d{13}|6(?:011|5\d{2})\d{12})\b'''
+tags = ["pii", "credit-card"]
+
+[[rules]]
+id = "pii-linkedin-profile"
+description = "Personal LinkedIn profile URL (possible PII)"
+regex = '''linkedin\.com/in/[A-Za-z0-9%._-]+'''
+tags = ["pii", "linkedin"]
+
+# ---------------------------------------------------------------------------
+# Allowlist — the repo's intentional synthetic placeholders (not real PII).
+# Keep this list tight: only obviously-fake documentation values belong here.
+# ---------------------------------------------------------------------------
+[allowlist]
+description = "Documentation placeholders — synthetic, not real PII"
+regexTarget = "match"
+regexes = [
+  # placeholder email domains used throughout the skill examples
+  '''@(?:x|acme|co|company|yourcompany|techcorp|startup|example|random)\.(?:com|io|org)''',
+  # the two gmail example addresses (gmail.com is NOT blanket-allowlisted)
+  '''\bbob@gmail\.com\b''',
+  '''\bc@gmail\.com\b''',
+  # org contact address (company role address, not personal PII)
+  '''@onfire\.ai''',
+  # canonical fake phone number (+1 555-1234567 / 555-01xx reserved test range)
+  '''\+?1?555123456\d''',
+  '''\b555[-.]?01\d{2}\b''',
+  # placeholder LinkedIn personal handles used in the skill examples
+  '''linkedin\.com/in/(?:johndoe|janedoe|alice-smith|alicejohnson|bob-jones|\.\.\.)$''',
+]
+# don't scan the config files that legitimately contain these example patterns
+paths = [
+  '''\.gitleaks\.toml$''',
+]

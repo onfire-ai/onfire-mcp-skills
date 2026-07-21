@@ -1,0 +1,43 @@
+# Secret + PII scanning via gitleaks, managed by the pre-commit framework.
+# https://pre-commit.com  •  https://github.com/gitleaks/gitleaks
+#
+# One-time activation per clone (installs the git hooks):
+#     pre-commit install --hook-type pre-commit --hook-type pre-push
+#
+# Requires the gitleaks binary on PATH:  brew install gitleaks
+# Rules + allowlist live in .gitleaks.toml.
+minimum_pre_commit_version: "3.0.0"
+
+repos:
+  - repo: local
+    hooks:
+      # Always-on reminder — prints on every commit/push (verbose shows it even
+      # when it passes). The scanner cannot catch names or free-text contact
+      # info, so a human must still eyeball the diff.
+      - id: pii-manual-reminder
+        name: manual PII check reminder
+        entry: bash -c 'printf "\n%s\n  %s\n  %s\n\n" "⚠️ 🔒 PII CHECK — please read before you commit/push 🔒 ⚠️" "🕵️  Manually verify NO PII (names, contact details, LinkedIn URLs, real company records) is present in the branch." "🤖  Automated scanning catches emails / phones / secrets / LinkedIn URLs — but it CANNOT catch names or other free-text personal data."'
+        language: system
+        pass_filenames: false
+        always_run: true
+        verbose: true
+        stages: [pre-commit, pre-push]
+
+      # Fast gate on `git commit`: scans only the staged diff.
+      - id: gitleaks-staged
+        name: gitleaks — block secrets & PII (staged)
+        description: Fail the commit if staged changes contain secrets or PII.
+        entry: gitleaks git --staged --redact --verbose --config .gitleaks.toml
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+      # Safety net on `git push`: full-history scan, catches anything that
+      # slipped past the commit gate (e.g. a `git commit --no-verify` bypass).
+      - id: gitleaks-full
+        name: gitleaks — block secrets & PII (full history)
+        description: Fail the push if any commit in history contains secrets or PII.
+        entry: gitleaks git --redact --verbose --config .gitleaks.toml
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
