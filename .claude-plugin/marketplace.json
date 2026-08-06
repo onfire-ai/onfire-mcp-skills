@@ -6,14 +6,14 @@
     "url": "https://onfire.ai"
   },
   "metadata": {
-    "description": "Onfire MCP skills marketplace. Hosts the onfire-mcp-skills plugin: an orchestrator skill plus five atomic skills (one per Onfire MCP tool) for AI prospecting, identity resolution, contact enrichment, and prospecting schema management, and an account-research skill that generates full BDR briefs from Onfire MCP, Snowflake EDGAR filings, and Metabase signals.",
-    "version": "0.3.0"
+    "description": "Onfire MCP skills marketplace. Hosts the onfire-mcp-skills plugin: atomic skills for identity resolution, AI prospecting, contact enrichment and every Onfire signal layer, plus report skills that generate account research and competitor briefs, and a recurring weekly territory plan (the 5x5) that scores a rep's accounts, maps the buying committee, and refreshes itself on a schedule.",
+    "version": "0.5.0"
   },
   "plugins": [
     {
       "name": "onfire-mcp-skills",
       "source": "./",
-      "description": "Skill tree for the Onfire MCP. Includes an orchestrator skill that routes user intent across five atomic skills (one per Onfire tool) covering identity resolution, AI prospecting, contact enrichment, and prospecting schema configuration, plus an account-research skill that generates full BDR briefs by combining Onfire MCP, Snowflake EDGAR 10-K filings, and Metabase intent signals.",
+      "description": "Skill tree for the Onfire MCP. Atomic skills cover identity resolution, AI prospecting, contact enrichment and each signal layer (intent, hiring, events, community, developer activity, technology footprint, growth and role movement). Report skills generate account-research briefs and competitor intelligence. The weekly territory plan (the 5x5) runs a rep's recurring routine end to end: a scored account resolver, buying-committee coverage with warm-intro paths, on-demand contact data, and a durable artifact that refreshes on a schedule.",
       "category": "skills",
       "tags": [
         "onfire",
@@ -26,7 +26,13 @@
         "account-research",
         "10-k",
         "edgar",
-        "intent-signals"
+        "intent-signals",
+        "territory-plan",
+        "weekly-plan",
+        "5x5",
+        "warm-intro",
+        "buying-committee",
+        "scheduled"
       ]
     }
   ]

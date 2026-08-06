@@ -1,7 +1,7 @@
 {
   "name": "onfire-mcp-skills",
-  "version": "0.3.0",
-  "description": "Skill tree for the Onfire MCP. Includes an orchestrator skill that routes user intent across five atomic skills (one per Onfire tool) covering identity resolution, AI prospecting, contact enrichment, and prospecting schema configuration, plus an account-research skill that generates full BDR briefs by combining Onfire MCP, Snowflake EDGAR 10-K filings, and Metabase intent signals.",
+  "version": "0.5.0",
+  "description": "Skill tree for the Onfire MCP. Atomic skills cover identity resolution, AI prospecting, contact enrichment and each signal layer (intent, hiring, events, community, developer activity, technology footprint, growth and role movement). Report skills generate account-research briefs and competitor intelligence. The weekly territory plan (the 5x5) runs a rep's recurring routine end to end: a scored account resolver, buying-committee coverage with warm-intro paths, on-demand contact data, and a durable artifact that refreshes on a schedule.",
   "author": {
     "name": "Onfire",
     "email": "onfire-ai@onfire.ai"
@@ -19,6 +19,12 @@
     "account-research",
     "10-k",
     "edgar",
-    "intent-signals"
+    "intent-signals",
+    "territory-plan",
+    "weekly-plan",
+    "5x5",
+    "warm-intro",
+    "buying-committee",
+    "scheduled"
   ]
 }
