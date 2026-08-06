@@ -72,6 +72,9 @@ regexes = [
   '''\b555[-.]?01\d{2}\b''',
   # placeholder LinkedIn personal handles used in the skill examples
   '''linkedin\.com/in/(?:johndoe|janedoe|alice-smith|alicejohnson|bob-jones|\.\.\.)$''',
+  # namespaced synthetic handles for multi-person skill fixtures. "example-" cannot be
+  # mistaken for a real handle, and \d{2} bounds the namespace to 100 slots.
+  '''linkedin\.com/in/example-person-\d{2}$''',
 ]
 # don't scan the config files that legitimately contain these example patterns
 paths = [
