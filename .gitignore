@@ -5,5 +5,11 @@
 *.plugin
 *.zip
 
+# Python bytecode. This repo ships one bundled helper script, and importing it
+# locally creates a __pycache__ alongside it. A .pyc embeds the source
+# docstring, so an uncommitted-by-accident one also trips the PII scan.
+__pycache__/
+*.pyc
+
 # macOS
 .DS_Store
