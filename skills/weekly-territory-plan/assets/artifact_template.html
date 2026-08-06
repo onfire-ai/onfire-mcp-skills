@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Plan</title>
+<style>
+  :root{ color-scheme: light;
+    --navy:#043349; --navy-dark:#02222f; --navy-soft:#e4eef2;
+    --ink:#0f1f26; --muted:#5c6f77; --line:#e3e9eb; --bg:#f5f8f9; --card:#ffffff;
+    --accent:#0f7a68; --accent-soft:#e2f1ee;
+    --hot:#b3261e; --hot-soft:#fdeaea;
+    --warm:#8a5a00; --warm-soft:#fdf2dc;
+    --cool:#4a5b62; --cool-soft:#eceff0;
+    --violet:#5b3fbf; --violet-soft:#eee9fc;
+    --ok:#1a7f37; --ok-soft:#e6f6ea;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+       background:var(--bg);color:var(--ink);padding:20px 3vw 60px;font-size:14px}
+  a{color:var(--navy)}
+  header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:12px}
+  h1{font-size:23px;letter-spacing:-.3px;color:var(--navy)}
+  .sub{color:var(--muted);font-size:12.5px;margin-top:3px}
+  .top-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 13px;
+       font-size:12.5px;font-weight:600;cursor:pointer;color:var(--ink);font-family:inherit}
+  .btn.primary{background:var(--navy);border-color:var(--navy);color:#fff}
+  .btn.ghost{background:transparent}
+  .btn:hover:not(:disabled){filter:brightness(.96)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .banner{background:var(--warm-soft);border:1px solid #e6cd94;color:#6b4a05;border-radius:10px;
+          padding:10px 14px;margin-bottom:14px;font-size:12.5px;font-weight:600}
+  .profile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 15px;
+           margin-bottom:14px;display:flex;flex-wrap:wrap;gap:18px;font-size:12.5px}
+  .profile b{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;
+             color:var(--muted);margin-bottom:2px;font-weight:700}
+  .kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:11px 16px;min-width:112px}
+  .kpi .n{font-size:21px;font-weight:700;color:var(--navy)}
+  .kpi .l{font-size:11px;color:var(--muted);margin-top:1px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+  .chip-f{font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:999px;cursor:pointer;
+          background:var(--card);border:1px solid var(--line);color:var(--muted)}
+  .chip-f.on{background:var(--navy);border-color:var(--navy);color:#fff}
+  .search{padding:7px 11px;border:1px solid var(--line);border-radius:9px;font-size:12.5px;
+          min-width:200px;font-family:inherit}
+  .tier-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
+          color:var(--muted);margin:20px 0 9px}
+  .account{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:16px;overflow:hidden}
+  .acct-head{display:flex;align-items:center;gap:13px;padding:15px 18px 9px;flex-wrap:wrap}
+  .rank{width:29px;height:29px;border-radius:8px;background:var(--navy);color:#fff;display:flex;
+        align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:none}
+  .acct-name{font-size:16px;font-weight:700}
+  .acct-meta{font-size:11.5px;color:var(--muted);margin-top:1px}
+  .fit{margin-left:auto;text-align:right;cursor:pointer;background:none;border:none;font-family:inherit}
+  .fit .pct{font-size:20px;font-weight:800;color:var(--navy)}
+  .fit .bar{width:104px;height:5px;border-radius:3px;background:var(--line);margin-top:3px}
+  .fit .bar i{display:block;height:5px;border-radius:3px;background:var(--navy)}
+  .fit .hint{font-size:9.5px;color:var(--muted);margin-top:3px}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:800;
+        letter-spacing:.04em;vertical-align:2px;margin-left:7px}
+  .act-now{background:var(--hot-soft);color:var(--hot)}
+  .build{background:var(--warm-soft);color:var(--warm)}
+  .watch{background:var(--cool-soft);color:var(--cool)}
+  .glance{margin:3px 18px 10px;padding:11px 13px;background:var(--navy-soft);border-radius:10px;
+          font-size:13px;line-height:1.55;color:#0b3141}
+  .glance b{color:var(--navy)}
+  .scoredims{display:none;margin:0 18px 10px;padding:11px 13px;background:var(--bg);
+             border:1px solid var(--line);border-radius:10px}
+  .scoredims.open{display:block}
+  .sd-row{display:flex;align-items:center;gap:9px;font-size:11.5px;margin-bottom:5px}
+  .sd-row .sd-l{width:230px;color:var(--muted);flex:none}
+  .sd-row .sd-bar{flex:1;height:5px;border-radius:3px;background:var(--line)}
+  .sd-row .sd-bar i{display:block;height:5px;border-radius:3px;background:var(--navy)}
+  .sd-row .sd-v{width:44px;text-align:right;font-weight:700}
+  .sd-null{color:var(--muted);font-style:italic;font-weight:400}
+  .chips{display:flex;gap:5px;flex-wrap:wrap;margin:0 18px 9px;align-items:center}
+  .chips .lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+              color:var(--muted);margin-right:2px}
+  .chip{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--cool-soft);color:var(--cool)}
+  .chip.layer{background:var(--violet-soft);color:var(--violet)}
+  .chip.t-cover{background:var(--navy-soft);color:var(--navy)}
+  .chip.t-open{background:#fff;border:1px dashed var(--line);color:var(--muted)}
+  details{border-top:1px solid var(--line)}
+  summary{cursor:pointer;padding:10px 18px;font-size:12.5px;font-weight:600;color:var(--navy);list-style:none}
+  summary::before{content:'\25B8  ';font-size:9px}
+  details[open] summary::before{content:'\25BE  '}
+  .why{padding:2px 18px 15px;display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:9px}
+  .ev{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.5}
+  .ev .tag{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
+           color:var(--navy);display:block;margin-bottom:4px}
+  .ev q{font-style:italic;color:#2b3b41}
+  .ev .src{display:block;margin-top:5px;color:var(--muted);font-size:10.5px}
+  .plist{padding:11px 18px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(272px,1fr));
+         gap:9px;border-top:1px solid var(--line)}
+  .pcard{border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:#fff;
+         cursor:pointer;position:relative;text-align:left;font-family:inherit;font-size:inherit;width:100%}
+  .pcard:hover{box-shadow:0 4px 13px rgba(4,51,73,.11)}
+  .pcard.tbd{background:var(--bg);border-style:dashed;cursor:default}
+  .pname{font-weight:700;font-size:13.5px;color:var(--ink)}
+  .ptitle{font-size:11.5px;color:var(--muted);margin:2px 0 7px;line-height:1.35}
+  .badges{display:flex;gap:4px;flex-wrap:wrap}
+  .b{font-size:9px;font-weight:800;padding:2px 6px;border-radius:999px;letter-spacing:.04em}
+  .b-p{background:var(--navy-soft);color:var(--navy)}
+  .b-key{background:var(--accent-soft);color:var(--accent)}
+  .b-sig{background:var(--hot-soft);color:var(--hot)}
+  .b-warm{background:var(--warm-soft);color:var(--warm)}
+  .b-enr{background:var(--ok-soft);color:var(--ok)}
+  .b-mis{background:var(--cool-soft);color:var(--cool)}
+  .b-evt{background:var(--violet-soft);color:var(--violet)}
+  .psig{margin-top:8px;font-size:11px;background:var(--hot-soft);border-radius:7px;padding:7px 9px;
+        color:#7a2520;line-height:1.45}
+  .psig b{font-size:9px;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:2px;color:var(--hot)}
+  .pc-x{position:absolute;top:6px;right:7px;border:none;background:transparent;color:#c3cbce;
+        font-size:13px;cursor:pointer;line-height:1;padding:2px 5px;border-radius:5px}
+  .pc-x:hover{background:var(--hot-soft);color:var(--hot)}
+  .acct-actions{display:flex;gap:8px;padding:0 18px 15px;flex-wrap:wrap;align-items:center}
+  .err{margin:0 18px 12px;padding:9px 12px;border-radius:9px;font-size:11.5px;line-height:1.45;display:none}
+  .err.show{display:block}
+  .err.perm{background:var(--cool-soft);color:var(--cool)}
+  .err.temp{background:var(--hot-soft);color:var(--hot)}
+  .empty{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 22px;text-align:center}
+  .empty h2{font-size:16px;margin-bottom:7px;color:var(--navy)}
+  .empty p{font-size:13px;color:var(--muted);line-height:1.6;max-width:560px;margin:0 auto}
+  .overlay{position:fixed;inset:0;background:rgba(4,51,73,.45);display:none;align-items:flex-start;
+           justify-content:center;padding:5vh 16px;z-index:50;overflow:auto}
+  .overlay.open{display:flex}
+  .modal{background:#fff;border-radius:14px;max-width:660px;width:100%;padding:20px 22px;
+         box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  .m-close{float:right;border:none;background:var(--cool-soft);border-radius:7px;width:27px;height:27px;
+           cursor:pointer;font-size:14px;color:var(--muted)}
+  .m-name{font-size:18px;font-weight:800}
+  .m-title{font-size:12.5px;color:var(--muted);margin:3px 0 11px}
+  .m-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:11px}
+  .m-cell{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:12.5px}
+  .m-cell b{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;
+            color:var(--muted);margin-bottom:3px}
+  .m-cell a{word-break:break-all}
+  .m-warm{background:var(--warm-soft);border-radius:9px;padding:9px 11px;font-size:12.5px;
+          margin-bottom:11px;color:#6b4a05;line-height:1.5}
+  .m-warm b{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;display:block;
+            margin-bottom:3px;color:var(--warm)}
+  .m-sig{background:var(--hot-soft);border-radius:9px;padding:9px 11px;font-size:12.5px;
+         margin-bottom:10px;color:#5f1d18;line-height:1.55}
+  .m-sig b{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px;color:var(--hot)}
+  .m-sig .sq{font-style:italic}
+  .m-sig .sd{color:#8a5a56;font-size:10.5px;display:block;margin-top:3px}
+  .sec-h{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+         color:var(--muted);margin:12px 0 6px}
+  .pt{display:flex;gap:8px;font-size:12px;line-height:1.5;margin-bottom:4px;color:#25322f}
+  .pt::before{content:'\25CF';color:var(--navy);font-size:7px;line-height:2.3}
+  .m-mail{border:1px solid var(--line);border-radius:10px;background:#fbfdfd;padding:13px 15px;
+          font-size:12.5px;line-height:1.6;margin-bottom:12px}
+  .m-mail .eh{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+              color:var(--navy);margin-bottom:6px}
+  .m-mail .subj{font-weight:700;margin-bottom:7px}
+  .m-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .swap-input{display:none;margin-top:8px}
+  .swap-input.open{display:block}
+  .swap-input input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;
+                    font-size:13px;margin-bottom:8px;font-family:inherit}
+  .match-card{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--bg);
+              line-height:1.6;margin-top:11px;font-size:12.5px}
+  .c-people{border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:9px 12px;
+            margin:11px 0;max-height:190px;overflow:auto}
+  .c-people div{font-size:12.5px;line-height:1.6}
+  .c-people div span{color:var(--muted)}
+  .c-cost{background:var(--navy-soft);border-radius:9px;padding:10px 12px;font-size:12.5px;
+          line-height:1.55;color:#0b3141;margin-bottom:12px;white-space:pre-wrap}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line);
+        border-top-color:var(--navy);border-radius:50%;animation:sp 1s linear infinite;
+        vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .toast{position:fixed;bottom:20px;right:20px;background:var(--ink);color:#fff;padding:11px 16px;
+         border-radius:10px;font-size:12.5px;opacity:0;transition:opacity .3s;pointer-events:none;
+         z-index:99;max-width:340px;line-height:1.45}
+  .toast.show{opacity:1}
+  .note{font-size:11px;color:var(--muted)}
+  footer{margin-top:28px;font-size:11px;color:var(--muted);line-height:1.7;
+         border-top:1px solid var(--line);padding-top:13px}
+</style>
+</head>
+<body>
+
+<div class="banner" id="example-banner" hidden>
+  Example data. This is the template fixture, not a real plan.
+</div>
+
+<header>
+  <div>
+    <h1 id="page-title">My Plan</h1>
+    <div class="sub" id="subline"></div>
+  </div>
+  <div class="top-actions">
+    <button class="btn primary" id="btn-csv">Download this week (CSV)</button>
+    <button class="btn" id="btn-crm" disabled>Send to CRM</button>
+    <span class="note" id="crm-note"></span>
+  </div>
+</header>
+
+<div class="profile" id="profile"></div>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="controls">
+  <span class="chip-f on" data-filter="all">All</span>
+  <span class="chip-f" data-filter="warm">Has a warm path</span>
+  <span class="chip-f" data-filter="signal">Has a live signal</span>
+  <input class="search" id="search" placeholder="Search accounts, people, titles">
+</div>
+
+<div id="board"></div>
+
+<footer id="footer"></footer>
+
+<div class="overlay" id="p-overlay"><div class="modal" id="p-modal"></div></div>
+
+<div class="overlay" id="s-overlay">
+  <div class="modal">
+    <button class="m-close" id="s-close">&#10005;</button>
+    <div class="m-name">Swap this account</div>
+    <div class="m-title">Replacing <span id="s-target"></span>. Check a company you have in mind.</div>
+    <div class="swap-input open">
+      <input id="s-domain" placeholder="Company name or domain">
+      <button class="btn primary" id="s-run">Check this company</button>
+    </div>
+    <div id="s-result"></div>
+    <div class="err" id="err-swap"></div>
+  </div>
+</div>
+
+<!-- Consent gate for a bulk reveal. Nothing is pulled until the rep approves
+     what this modal states. Above the server's threshold the cost line is
+     replaced with the server's own wording, verbatim. -->
+<div class="overlay" id="c-overlay">
+  <div class="modal">
+    <button class="m-close" id="c-close">&#10005;</button>
+    <div class="m-name" id="c-title">Reveal contact data</div>
+    <div class="m-title" id="c-sub"></div>
+    <div class="c-people" id="c-people"></div>
+    <div class="c-cost" id="c-cost"></div>
+    <div class="err" id="err-confirm"></div>
+    <div class="m-actions">
+      <button class="btn primary" id="c-go" disabled>Reveal</button>
+      <button class="btn ghost" id="c-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ------------------------------------------------------------------ *
+ * Environment shims. Present in every copy so the same markup opens
+ * standalone, where live controls degrade instead of throwing. Keep
+ * the message neutral: whoever the rep forwards this to will read it.
+ * ------------------------------------------------------------------ */
+if (typeof window !== 'undefined' && typeof window.cowork === 'undefined') {
+  window.cowork = { callMcpTool: async function () {
+    throw new Error('Live actions run inside your workspace');
+  }};
+}
+if (typeof window !== 'undefined' && typeof window.storage === 'undefined') {
+  window.storage = { get: async function () { return null; }, set: async function () {} };
+}
+
+/* ------------------------------------------------------------------ *
+ * Injected at render time. Never hardcode a tenant's values here, and
+ * never embed a connector id: substitute the fully-qualified tool
+ * identifiers from THIS session. A surviving __TOOL_* placeholder is a
+ * signal, not a bug -- its control renders disabled with a reason.
+ * ------------------------------------------------------------------ */
+const DISPLAY_NAME = "__DISPLAY_NAME__";
+const WEEK_LABEL   = "__WEEK_LABEL__";
+const TITLE_SET    = ["__TITLE_SET__"];
+const DIMS         = ["__DIMS__"];
+const TOUCHPOINTS  = ["__TOUCHPOINTS__"];
+const PROFILE      = { segment: "__SEGMENT__", territory: "__TERRITORY__", weighted: "__WEIGHTED__" };
+const TOOLS = {
+  match_company:           "__TOOL_MATCH_COMPANY__",
+  contact_data_enrichment: "__TOOL_CONTACT_ENRICHMENT__",
+  ai_prospecting:          "__TOOL_AI_PROSPECTING__"
+};
+const ENRICH_TENANT_ID = null;
+
+/* Set false when DATA is replaced with a real run. */
+const IS_EXAMPLE_DATA = true;
+
+/* ------------------------------------------------------------------ *
+ * DATA -- see references/data-contract.md for the field-by-field
+ * contract. The fixture below is synthetic: placeholder-register names
+ * and namespaced example profile handles. Replace it wholesale.
+ * ------------------------------------------------------------------ */
+const DATA = [
+{
+  id:"northwind", name:"Northwind", li:"linkedin.com/company/northwind",
+  website:"northwind.example.com", tier:"ACT NOW", tierClass:"act-now", fit:88,
+  dims:[84, 95, 90, 78, 92, 70],
+  meta:"Logistics software · ~900 employees · Springfield, IL · northwind.example.com",
+  glance:"<b>Why now:</b> The owner of their data-platform tooling left in March and has not been backfilled, three platform roles opened in the last month, and an engineer asked publicly how to audit access across their warehouse. The work still needs doing and nobody owns it.",
+  stack:["Kubernetes","Snowflake","Okta"],
+  layers:["6 community signals, Feb to Jul","3 open platform roles","Role movement: owner departed Mar","Technology footprint verified","2 warm paths"],
+  covered:["Economic buyer","Platform owner","Risk and compliance"],
+  evidence:[
+    {tag:"Access control · 12 Jul 2026", q:"“We still have no clean way to see who can read which tables. Every audit turns into a week of spreadsheet archaeology.”", src:"Data engineering community"},
+    {tag:"Role movement · Mar 2026", q:"The platform tooling owner left and the seat has not been refilled.", src:"Career history records"},
+    {tag:"Open roles · posted 2 Jul 2026", q:"Three platform engineering roles opened in the last month, the most recent two weeks ago.", src:"Open roles and hiring activity"},
+    {tag:"Technology footprint", q:"Warehouse and identity tooling confirmed on employee profiles.", src:"Verified employee technology footprint"}
+  ],
+  personas:[
+    {name:"Jane Doe", title:"VP Engineering", loc:"Springfield, IL", p:"ECONOMIC BUYER",
+     badges:["key","warm"], email:null, phone:null, li:"linkedin.com/in/example-person-01",
+     warm:"Introduced by Jane Roe, who overlapped with her at Continental Bank from 2019 to 2021.",
+     signal:{d:"12 Jul 2026 · account signal", q:"“We still have no clean way to see who can read which tables. Every audit turns into a week of spreadsheet archaeology.”", why:"Her org owns the gap, and the seat that used to own it is still empty."},
+     points:["Owns the platform group that lost its tooling owner","Approves tooling spend at this size of team","Three of her roles are open right now"],
+     why:"The budget owner for the gap the signals describe.",
+     mail:{s:"The access-audit gap while your platform seat is open",
+           b:"Hi Jane,<br><br>Jane Roe on our team overlapped with you at Continental Bank and suggested I reach out.<br><br>Saw one of your engineers describe audits turning into spreadsheet archaeology, which tracks with the platform tooling seat still being open since March.<br><br>Worth 20 minutes next week?"}},
+    {name:"John Doe", title:"Director, Platform", loc:"Chicago, IL", p:"PLATFORM OWNER",
+     badges:["key"], email:null, phone:null, li:"linkedin.com/in/example-person-02",
+     warm:null,
+     signal:{d:"2 Jul 2026 · hiring signal", q:"Three platform engineering roles opened in the last month.", why:"He is staffing the exact gap, which is the strongest budget signal on the account."},
+     points:["Hiring across platform engineering right now","Owns the warehouse and identity surface","New in seat since the March departure"],
+     why:"Budget and urgency in one person: he is staffing this gap.",
+     mail:{s:"Guardrails while the platform team ramps",
+           b:"Hi John,<br><br>Saw you are hiring across platform engineering, which usually means the gap is felt right now rather than next quarter.<br><br>Happy to share how teams your size closed the access-audit gap before the new hires landed. Useful?"}},
+    {name:"Alice Smith", title:"Staff Data Engineer", loc:"Remote, US", p:"SIGNAL HOLDER",
+     badges:["sig"], email:null, phone:null, li:"linkedin.com/in/example-person-03",
+     warm:null,
+     signal:{d:"12 Jul 2026 · signal holder", q:"“We still have no clean way to see who can read which tables. Every audit turns into a week of spreadsheet archaeology.”", why:"She wrote the account's why-now message. She is living the problem in public."},
+     points:["Authored the account's clearest public signal","Hands-on with the warehouse day to day","Warmest technical entry point"],
+     why:"The signal holder, and the person who will validate whether this is real.",
+     mail:{s:"Your point about spreadsheet archaeology",
+           b:"Hi Alice,<br><br>Your note about audits turning into spreadsheet archaeology is the clearest description of that problem I have read this month.<br><br>Would you be open to comparing notes on how other teams have handled it?"}},
+    {name:"Bob Jones", title:"Head of Risk and Compliance", loc:"Springfield, IL", p:"RISK AND COMPLIANCE",
+     badges:["key","evt"], email:null, phone:null, li:"linkedin.com/in/example-person-04",
+     warm:null,
+     signal:{d:"18 Jun 2026 · event signal", q:"Attended SecureCon 2026.", why:"Audit evidence is his exposure, and the access gap is an audit finding waiting to happen."},
+     points:["Owns the audit posture for a regulated customer base","Attended SecureCon 2026","Access review is a recurring finding in his scope"],
+     why:"Owns the exposure that the access gap creates.",
+     mail:{s:"Audit evidence for warehouse access",
+           b:"Hi Bob,<br><br>Your engineering team is publicly describing access reviews as a week of manual work, which is the class of gap that tends to become an audit finding.<br><br>Open to a short walkthrough of how that evidence can be generated rather than assembled?"}},
+    {name:"Mary Jones", title:"IT Operations Manager", loc:"Peoria, IL", p:"OPERATIONS",
+     badges:["key"], email:null, phone:null, li:"linkedin.com/in/example-person-05",
+     warm:null,
+     signal:{d:"Account context", q:"Identity tooling confirmed on employee profiles across the operations group.", why:"Any rollout lands on her team, so deployment effort is her evaluation lens."},
+     points:["Runs the estate a rollout would touch","Identity tooling already in place","Practical evaluator for deployment effort"],
+     why:"The operational owner who feels every added integration.",
+     mail:{s:"What a rollout actually costs your team",
+           b:"Hi Mary,<br><br>Most tooling in this space lands on your team as another integration to run.<br><br>Happy to walk through what deployment looks like in practice. Useful?"}}
+  ]
+},
+{
+  id:"meridian-bank", name:"Meridian Bank", li:"linkedin.com/company/meridian-bank",
+  website:"meridianbank.example.com", tier:"BUILD", tierClass:"build", fit:79,
+  dims:[88, 72, 84, 70, 66, 55],
+  meta:"Regional banking · ~2,400 employees · Columbus, OH · meridianbank.example.com",
+  glance:"<b>Why now:</b> A newly promoted technology leader took the seat in May, the annual filing added new language about data-governance investment, and two of their engineers joined a data-governance community in the last quarter. Good fit, no urgent trigger yet.",
+  stack:["Snowflake","Terraform"],
+  layers:["Promotion signal, May 2026","Annual filing language","2 community joins","1 warm path"],
+  covered:["Economic buyer","Platform owner"],
+  evidence:[
+    {tag:"Promotion · May 2026", q:"Promoted from Director to Chief Information Officer.", src:"Career history records"},
+    {tag:"Annual filing · FY2025", q:"Added language on investment in data governance and access controls over the coming year.", src:"Annual filing"},
+    {tag:"Community joins · Q2 2026", q:"Two engineers joined a data-governance community this quarter.", src:"Community membership signal"}
+  ],
+  personas:[
+    {name:"Richard Roe", title:"Chief Information Officer", loc:"Columbus, OH", p:"ECONOMIC BUYER",
+     badges:["key","warm"], email:null, phone:null, li:"linkedin.com/in/example-person-06",
+     warm:"Introduced by John Smith, who overlapped with him at Northwind from 2016 to 2018.",
+     signal:{d:"May 2026 · account signal", q:"Promoted from Director to Chief Information Officer.", why:"A new leader in seat is the window when tooling decisions actually reopen."},
+     points:["New in the seat since May","Named data governance in the annual filing","Sets the agenda for the coming year"],
+     why:"New in seat, with a stated mandate that matches.",
+     mail:{s:"Congratulations, and a question about your governance plan",
+           b:"Hi Richard,<br><br>Congratulations on the new role. John Smith on our team mentioned you worked together at Northwind.<br><br>Your filing calls out data governance investment this year. Worth a short conversation while the plan is still being shaped?"}},
+    {name:"Alice Johnson", title:"Director, Security Engineering", loc:"Columbus, OH", p:"PLATFORM OWNER",
+     badges:["key","sig"], email:null, phone:null, li:"linkedin.com/in/example-person-07",
+     warm:null,
+     signal:{d:"Q2 2026 · signal holder", q:"Joined a data-governance community this quarter.", why:"She went looking for this topic herself, which is a stronger signal than a filing sentence."},
+     points:["Sought out a governance community independently","Owns the controls the filing commits to","Likely technical evaluator"],
+     why:"She is already researching this, unprompted.",
+     mail:{s:"The governance question you have been researching",
+           b:"Hi Alice,<br><br>Noticed you have been active where teams compare notes on data-governance controls.<br><br>Happy to share what has worked for similar-sized banks. Interested?"}},
+    {name:"John Public", title:"Head of Data Platform", loc:"Cleveland, OH", p:"PLATFORM OWNER",
+     badges:["key"], email:null, phone:null, li:"linkedin.com/in/example-person-08",
+     warm:null,
+     signal:{d:"Account context", q:"Warehouse and infrastructure-as-code tooling confirmed on the platform group.", why:"Whatever the filing commits to has to land on his platform."},
+     points:["Owns the warehouse the controls would apply to","Build-versus-buy decision sits with him","Practical about integration effort"],
+     why:"The platform owner who would otherwise build this.",
+     mail:{s:"Build or buy for warehouse access controls",
+           b:"Hi John,<br><br>With governance investment named for this year, the access-control layer is usually the first build-or-buy call.<br><br>Worth comparing notes before it becomes a roadmap item?"}},
+    {name:"TBD — Risk and compliance owner", title:"Target: Head of Risk or Chief Compliance Officer",
+     loc:"", p:"RISK AND COMPLIANCE", badges:[], email:null, phone:null, li:"",
+     warm:null,
+     signal:{d:"Seat unfilled", q:"No confident match found for this committee seat.", why:"Named so the gap is visible rather than quietly dropped."},
+     points:["No confident match in the current data","Worth a manual look on the rep's side"],
+     why:"A visible gap is more useful than an invented name.",
+     mail:{s:"", b:""}}
+  ]
+},
+{
+  id:"frostbyte", name:"Frostbyte", li:"", website:"frostbyte.example.com",
+  tier:"WATCH", tierClass:"watch", fit:73,
+  dims:[76, 64, 72, 68, 60, null],
+  meta:"Cold-chain logistics · ~450 employees · Portland, OR · frostbyte.example.com",
+  glance:"<b>Why now:</b> Good profile fit and a steady technical footprint, but the only live trigger is a single event attendance and headcount has been flat. Worth nurturing rather than working hard this week.",
+  stack:["Kubernetes"],
+  layers:["1 event signal","Technology footprint verified","1 warm path","Headcount flat"],
+  covered:["Economic buyer"],
+  evidence:[
+    {tag:"Event · 18 Jun 2026", q:"Two attendees at CloudCon 2025 and one at SecureCon 2026.", src:"Event attendance"},
+    {tag:"Technology footprint", q:"Container orchestration confirmed on the engineering group.", src:"Verified employee technology footprint"},
+    {tag:"Headcount trend", q:"Flat across the trailing twelve months.", src:"Monthly headcount series"}
+  ],
+  personas:[
+    {name:"Jane Public", title:"VP Infrastructure", loc:"Portland, OR", p:"ECONOMIC BUYER",
+     badges:["key","warm"], email:null, phone:null, li:"linkedin.com/in/example-person-09",
+     warm:"Introduced by Lana Patel, who overlapped with her at PathWatch from 2020 to 2022.",
+     signal:{d:"18 Jun 2026 · event signal", q:"Attended SecureCon 2026.", why:"An event attendance is a light trigger, but it is a reason to open the conversation."},
+     points:["Owns infrastructure decisions","Attended SecureCon 2026","Warm path available"],
+     why:"The right entry point when the account warms up.",
+     mail:{s:"Following up on SecureCon",
+           b:"Hi Jane,<br><br>Lana Patel on our team mentioned you worked together at PathWatch.<br><br>Saw you were at SecureCon this year. Would a short conversation be useful, or is this better revisited next quarter?"}},
+    {name:"Sam Doe", title:"Engineering Manager, Platform", loc:"Portland, OR", p:"PLATFORM OWNER",
+     badges:["key","evt"], email:null, phone:null, li:"linkedin.com/in/example-person-10",
+     warm:null,
+     signal:{d:"2025 · event signal", q:"Attended CloudCon 2025.", why:"Technical interest is present, but there is no live pain signal yet."},
+     points:["Runs the platform group","Attended CloudCon 2025","No live pain signal on the account"],
+     why:"Technical contact for when a real trigger appears.",
+     mail:{s:"Comparing notes on platform tooling",
+           b:"Hi Sam,<br><br>Reaching out on the off chance the timing is right rather than because something is on fire.<br><br>Would comparing notes on platform tooling be useful this quarter?"}},
+    {name:"Jane Roe", title:"Data Protection Officer", loc:"Seattle, WA", p:"RISK AND COMPLIANCE",
+     badges:["key","warm"], email:null, phone:null, li:"linkedin.com/in/example-person-11",
+     warm:"Introduced by Alex K., who overlapped with her at Sendline from 2018 to 2019.",
+     signal:{d:"Account context", q:"Regulated cold-chain customer base with contractual data-handling commitments.", why:"Her mandate is a standing reason to talk, independent of a live trigger."},
+     points:["Owns data-handling commitments to customers","Warm path available","Standing mandate rather than a live trigger"],
+     why:"The persona whose mandate does not depend on a trigger.",
+     mail:{s:"Data-handling commitments in a regulated supply chain",
+           b:"Hi Jane,<br><br>Alex K. on our team mentioned you worked together at Sendline.<br><br>Happy to share what peers with similar contractual commitments have found useful. Worth a short conversation?"}}
+  ]
+}
+];
+
+/* ------------------------------------------------------------------ *
+ * Helpers
+ * ------------------------------------------------------------------ */
+const BADGES = {
+  key:  ['b-key','TITLE MATCH'],
+  sig:  ['b-sig','SIGNAL HOLDER'],
+  warm: ['b-warm','WARM PATH'],
+  enr:  ['b-enr','CONTACT REVEALED'],
+  mis:  ['b-mis','CHECKED · NONE FOUND'],
+  evt:  ['b-evt','EVENT SIGNAL']
+};
+const TIER_CLASSES = ['act-now','build','watch'];
+const TIER_ORDER = ['ACT NOW','BUILD','WATCH'];
+
+function escHtml(value){
+  return String(value == null ? '' : value)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function isPlaceholder(value){ return /^__[A-Z_]+__$/.test(String(value || '')); }
+function clean(list){ return (Array.isArray(list) ? list : []).filter(function(v){ return !isPlaceholder(v); }); }
+
+function unwrap(res){
+  if (res == null) return null;
+  var payload = (res.structuredContent !== undefined && res.structuredContent !== null)
+    ? res.structuredContent : res;
+  if (payload && Array.isArray(payload.content) && payload.content[0] &&
+      typeof payload.content[0].text === 'string') {
+    try { payload = JSON.parse(payload.content[0].text); }
+    catch (e) { return { text: payload.content[0].text }; }
+  }
+  for (var i = 0; i < 3 && payload && typeof payload.result === 'string'; i++) {
+    try { payload = JSON.parse(payload.result); } catch (e) { break; }
+  }
+  if (payload && payload.isError) throw new Error(payload.error || 'the tool reported an error');
+  return payload;
+}
+function rowsOf(payload){
+  if (!payload) return [];
+  var candidate = payload.rows || payload.results || payload.prospects || payload.data || payload.items;
+  return Array.isArray(candidate) ? candidate : [];
+}
+function firstRow(payload){ var list = rowsOf(payload); return list[0] || payload || {}; }
+
+/* Field lookup is case-insensitive and unwraps a single-element array,
+   because the same value arrives as `email`, `EMAIL` and `emails[0]`
+   depending on which side of the pipeline answered. A chain that only
+   checks lowercase reads a populated row as empty, which is
+   indistinguishable from "no contact data exists" to the rep. */
+function pickField(row, names){
+  if (!row || typeof row !== 'object') return null;
+  var keys = Object.keys(row);
+  for (var n = 0; n < names.length; n++) {
+    for (var k = 0; k < keys.length; k++) {
+      if (keys[k].toLowerCase() !== names[n]) continue;
+      var value = row[keys[k]];
+      if (Array.isArray(value)) value = value[0];
+      if (value === null || value === undefined) continue;
+      value = String(value).trim();
+      if (value) return value;
+    }
+  }
+  return null;
+}
+
+/* The normalisation from state-file.md, so a URL compares equal however it
+   arrives: lowercase, no scheme, no leading www., no query or fragment, no
+   trailing slash. Used to map returned rows back to the right person. */
+function normalizeLi(value){
+  return String(value == null ? '' : value)
+    .trim().toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/[?#].*$/, '')
+    .replace(/\/+$/, '');
+}
+
+/* One builder for every enrichment call. The three column-name parameters are
+   required by the tool schema on every call, including the consent phase —
+   omitting them left the artifact depending on the server's defaults matching
+   these key names by luck. Both data types always: same as per-person reveal. */
+function enrichArgs(contacts, intent, extra){
+  var args = {
+    contacts: contacts,
+    linkedin_url_column: 'linkedin_url',
+    account_website_column: 'account_website',
+    person_name_column: 'full_name',
+    include_email: true,
+    include_phone: true,
+    telemetry: { intent: intent }
+  };
+  if (ENRICH_TENANT_ID) args.target_tenant_id = ENRICH_TENANT_ID;
+  for (var key in (extra || {})) if (extra.hasOwnProperty(key)) args[key] = extra[key];
+  return args;
+}
+
+function contactPayload(account, person){
+  return { linkedin_url: person.li ? 'https://' + person.li : '',
+           full_name: person.name, account_website: account.website };
+}
+
+/* Enrichment is asynchronous. When a run outlives its poll window the server
+   answers {status:"still_running", continuation_token} and the SAME call is
+   repeated with that token to resume the SAME run — it is not a second run
+   and not a second charge.
+
+   Every enrichment call goes through here, because a still_running response
+   carries no rows: read naively it looks exactly like "this person has no
+   contact data", which is how a profile with a verified email came back as
+   "none found". A pending answer is not a negative one. */
+var ENRICH_POLL_LIMIT = 15;
+var ENRICH_POLL_DELAY_MS = 3000;
+
+/* This pause is the server's instruction ("wait a few seconds between
+   calls"), not decoration. It is the one sleep in this file that is not
+   simulated latency: the run really is still going, and hammering it just
+   exhausts the attempt budget in a few milliseconds and reports a timeout
+   the rep did not have. */
+function wait(ms){ return new Promise(function(resolve){ setTimeout(resolve, ms); }); }
+
+async function callEnrichment(args, onWait){
+  var pending = args;
+  for (var attempt = 0; attempt < ENRICH_POLL_LIMIT; attempt++) {
+    var payload = await callTool('contact_data_enrichment', pending);
+    if (!payload || payload.status !== 'still_running') return payload;
+    if (!payload.continuation_token) break;
+    if (onWait) onWait(attempt + 1);
+    pending = {};
+    for (var key in args) if (args.hasOwnProperty(key)) pending[key] = args[key];
+    pending.continuation_token = payload.continuation_token;
+    if (ENRICH_POLL_DELAY_MS) await wait(ENRICH_POLL_DELAY_MS);
+  }
+  throw new Error('the contact data provider is still working — try again in a moment');
+}
+
+/* Applies one result row to one person and returns whether anything was found.
+   Shared by the per-person and bulk paths so the two cannot drift on which
+   field names count, which badges get set, or what "found" means. */
+function applyContactRow(person, row){
+  var email = pickField(row, ['email','work_email','professional_email','business_email',
+                              'email_address','emails']);
+  var phone = pickField(row, ['phone','mobile_phone','phone_number','direct_phone',
+                              'mobile','phones']);
+  var found = !!(email || phone);
+  person.email = email;
+  person.phone = phone;
+  person.checked = true;
+  setBadge(person, 'enr', found);
+  setBadge(person, 'mis', !found);
+  return found;
+}
+
+function ToolUnavailable(shortName){
+  this.name = 'ToolUnavailable';
+  this.shortName = shortName;
+  this.message = 'not connected in this workspace';
+}
+ToolUnavailable.prototype = Object.create(Error.prototype);
+
+function resolveTool(shortName){
+  var injected = TOOLS[shortName];
+  if (injected && !isPlaceholder(injected)) return injected;
+  var listed = (window.cowork && typeof window.cowork.listMcpTools === 'function')
+    ? (window.cowork.listMcpTools() || []) : [];
+  for (var i = 0; i < listed.length; i++) {
+    if (typeof listed[i] === 'string' && listed[i].indexOf('__' + shortName) === listed[i].length - shortName.length - 2) {
+      return listed[i];
+    }
+  }
+  return null;
+}
+function toolAvailable(shortName){ return resolveTool(shortName) !== null; }
+
+async function callTool(shortName, args){
+  var id = resolveTool(shortName);
+  if (!id) throw new ToolUnavailable(shortName);
+  if (typeof window === 'undefined' || !window.cowork ||
+      typeof window.cowork.callMcpTool !== 'function') throw new ToolUnavailable(shortName);
+  return unwrap(await window.cowork.callMcpTool(id, args));
+}
+
+function showError(slotId, message, permanent){
+  var slot = document.getElementById(slotId);
+  if (!slot) return;
+  slot.textContent = message;
+  slot.className = 'err show ' + (permanent ? 'perm' : 'temp');
+}
+function clearError(slotId){
+  var slot = document.getElementById(slotId);
+  if (slot) { slot.className = 'err'; slot.textContent = ''; }
+}
+async function guard(slotId, fn){
+  clearError(slotId);
+  try { return await fn(); }
+  catch (err) {
+    console.error(err);
+    var permanent = err && err.name === 'ToolUnavailable';
+    showError(slotId, permanent
+      ? 'That action is not connected in this workspace. Ask in chat instead.'
+      : ('That did not work just now: ' + (err && err.message ? err.message : 'unknown error') + '. You can try again.'),
+      permanent);
+    return null;
+  }
+}
+
+function toast(message){
+  var el = document.getElementById('toast');
+  el.textContent = message;
+  el.classList.add('show');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(function(){ el.classList.remove('show'); }, 3600);
+}
+
+/* Buffer writes go to window.storage, never localStorage. The next run
+   drains them into the state file, which is the source of truth.
+
+   This throws rather than swallowing. It used to catch its own errors and
+   return normally, so a caller could await it, see no error, and toast
+   "saved" over a write that never landed. A failed write has to be visible
+   to the caller or the toast lies. */
+const BUFFER_KEY = 'plan-buffer';
+
+async function readBuffer(){
+  var current = (await window.storage.get(BUFFER_KEY)) || [];
+  return Array.isArray(current) ? current : [];
+}
+
+async function buffer(kind, payload){
+  var current = await readBuffer();
+  current.push({ kind: kind, payload: payload });
+  await window.storage.set(BUFFER_KEY, current);
+  return true;
+}
+
+/* For writes that trail an action the rep can already see on screen: the
+   action stands, but we say plainly that it was not recorded rather than
+   letting it silently return next Monday. Actions whose entire product IS
+   the write go through guard() instead, so failure reads as failure. */
+async function bufferOrWarn(kind, payload, slotId){
+  try { return await buffer(kind, payload); }
+  catch (err) {
+    console.error('buffer write failed', err);
+    if (slotId) showError(slotId,
+      'Done on screen, but we could not record it for next week — it may come back.', false);
+    return false;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Normalisation. A missing or unexpected field degrades; it never
+ * throws and takes the whole render with it.
+ * ------------------------------------------------------------------ */
+function normalizePersona(person){
+  var p = person || {};
+  var revealed = !!(p.email || p.phone);
+  var checked = revealed || !!p.checked;
+  var badges = (Array.isArray(p.badges) ? p.badges : []).filter(function(b){ return BADGES[b]; });
+  if (revealed && badges.indexOf('enr') === -1) badges.push('enr');
+  if (checked && !revealed && badges.indexOf('mis') === -1) badges.push('mis');
+  var signal = p.signal || {};
+  return {
+    name: p.name || 'Unnamed contact',
+    title: p.title || '',
+    loc: p.loc || '',
+    p: p.p || 'CONTACT',
+    badges: badges,
+    email: p.email || null,
+    phone: p.phone || null,
+    /* Runtime only, never authored into DATA. Separates "we asked and got
+       nothing" from "nobody has asked yet" — identical states on the board
+       before this existed, which made a miss look like an untouched card. */
+    checked: checked,
+    li: p.li || '',
+    warm: p.warm || null,
+    signal: { d: signal.d || '', q: signal.q || '', why: signal.why || '' },
+    points: Array.isArray(p.points) ? p.points : [],
+    why: p.why || '',
+    mail: { s: (p.mail && p.mail.s) || '', b: (p.mail && p.mail.b) || '' },
+    isTbd: /^TBD\b/i.test(String(p.name || ''))
+  };
+}
+function normalizeAccount(account){
+  var a = account || {};
+  var dims = Array.isArray(a.dims) ? a.dims : [];
+  return {
+    id: a.id || 'account',
+    name: a.name || 'Unnamed account',
+    li: a.li || '',
+    website: a.website || '',
+    tier: a.tier || 'WATCH',
+    tierClass: TIER_CLASSES.indexOf(a.tierClass) === -1 ? 'watch' : a.tierClass,
+    fit: typeof a.fit === 'number' ? a.fit : 0,
+    dims: dims,
+    meta: a.meta || '',
+    glance: a.glance || '',
+    stack: Array.isArray(a.stack) ? a.stack : [],
+    layers: Array.isArray(a.layers) ? a.layers : [],
+    covered: Array.isArray(a.covered) ? a.covered : [],
+    evidence: Array.isArray(a.evidence) ? a.evidence : [],
+    personas: (Array.isArray(a.personas) ? a.personas : []).map(normalizePersona)
+  };
+}
+
+var BOARD = DATA.map(normalizeAccount);
+var LABELS = clean(DIMS);
+var TITLES = clean(TITLE_SET);
+var TOUCHES = clean(TOUCHPOINTS);
+
+BOARD.forEach(function(account){
+  if (LABELS.length && account.dims.length !== LABELS.length) {
+    console.warn('dimension length mismatch on ' + account.id +
+      ': ' + account.dims.length + ' scores vs ' + LABELS.length + ' labels');
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * Render
+ * ------------------------------------------------------------------ */
+var activeFilter = 'all';
+var searchTerm = '';
+
+function matchesFilters(account){
+  if (activeFilter === 'warm' && !account.personas.some(function(p){ return p.warm; })) return false;
+  if (activeFilter === 'signal' && !account.evidence.length) return false;
+  if (!searchTerm) return true;
+  var haystack = [account.name, account.meta,
+    account.personas.map(function(p){ return p.name + ' ' + p.title; }).join(' ')
+  ].join(' ').toLowerCase();
+  return haystack.indexOf(searchTerm) !== -1;
+}
+
+function personaCard(account, ai, person, pi){
+  var badgeHtml = person.badges.map(function(b){
+    return '<span class="b ' + BADGES[b][0] + '">' + BADGES[b][1] + '</span>';
+  }).join('');
+  var quote = person.signal.q.length > 150 ? person.signal.q.slice(0, 150) + '…' : person.signal.q;
+  var nameHtml = person.li
+    ? '<a href="https://' + escHtml(person.li) + '" target="_blank" rel="noopener">' + escHtml(person.name) + '</a>'
+    : escHtml(person.name);
+  return '' +
+    '<div class="pcard' + (person.isTbd ? ' tbd' : '') + '" ' +
+      (person.isTbd ? '' : 'data-open="' + ai + ',' + pi + '" role="button" tabindex="0"') + '>' +
+      (person.isTbd ? '' : '<button class="pc-x" title="Not relevant" data-remove="' + ai + ',' + pi + '">&#10005;</button>') +
+      '<div class="pname">' + nameHtml + '</div>' +
+      '<div class="ptitle">' + escHtml(person.title) + (person.loc ? ' · ' + escHtml(person.loc) : '') + '</div>' +
+      '<div class="badges"><span class="b b-p">' + escHtml(person.p) + '</span>' + badgeHtml + '</div>' +
+      (person.signal.q ? '<div class="psig"><b>Why now · ' + escHtml(person.signal.d) + '</b>' + escHtml(quote) + '</div>' : '') +
+    '</div>';
+}
+
+/* The one definition of who a bulk request covers. The label and the action
+   read it from here so the count on the button cannot disagree with the
+   number actually marked — it previously counted every non-TBD person while
+   the handler skipped anyone already revealed. */
+function pendingContacts(account){
+  return account.personas.filter(function(p){ return !p.isTbd && !p.email && !p.phone; });
+}
+
+function requestControl(account, ai){
+  var pending = pendingContacts(account);
+  if (!pending.length) {
+    return '<button class="btn" disabled>Reveal contact data</button>' +
+      '<span class="note">Everyone here has been checked already.</span>';
+  }
+  return '<button class="btn" id="req-' + escHtml(account.id) + '" data-request="' + ai + '">' +
+    'Reveal contact data for these ' + pending.length + '</button>';
+}
+
+function accountCard(account, ai){
+  var dimRows = account.dims.map(function(value, di){
+    var label = escHtml(LABELS[di] || ('Dimension ' + (di + 1)));
+    if (value === null || value === undefined) {
+      return '<div class="sd-row"><span class="sd-l">' + label + '</span>' +
+             '<span class="sd-bar"></span><span class="sd-v sd-null">n/a</span></div>';
+    }
+    return '<div class="sd-row"><span class="sd-l">' + label + '</span>' +
+           '<span class="sd-bar"><i style="width:' + value + '%"></i></span>' +
+           '<span class="sd-v">' + value + '</span></div>';
+  }).join('');
+
+  var titleChips = TITLES.map(function(title){
+    var covered = account.covered.indexOf(title) !== -1;
+    return '<span class="chip ' + (covered ? 't-cover' : 't-open') + '">' +
+           (covered ? '✓ ' : '') + escHtml(title) + '</span>';
+  }).join('');
+
+  var nameHtml = account.li
+    ? '<a href="https://' + escHtml(account.li) + '" target="_blank" rel="noopener" style="color:inherit">' + escHtml(account.name) + '</a>'
+    : escHtml(account.name);
+
+  return '' +
+  '<div class="account" id="acct-' + escHtml(account.id) + '">' +
+    '<div class="acct-head">' +
+      '<div class="rank">' + (ai + 1) + '</div>' +
+      '<div><div class="acct-name">' + nameHtml +
+        '<span class="pill ' + account.tierClass + '">' + escHtml(account.tier) + '</span></div>' +
+        '<div class="acct-meta">' + escHtml(account.meta) + '</div></div>' +
+      '<button class="fit" data-dims="' + escHtml(account.id) + '" title="Scoring breakdown">' +
+        '<div class="pct">' + account.fit + '%</div>' +
+        '<div class="bar"><i style="width:' + account.fit + '%"></i></div>' +
+        '<div class="hint">why this score</div></button>' +
+    '</div>' +
+    (account.glance ? '<div class="glance">' + account.glance + '</div>' : '') +
+    '<div class="scoredims" id="sd-' + escHtml(account.id) + '">' + dimRows + '</div>' +
+    (account.layers.length ? '<div class="chips"><span class="lbl">Signals</span>' +
+      account.layers.map(function(s){ return '<span class="chip layer">' + escHtml(s) + '</span>'; }).join('') + '</div>' : '') +
+    (account.stack.length ? '<div class="chips"><span class="lbl">Stack</span>' +
+      account.stack.map(function(s){ return '<span class="chip">' + escHtml(s) + '</span>'; }).join('') + '</div>' : '') +
+    (TITLES.length ? '<div class="chips"><span class="lbl">Committee</span>' + titleChips + '</div>' : '') +
+    (account.evidence.length ?
+      '<details><summary>Full evidence — why this account made the week</summary><div class="why">' +
+      account.evidence.map(function(e){
+        return '<div class="ev"><span class="tag">' + escHtml(e.tag) + '</span><q>' + escHtml(e.q) +
+               '</q><span class="src">' + escHtml(e.src) + '</span></div>';
+      }).join('') + '</div></details>' : '') +
+    '<div class="plist">' +
+      account.personas.map(function(person, pi){ return personaCard(account, ai, person, pi); }).join('') +
+    '</div>' +
+    '<div class="err" id="err-acct-' + escHtml(account.id) + '"></div>' +
+    '<div class="acct-actions">' +
+      requestControl(account, ai) +
+      '<button class="btn ghost" data-swap="' + ai + '">Swap this account</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function render(){
+  document.getElementById('page-title').textContent =
+    (isPlaceholder(DISPLAY_NAME) ? 'My plan' : 'My ' + DISPLAY_NAME) +
+    (isPlaceholder(WEEK_LABEL) ? '' : ' · ' + WEEK_LABEL);
+  document.getElementById('example-banner').hidden = !IS_EXAMPLE_DATA;
+
+  var profileParts = [];
+  if (!isPlaceholder(PROFILE.territory)) profileParts.push(['My territory', PROFILE.territory]);
+  if (!isPlaceholder(PROFILE.segment)) profileParts.push(['My segment', PROFILE.segment]);
+  if (!isPlaceholder(PROFILE.weighted)) profileParts.push(['Weighted signals', PROFILE.weighted]);
+  var profile = document.getElementById('profile');
+  profile.hidden = profileParts.length === 0;
+  profile.innerHTML = profileParts.map(function(pair){
+    return '<div><b>' + escHtml(pair[0]) + '</b>' + escHtml(pair[1]) + '</div>';
+  }).join('') + '<div style="margin-left:auto;align-self:center" class="note">' +
+    'This is your profile. Say &ldquo;change my ICP&rdquo; in chat to edit it.</div>';
+
+  var people = BOARD.reduce(function(n, a){ return n + a.personas.filter(function(p){ return !p.isTbd; }).length; }, 0);
+  var warm = BOARD.reduce(function(n, a){ return n + a.personas.filter(function(p){ return p.warm; }).length; }, 0);
+  var revealed = BOARD.reduce(function(n, a){ return n + a.personas.filter(function(p){ return p.email || p.phone; }).length; }, 0);
+  document.getElementById('kpis').innerHTML = [
+    [BOARD.length, 'Accounts worth working'],
+    [people, 'People to engage'],
+    [warm, 'Warm paths'],
+    [revealed, 'Contacts revealed'],
+    ['On request', 'Contact data']
+  ].map(function(pair){
+    return '<div class="kpi"><div class="n"' +
+      (typeof pair[0] === 'string' ? ' style="font-size:15px"' : '') + '>' + escHtml(pair[0]) +
+      '</div><div class="l">' + escHtml(pair[1]) + '</div></div>';
+  }).join('');
+
+  document.getElementById('subline').textContent = BOARD.length
+    ? BOARD.length + ' account' + (BOARD.length === 1 ? '' : 's') + ' · ' + people +
+      ' people · only the ones worth working'
+    : 'Nothing cleared the bar this week';
+
+  var board = document.getElementById('board');
+  if (!BOARD.length) {
+    board.innerHTML = '<div class="empty"><h2>Nothing cleared the bar this week</h2>' +
+      '<p>No account in your territory met the relevance floor with a live reason to act. ' +
+      'That is a real answer, not an error: a short week beats five accounts you would ignore. ' +
+      'Ask in chat to see what came closest and why, or to widen your territory or segment.</p></div>';
+    return;
+  }
+
+  var visible = BOARD.filter(matchesFilters);
+  if (!visible.length) {
+    board.innerHTML = '<div class="empty"><h2>No matches</h2><p>Nothing matches that filter or search. ' +
+      'Clear it to see the full week.</p></div>';
+    return;
+  }
+
+  var html = '';
+  TIER_ORDER.forEach(function(tier){
+    var group = visible.filter(function(a){ return a.tier === tier; });
+    if (!group.length) return;
+    html += '<div class="tier-h">' + escHtml(tier) + ' · ' + group.length + '</div>';
+    group.forEach(function(account){ html += accountCard(account, BOARD.indexOf(account)); });
+  });
+  var ungrouped = visible.filter(function(a){ return TIER_ORDER.indexOf(a.tier) === -1; });
+  ungrouped.forEach(function(account){ html += accountCard(account, BOARD.indexOf(account)); });
+  board.innerHTML = html;
+
+  applyCapabilities();
+}
+
+function openProspect(ai, pi){
+  var account = BOARD[ai];
+  var person = account.personas[pi];
+  var badgeHtml = person.badges.map(function(b){
+    return '<span class="b ' + BADGES[b][0] + '">' + BADGES[b][1] + '</span>';
+  }).join('');
+  var canReveal = toolAvailable('contact_data_enrichment');
+  /* "Nothing found" is a result, not an absence of one. Saying "available on
+     request" after a check already came back empty invites the rep to keep
+     asking for something that is not there. */
+  var emptyNote = person.checked
+    ? '<span class="note">Checked — none found</span>'
+    : '<span class="note">Available on request</span>';
+
+  document.getElementById('p-modal').innerHTML = '' +
+    '<button class="m-close" data-close="p-overlay">&#10005;</button>' +
+    '<div class="m-name">' + escHtml(person.name) + '</div>' +
+    '<div class="m-title">' + escHtml(person.title) + ' · ' + escHtml(account.name) +
+      (person.loc ? ' · ' + escHtml(person.loc) : '') + '</div>' +
+    '<div class="badges" style="margin-bottom:11px"><span class="b b-p">' + escHtml(person.p) + '</span>' + badgeHtml + '</div>' +
+    '<div class="m-grid">' +
+      '<div class="m-cell"><b>Email</b><span id="em-' + ai + '-' + pi + '">' +
+        (person.email ? '<a href="mailto:' + escHtml(person.email) + '">' + escHtml(person.email) + '</a>'
+                      : emptyNote) + '</span></div>' +
+      '<div class="m-cell"><b>Phone</b><span id="ph-' + ai + '-' + pi + '">' +
+        (person.phone ? escHtml(person.phone) : emptyNote) + '</span></div>' +
+      '<div class="m-cell" style="grid-column:1/-1"><b>Profile</b>' +
+        (person.li ? '<a href="https://' + escHtml(person.li) + '" target="_blank" rel="noopener">' +
+          escHtml(person.li) + '</a>' : '<span class="note">No profile link</span>') + '</div>' +
+    '</div>' +
+    (person.signal.q ? '<div class="m-sig"><b>The signal — why this account, why now</b>' +
+      '<span class="sq">' + escHtml(person.signal.q) + '</span>' +
+      '<span class="sd">' + escHtml(person.signal.d) + '</span>' +
+      (person.signal.why ? '<span style="display:block;margin-top:6px">' + escHtml(person.signal.why) + '</span>' : '') +
+      '</div>' : '') +
+    (person.warm ? '<div class="m-warm"><b>Warm path</b>' + escHtml(person.warm) + '</div>' : '') +
+    (person.points.length ? '<div class="sec-h">Context</div>' +
+      person.points.map(function(pt){ return '<div class="pt">' + escHtml(pt) + '</div>'; }).join('') : '') +
+    (person.why ? '<div class="sec-h">Why this person</div><div class="pt">' + escHtml(person.why) + '</div>' : '') +
+    (person.mail.s || person.mail.b ?
+      '<div class="sec-h">Drafted first touch</div>' +
+      '<div class="m-mail"><div class="eh">Grounded in the signal above — edit before sending</div>' +
+      '<div class="subj">Subject: ' + escHtml(person.mail.s) + '</div>' +
+      '<div>' + person.mail.b + '<br><br>Best,<br>[Your name]</div></div>' : '') +
+    (TOUCHES.length ? '<div class="sec-h">Touchpoint plan</div>' +
+      TOUCHES.map(function(t, i){ return '<div class="pt">Touch ' + (i + 1) + ': ' + escHtml(t) + '</div>'; }).join('') : '') +
+    '<div class="err" id="err-p-' + ai + '-' + pi + '"></div>' +
+    '<div class="m-actions">' +
+      /* Gated on both values, not email alone: a person who came back with a
+         phone and no email is revealed, and re-offering the button re-bills. */
+      ((person.email || person.phone) ? '' :
+        '<button class="btn ' + (person.checked ? '' : 'primary') + '" ' +
+        'id="reveal-' + ai + '-' + pi + '" data-reveal="' + ai + ',' + pi + '"' +
+        (canReveal ? '' : ' disabled') + '>' +
+        (person.checked ? 'None found — try again' : 'Reveal contact data') + '</button>' +
+        (canReveal ? '' : '<span class="note">Not connected here — ask in chat.</span>')) +
+      '<button class="btn" data-replace="' + ai + ',' + pi + '">Replace this person</button>' +
+      '<button class="btn ghost" data-remove-close="' + ai + ',' + pi + '">Not relevant</button>' +
+    '</div>';
+  document.getElementById('p-overlay').classList.add('open');
+}
+
+/* ------------------------------------------------------------------ *
+ * Capability probe. Runs at render, not at click: showing a rep the
+ * truth up front beats letting them discover it by pressing a button.
+ * ------------------------------------------------------------------ */
+function applyCapabilities(){
+  var canSwap = toolAvailable('match_company');
+  document.querySelectorAll('[data-swap]').forEach(function(btn){
+    btn.disabled = !canSwap;
+    if (!canSwap) btn.title = 'Company lookup is not connected in this workspace. Ask in chat.';
+  });
+  /* The bulk control makes a real, paid call now, so it is gated like every
+     other live control: disabled with a reason rather than failing on click. */
+  var canReveal = toolAvailable('contact_data_enrichment');
+  document.querySelectorAll('[data-request]').forEach(function(btn){
+    btn.disabled = !canReveal;
+    if (!canReveal) btn.title = 'Contact data is not connected in this workspace. Ask in chat.';
+  });
+  var crmNote = document.getElementById('crm-note');
+  crmNote.textContent = 'CRM writes run from chat, confirmed one record at a time.';
+  document.getElementById('btn-crm').title = crmNote.textContent;
+}
+
+/* ------------------------------------------------------------------ *
+ * Actions. Nothing here runs on load.
+ * ------------------------------------------------------------------ */
+async function revealContact(ai, pi){
+  var account = BOARD[ai];
+  var person = account.personas[pi];
+  var slot = 'err-p-' + ai + '-' + pi;
+  var button = document.getElementById('reveal-' + ai + '-' + pi);
+  if (button) { button.disabled = true; button.innerHTML = '<span class="spin"></span>Revealing…'; }
+
+  var result = await guard(slot, async function(){
+    return await callEnrichment(enrichArgs(
+      [contactPayload(account, person)],
+      'Rep clicked to reveal one contact from their weekly plan'), function(){
+      if (button) button.innerHTML = '<span class="spin"></span>Still working…';
+    });
+  });
+
+  if (result === null) {
+    if (button) { button.disabled = false; button.textContent = restoreLabel(person); }
+    return;
+  }
+
+  var row = firstRow(result);
+  var found = applyContactRow(person, row);
+  var email = person.email;
+  var phone = person.phone;
+
+  /* A miss is the case worth being able to debug later: the tool answers for
+     this profile from chat, so an empty read here is either a provider miss
+     or a shape this parser does not recognise. The raw payload is the only
+     thing that tells those apart after the fact. */
+  if (!found) console.log('contact_data_enrichment returned no contact values',
+    { person: person.li, raw: result, parsedRow: row });
+
+  var emailEl = document.getElementById('em-' + ai + '-' + pi);
+  var phoneEl = document.getElementById('ph-' + ai + '-' + pi);
+  if (emailEl) emailEl.innerHTML = email
+    ? '<a href="mailto:' + escHtml(email) + '">' + escHtml(email) + '</a>'
+    : '<span class="note">Checked — none found</span>';
+  if (phoneEl) phoneEl.innerHTML = phone
+    ? escHtml(phone) : '<span class="note">Checked — none found</span>';
+
+  /* Only a hit retires the control. Removing it on a miss stranded the rep:
+     the only way back was closing and reopening the modal, which nothing on
+     screen suggested. A miss can be a transient provider gap, so the retry
+     stays one click away — an explicit one, because the pull is paid and an
+     automatic retry would double the spend on the rep's behalf. */
+  if (button) {
+    if (found) button.remove();
+    else {
+      button.disabled = false;
+      button.className = 'btn';
+      button.textContent = 'None found — try again';
+    }
+  }
+
+  await bufferOrWarn(found ? 'revealed' : 'reveal_miss',
+    { account: account.id, person: person.li }, slot);
+  toast(found ? 'Contact data revealed for ' + person.name
+              : 'No verified contact data found for ' + person.name + '. You can try again.');
+  render();
+}
+
+function restoreLabel(person){
+  return person.checked ? 'None found — try again' : 'Reveal contact data';
+}
+
+function setBadge(person, key, on){
+  var at = person.badges.indexOf(key);
+  if (on && at === -1) person.badges.push(key);
+  if (!on && at !== -1) person.badges.splice(at, 1);
+}
+
+/* ------------------------------------------------------------------ *
+ * Bulk reveal. The artifact enriches directly, but never before the rep
+ * has seen what will be pulled and what it costs and said yes.
+ *
+ * Two tiers, because the server has two. At or under its threshold there
+ * is no server consent step to show, so the modal states the cost in its
+ * own words. Above it, the server owns the wording: phase 1 returns a
+ * `user_facing_message` that is rendered VERBATIM via textContent and
+ * never paraphrased, and approval sends batches carrying its token.
+ *
+ * What this replaces: a button that recorded the selection and told the
+ * rep to ask in chat. That deferral bought friction rather than consent —
+ * the same people revealed one at a time cost the same and passed no gate
+ * at all. A real gate is both safer and less work for the rep.
+ * ------------------------------------------------------------------ */
+const CONSENT_THRESHOLD = 10;
+const DEFAULT_BATCH = 20;
+var CONFIRM = null;
+
+function closeConfirm(){
+  document.getElementById('c-overlay').classList.remove('open');
+  CONFIRM = null;
+}
+
+async function openRevealAll(ai){
+  var account = BOARD[ai];
+  var people = pendingContacts(account);
+  if (!people.length) return;
+
+  CONFIRM = { ai: ai, people: people, token: null, batch: DEFAULT_BATCH,
+              total: people.length, ready: false };
+
+  document.getElementById('c-title').textContent =
+    'Reveal contact data for ' + people.length + ' ' +
+    (people.length === 1 ? 'person' : 'people') + '?';
+  document.getElementById('c-sub').textContent = account.name;
+  document.getElementById('c-people').innerHTML = people.map(function(p){
+    return '<div>' + escHtml(p.name) +
+      (p.title ? ' <span>· ' + escHtml(p.title) + '</span>' : '') + '</div>';
+  }).join('');
+  clearError('err-confirm');
+
+  var go = document.getElementById('c-go');
+  var cost = document.getElementById('c-cost');
+  go.textContent = 'Yes, reveal ' + people.length;
+  document.getElementById('c-overlay').classList.add('open');
+
+  if (people.length <= CONSENT_THRESHOLD) {
+    /* No server consent step at this tier, so this wording is ours — and it
+       follows the server's own rule for consent copy: frame it as volume,
+       never as cost, credits or billing. Above the threshold the server
+       supplies the wording and we show it untouched. */
+    cost.textContent = 'Looks up a verified email and phone for each of these ' +
+      people.length + '. Nothing is looked up until you confirm.';
+    go.disabled = false;
+    CONFIRM.ready = true;
+    return;
+  }
+
+  go.disabled = true;
+  cost.textContent = 'Checking how many and what it costs…';
+  var consent = await guard('err-confirm', function(){
+    return callEnrichment(enrichArgs([],
+      'Rep opened a bulk reveal above the consent threshold from their weekly plan',
+      { total_count: people.length }));
+  });
+  if (!CONFIRM || CONFIRM.ai !== ai) return;          // rep closed it meanwhile
+  if (consent === null) { cost.textContent = ''; return; }
+
+  /* Verbatim, via textContent. Paraphrasing the cost defeats the flow. */
+  var message = consent.user_facing_message || consent.message;
+  if (!message || !consent.confirmation_token) {
+    showError('err-confirm',
+      'We could not confirm the cost for that many people. Reveal them individually, or ask in chat.',
+      false);
+    cost.textContent = '';
+    console.log('unexpected consent response', consent);
+    return;
+  }
+  cost.textContent = message;
+  CONFIRM.token = consent.confirmation_token;
+  CONFIRM.batch = consent.max_batch_size || DEFAULT_BATCH;
+  CONFIRM.ready = true;
+  go.disabled = false;
+}
+
+function chunk(list, size){
+  var out = [];
+  for (var i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
+}
+
+/* Rows map to people by normalised LinkedIn URL and nothing else. A
+   positional fallback would be a guess, and the cost of guessing wrong is a
+   rep emailing the wrong human — strictly worse than revealing nobody. */
+function indexRows(payload){
+  var byUrl = {};
+  rowsOf(payload).forEach(function(row){
+    var key = normalizeLi(pickField(row, ['linkedin_url','linkedin','profile_url','url','li']));
+    if (key) byUrl[key] = row;
+  });
+  return byUrl;
+}
+
+async function confirmRevealAll(){
+  if (!CONFIRM || !CONFIRM.ready) return;
+  var state = CONFIRM;
+  var account = BOARD[state.ai];
+  var people = state.people;
+  var go = document.getElementById('c-go');
+  go.disabled = true;
+  go.innerHTML = '<span class="spin"></span>Revealing…';
+
+  var batches = chunk(people, state.batch);
+  var payloads = await guard('err-confirm', async function(){
+    var out = [];
+    for (var i = 0; i < batches.length; i++) {
+      var extra = state.token
+        ? { total_count: state.total, confirmation_token: state.token }
+        : {};
+      var label = batches.length > 1 ? ' (' + (i + 1) + ' of ' + batches.length + ')' : '';
+      go.innerHTML = '<span class="spin"></span>Revealing…' + label;
+      out.push(await callEnrichment(enrichArgs(
+        batches[i].map(function(p){ return contactPayload(account, p); }),
+        'Rep approved a bulk contact reveal from their weekly plan', extra), function(){
+        go.innerHTML = '<span class="spin"></span>Still working…' + label;
+      }));
+    }
+    return out;
+  });
+
+  if (payloads === null) {
+    go.disabled = false;
+    go.textContent = 'Yes, reveal ' + people.length;
+    return;
+  }
+
+  var byUrl = {};
+  payloads.forEach(function(payload){
+    var part = indexRows(payload);
+    for (var key in part) if (part.hasOwnProperty(key)) byUrl[key] = part[key];
+  });
+
+  /* "No rows at all" and "rows we could not match" are different answers. The
+     tool echoes every contact back with null values when it finds nothing, so
+     an all-miss arrives fully matched and falls through to the loop below as
+     the miss it is. Reaching here with rows present means the shape changed,
+     which is worth refusing rather than guessing at. */
+  var rowCount = payloads.reduce(function(n, p){ return n + rowsOf(p).length; }, 0);
+  if (rowCount && !Object.keys(byUrl).length) {
+    console.log('bulk reveal returned rows that could not be matched by profile URL',
+      { raw: payloads });
+    showError('err-confirm',
+      'That came back in a shape we could not match to these people. Nothing was changed — ' +
+      'reveal them individually, or ask in chat.', false);
+    go.disabled = false;
+    go.textContent = 'Yes, reveal ' + people.length;
+    return;
+  }
+
+  /* A truncated response is a short answer, not a negative one. Marking the
+     people it left out as "checked, none found" would bill them a second time
+     to learn what we never actually asked. */
+  var short = payloads.some(function(p){ return p && p.truncated; });
+  var found = 0, skipped = 0;
+  for (var i = 0; i < people.length; i++) {
+    var person = people[i];
+    var row = byUrl[normalizeLi(person.li)];
+    if (!row && short) { skipped++; continue; }
+    var hit = applyContactRow(person, row || {});
+    if (hit) found++;
+    await bufferOrWarn(hit ? 'revealed' : 'reveal_miss',
+      { account: account.id, person: person.li }, 'err-acct-' + account.id);
+  }
+
+  closeConfirm();
+  var missed = people.length - found - skipped;
+  toast(found
+    ? 'Revealed ' + found + ' of ' + people.length + ' at ' + account.name +
+      (missed ? '. ' + missed + ' came up empty — open them to try again.' : '.') +
+      (skipped ? ' ' + skipped + ' were not returned — run it again for those.' : '')
+    : 'No verified contact data found for these ' + people.length + '. You can try again.');
+  render();
+}
+
+async function swapAccount(ai){
+  var account = BOARD[ai];
+  document.getElementById('s-target').textContent = account.name;
+  document.getElementById('s-result').innerHTML = '';
+  clearError('err-swap');
+  document.getElementById('s-overlay').classList.add('open');
+  document.getElementById('s-overlay').dataset.ai = String(ai);
+  document.getElementById('s-domain').focus();
+}
+
+async function runMatch(){
+  var value = document.getElementById('s-domain').value.trim();
+  if (!value) return;
+  var out = document.getElementById('s-result');
+  out.innerHTML = '<div class="match-card"><span class="spin"></span>Checking &ldquo;' +
+    escHtml(value) + '&rdquo;…</div>';
+
+  var result = await guard('err-swap', async function(){
+    var args = value.indexOf('.') !== -1 ? { companies: [{ website: value }] }
+                                        : { companies: [{ name: value }] };
+    args.telemetry = { intent: 'Rep checked a replacement account from their weekly plan' };
+    return await callTool('match_company', args);
+  });
+
+  if (result === null) { out.innerHTML = ''; return; }
+
+  var match = firstRow(result);
+  if (!match || match.matched === false || (!match.name && !match.linkedin_url)) {
+    out.innerHTML = '<div class="match-card">No confident match for &ldquo;' + escHtml(value) +
+      '&rdquo;. Try the full company domain.</div>';
+    return;
+  }
+  out.innerHTML = '<div class="match-card"><b>' + escHtml(match.name || value) + '</b><br>' +
+    '<span class="note">' +
+    (match.website ? 'Website: ' + escHtml(match.website) + '<br>' : '') +
+    (match.linkedin_url ? 'Profile: ' + escHtml(match.linkedin_url) : '') +
+    '</span><br><br>Ask in chat to build the full plan for this account — signals, ' +
+    'people and drafts take a couple of minutes.</div>';
+}
+
+async function replaceProspect(ai, pi){
+  var account = BOARD[ai];
+  var person = account.personas[pi];
+  var slot = 'err-p-' + ai + '-' + pi;
+
+  var result = await guard(slot, async function(){
+    return await callTool('ai_prospecting', {
+      action: 'run',
+      company_linkedin_url: account.li ? 'https://' + account.li : '',
+      telemetry: { intent: 'Rep marked a contact not relevant and asked for the next best buyer at the same account' }
+    });
+  });
+  if (result === null) return;
+
+  var seen = {};
+  account.personas.forEach(function(p){ if (p.li) seen[p.li] = true; });
+  var candidates = rowsOf(result).filter(function(row){
+    var li = String(row.LINKEDIN_URL || row.linkedin_url || '').replace(/^https?:\/\//, '');
+    return li && !seen[li];
+  });
+
+  if (!candidates.length) {
+    showError(slot, 'No clean replacement came back. Ask in chat for a hand-picked one.', false);
+    return;
+  }
+
+  var pick = candidates[0];
+  account.personas[pi] = normalizePersona({
+    name: pick.FULL_NAME || pick.full_name || 'New contact',
+    title: pick.TITLE_NAME || pick.job_title || '',
+    loc: pick.location || '',
+    p: 'REPLACEMENT',
+    li: String(pick.LINKEDIN_URL || pick.linkedin_url || '').replace(/^https?:\/\//, ''),
+    signal: { d: 'Replacement', q: pick.ai_reasoning || 'Surfaced as a strong fit at this account.',
+              why: 'Ranked a strong fit for ' + account.name + '.' },
+    why: 'Replacement surfaced for ' + account.name + '.',
+    mail: { s: '', b: '' }
+  });
+
+  await bufferOrWarn('replaced',
+    { account: account.id, removed: person.li, added: account.personas[pi].li }, slot);
+  document.getElementById('p-overlay').classList.remove('open');
+  toast('Replaced ' + person.name + ' at ' + account.name);
+  render();
+}
+
+async function removeProspect(ai, pi){
+  var account = BOARD[ai];
+  var person = account.personas[pi];
+  account.personas.splice(pi, 1);
+  var written = await bufferOrWarn('removed_person',
+    { account: account.id, person: person.li || person.name }, 'err-acct-' + account.id);
+  toast(written
+    ? 'Removed ' + person.name + '. They will not come back next week.'
+    : 'Removed ' + person.name + ' here, but we could not record it — they may come back.');
+  render();
+}
+
+function csvCell(value){
+  var s = value == null ? '' : String(value);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function downloadCsv(){
+  var header = ['Week','Account','Contact','Title','Profile','Email','Phone']
+    .concat(TOUCHES.map(function(_, i){ return 'Touchpoint ' + (i + 1); }))
+    .concat(['Completed?','Meeting booked?','Notes']);
+  var lines = [header];
+  BOARD.forEach(function(account){
+    account.personas.forEach(function(person){
+      lines.push([
+        isPlaceholder(WEEK_LABEL) ? '' : WEEK_LABEL,
+        account.name, person.name, person.title,
+        person.li ? 'https://' + person.li : '',
+        person.email || '', person.phone || ''
+      ].concat(TOUCHES).concat(['', '',
+        person.signal.d + (person.warm ? '  ·  Warm intro: ' + person.warm : '')
+      ]));
+    });
+  });
+  var csv = lines.map(function(row){ return row.map(csvCell).join(','); }).join('\n');
+  var link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  link.download = 'weekly-plan.csv';
+  link.click();
+  URL.revokeObjectURL(link.href);
+  toast('Downloaded. Includes any contact data you revealed.');
+}
+
+/* ------------------------------------------------------------------ *
+ * Wiring
+ * ------------------------------------------------------------------ */
+function pair(value){ return value.split(',').map(Number); }
+
+document.addEventListener('click', function(event){
+  var target = event.target;
+  var el = target.closest ? target.closest('[data-open],[data-remove],[data-dims],[data-swap],[data-request],[data-reveal],[data-replace],[data-remove-close],[data-close],[data-filter]') : null;
+  if (!el) return;
+
+  if (el.hasAttribute('data-remove')) {
+    event.stopPropagation();
+    var r = pair(el.getAttribute('data-remove'));
+    removeProspect(r[0], r[1]);
+  } else if (el.hasAttribute('data-remove-close')) {
+    var rc = pair(el.getAttribute('data-remove-close'));
+    document.getElementById('p-overlay').classList.remove('open');
+    removeProspect(rc[0], rc[1]);
+  } else if (el.hasAttribute('data-reveal')) {
+    var rv = pair(el.getAttribute('data-reveal'));
+    revealContact(rv[0], rv[1]);
+  } else if (el.hasAttribute('data-replace')) {
+    var rp = pair(el.getAttribute('data-replace'));
+    replaceProspect(rp[0], rp[1]);
+  } else if (el.hasAttribute('data-dims')) {
+    document.getElementById('sd-' + el.getAttribute('data-dims')).classList.toggle('open');
+  } else if (el.hasAttribute('data-swap')) {
+    swapAccount(Number(el.getAttribute('data-swap')));
+  } else if (el.hasAttribute('data-request')) {
+    openRevealAll(Number(el.getAttribute('data-request')));
+  } else if (el.hasAttribute('data-close')) {
+    document.getElementById(el.getAttribute('data-close')).classList.remove('open');
+  } else if (el.hasAttribute('data-filter')) {
+    activeFilter = el.getAttribute('data-filter');
+    document.querySelectorAll('.chip-f').forEach(function(chip){
+      chip.classList.toggle('on', chip === el);
+    });
+    render();
+  } else if (el.hasAttribute('data-open')) {
+    var o = pair(el.getAttribute('data-open'));
+    openProspect(o[0], o[1]);
+  }
+});
+
+document.addEventListener('keydown', function(event){
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  var el = event.target.closest ? event.target.closest('[data-open]') : null;
+  if (!el) return;
+  event.preventDefault();
+  var o = pair(el.getAttribute('data-open'));
+  openProspect(o[0], o[1]);
+});
+
+document.getElementById('search').addEventListener('input', function(event){
+  searchTerm = event.target.value.trim().toLowerCase();
+  render();
+});
+document.getElementById('btn-csv').addEventListener('click', downloadCsv);
+document.getElementById('s-run').addEventListener('click', runMatch);
+document.getElementById('s-close').addEventListener('click', function(){
+  document.getElementById('s-overlay').classList.remove('open');
+});
+document.getElementById('s-domain').addEventListener('keydown', function(event){
+  if (event.key === 'Enter') runMatch();
+});
+document.getElementById('c-go').addEventListener('click', confirmRevealAll);
+document.getElementById('c-cancel').addEventListener('click', closeConfirm);
+document.getElementById('c-close').addEventListener('click', closeConfirm);
+
+['p-overlay','s-overlay'].forEach(function(id){
+  document.getElementById(id).addEventListener('click', function(event){
+    if (event.target === this) this.classList.remove('open');
+  });
+});
+document.getElementById('c-overlay').addEventListener('click', function(event){
+  if (event.target === this) closeConfirm();
+});
+
+document.getElementById('footer').textContent =
+  'Built from market intelligence across every available layer: buying-intent messages from ' +
+  'professional communities, open roles and hiring activity, event attendance, community ' +
+  'membership, developer-community activity, verified employee technology footprint, adoption ' +
+  'and headcount trends, career-history movement, and annual-filing language. Every quote is ' +
+  'reproduced verbatim from a public message. Contact data is fetched only when you ask for it, ' +
+  'never automatically.';
+
+/* A read on load, never a write. Until the next run drains it, the buffer is
+   the only record that a reveal came back empty, so without replaying it a
+   person who was checked looks untouched again after a reload.
+
+   Deliberately narrow: contact-data state only. Replaying removals would
+   reach into suppression semantics that belong to the drain. */
+async function restoreContactState(){
+  var entries;
+  try { entries = await readBuffer(); }
+  catch (err) { console.error('buffer read failed', err); return; }
+
+  var byId = {};
+  BOARD.forEach(function(account){ byId[account.id] = account; });
+  var changed = false;
+
+  entries.forEach(function(entry){
+    if (entry.kind !== 'reveal_miss') return;
+    var payload = (entry && entry.payload) || {};
+    var account = byId[payload.account];
+    if (!account) return;
+    account.personas.forEach(function(person){
+      if (!person.li || normalizeLi(person.li) !== normalizeLi(payload.person)) return;
+      if (person.email || person.phone) return;
+      person.checked = true;
+      setBadge(person, 'mis', true);
+      changed = true;
+    });
+  });
+
+  if (changed) render();
+}
+
+render();
+restoreContactState();
+</script>
+</body>
+</html>
