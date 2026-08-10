@@ -29,8 +29,8 @@ The single-prospect and many-prospect cases run the same steps; the batch case j
 | Purpose | Tool |
 |---|---|
 | Get tenant config + integration ids + **ICP** | `get_tenant_settings()` |
-| **Read** your tenant's CRM / SEP (Outreach) | `onfire_integration_read(integration_id, relative_url, …)` |
-| **Write** to Outreach (create/enroll/draft/send) | `onfire_integration_write(integration_id, http_method, relative_url, json_body)` |
+| **Read** Outreach | `sep_read(relative_url, http_method="GET", params=…)` — **no** `integration_id` |
+| **Write** to Outreach (create/enroll/draft/send) | `sep_write(http_method, relative_url, json_body=…)` — **no** `integration_id` |
 | Resolve a person → LinkedIn + title/company | `match_person` |
 | Resolve a company → LinkedIn + firmographics | `match_company` |
 | Score the prospect + get talking points | `ai_prospecting` |
@@ -49,11 +49,13 @@ The email-writing rubric and the researched cold-email best practices live in **
 
 Most failures in this flow are **not** code errors — they're configuration gates that leave a prospect silently stuck in **"pending"** with no draft to edit. Check these before promising the user anything.
 
-1. **Resolve the integration id fresh, every session.** Call `get_tenant_settings()` and read `sep.integration_id` (Outreach) and `sep.type`. **Integration ids rotate** — e.g. after a mailbox/scope reconnect an id can change from `1230` to `2121`. Never reuse a hard-coded id; re-fetch.
+1. **Confirm the provider, every session.** Call `get_tenant_settings()` and read `sep.type` — it must be `"outreach"` for this skill. If it's `salesloft`, `gong`, or `replyio`, this skill's endpoints do not apply: use **`sep-cadence-enrollment`** instead (and `gong-create-and-push-to-flow` for Gong).
+
+   `sep_read`/`sep_write` take **no `integration_id`** — the engine resolves the tenant's Outreach integration internally, so there is no id to fetch, rotate, or go stale. (Only `crm_read` still takes one, from `crm.integration_id`.)
 
 2. **OAuth scopes.** The flow needs: `prospects.read/write`, `sequences.read/write`, `sequenceSteps.read/write`, `sequenceStates.read/write`, `sequenceTemplates.all` (or `.read`), `templates.all` (or `.read`), `mailboxes.read`, `mailings.read/write`, `tasks.read/write`, `emailAddresses.read/write`. A missing scope returns `403 unauthorizedOauthScope` naming the exact scope. `schedules.read` is commonly **absent** — expect not to be able to read the delivery schedule via API, and diagnose schedule issues from the UI instead.
 
-3. **Scopes need a token refresh, and that rotates the id.** Adding scopes in the Outreach app does **not** upgrade an already-issued token. The integration must be **reconnected / re-authorized**, after which the `integration_id` usually changes — so re-run step 1.
+3. **Scopes need a token refresh.** Adding scopes in the Outreach app does **not** upgrade an already-issued token. The integration must be **reconnected / re-authorized** in the Onfire app before the new scopes take effect.
 
 4. **A sendable mailbox must exist.** `GET mailboxes` and pick one where `sendState == "ENABLED"` and `sendDisabled == false`. **Sending and syncing are independent**: the "Enable sending" toggle is what matters for outbound; the "Enable syncing" toggle only governs reply tracking and does **not** block sends. Dev tenants often have mailboxes with sending disabled — surface which mailbox you'll send from and that its `from` address is what the prospect will see.
 
@@ -84,7 +86,14 @@ Either way, the email step you target **must be a Manual Email step** — that's
 
 ## STEP 2 — Create or resolve the prospect
 
-Always **dedupe first**: `GET prospects?filter[emails]=<email>`. If they exist, reuse that prospect `id`. Only `POST prospects` when they don't. Make sure the prospect has an **email address attached** — an email step can't send without one. If the user gave only a name/company, resolve identity with `match_person` first so you create a clean, correct record.
+Always **dedupe first**: `GET prospects?filter[emails]=<email>`. If they exist, reuse that prospect `id` and skip the rest of this step. Make sure the prospect has an **email address attached** — an email step can't send without one. If the user gave only a name/company, resolve identity with `match_person` first so you create a clean, correct record.
+
+**If they don't exist, how you create them depends on the tenant** — see `sep-cadence-enrollment` for the full rule:
+
+- **CRM connected (`crm.enabled` is true) → go through the CRM.** Push the person with `crm_write(entity_type="prospect", records=[…])`, then wait for the tenant's CRM→Outreach mirror to create the prospect, then re-run the dedupe lookup above to get the prospect `id`. This respects the tenant's CRM field mapping and ownership routing; a direct create bypasses both and can duplicate the record the mirror is about to create anyway.
+- **No CRM connected → `POST prospects` directly.** With no mirror to fight, this is the only path and it's the correct one.
+
+Don't guess which case you're in — read `crm.enabled` from `get_tenant_settings()`.
 
 ## STEP 3 — Enroll the prospect
 
@@ -139,7 +148,9 @@ Same flow, looped, with a few additions:
 
 ## Hard rules (the things that bite)
 
-- **Re-fetch the integration id every session** — ids rotate after reconnects.
+- **Confirm `sep.type == "outreach"` every session.** Another provider means another skill (`sep-cadence-enrollment`).
+- **`sep_read`/`sep_write` take no `integration_id`** — don't invent the argument.
+- **Prefer CRM-first for creating people** when a CRM is connected (see STEP 2).
 - **Never prefix `api/v2/`** in `relative_url`.
 - **The email step must be a Manual Email step**, and the **draft must already exist** before you PATCH it.
 - **Pending ≠ broken.** It's almost always the delivery-schedule window, an inactive sequence, or a non-sendable mailbox. Diagnose those, don't retry blindly.
