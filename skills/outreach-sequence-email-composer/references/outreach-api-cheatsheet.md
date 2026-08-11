@@ -2,16 +2,18 @@
 
 All calls go through the Onfire Integrations tools, which resolve credentials and route to Outreach. **The engine already applies the `api/v2/` root** — `relative_url` must be the bare path (`prospects`, not `api/v2/prospects`).
 
-- **Reads (any tenant):** `onfire_integration_read(integration_id, relative_url, params?, http_method="GET")`
-- **Writes:** `onfire_integration_write(integration_id, http_method, relative_url, json_body)`
+- **Reads:** `sep_read(relative_url, http_method="GET", params?)`
+- **Writes:** `sep_write(http_method, relative_url, json_body?, params?)`
+- **Neither takes an `integration_id`** — the engine resolves the tenant's Outreach integration internally. There is no id to fetch or keep fresh.
 - Bodies are **JSON:API**: `{"data": {"type": "...", "id": ..., "attributes": {...}, "relationships": {...}}}`.
-- Get `integration_id` from `get_tenant_settings(...).sep.integration_id`. **Re-fetch each session — ids rotate.**
+- `sep_read` is read-only by construction: a write-shaped request sent to it is redirected, not executed. `sep_write` is deny-by-default — if the tenant lacks the grant you get a refusal, not a silent no-op.
 
-## Get the integration id + ICP
+## Confirm the provider + get the ICP
 
 ```
 get_tenant_settings()
-  → sep.integration_id, sep.type ("outreach")
+  → sep.type          # must be "outreach" for this cheat-sheet
+  → crm.enabled       # true → create people CRM-first (see the skill's STEP 2)
   → account_research.{golden_persona, competitors, technologies,
       organization, buying_committee_queries, display_names_mapping}  # ICP
 ```
@@ -142,4 +144,4 @@ The manual-email task links to the same `mailing`. It appears in the user's Task
 
 ## Common 403s
 
-`unauthorizedOauthScope` names the missing scope. The flow needs: `prospects.read/write`, `sequences.read/write`, `sequenceSteps.read/write`, `sequenceStates.read/write`, `sequenceTemplates.all`, `templates.all`, `mailboxes.read`, `mailings.read/write`, `tasks.read/write`, `emailAddresses.read/write`. `schedules.read` is often missing — diagnose schedule issues from the UI. Adding scopes requires reconnecting the integration, which rotates the `integration_id`.
+`unauthorizedOauthScope` names the missing scope. The flow needs: `prospects.read/write`, `sequences.read/write`, `sequenceSteps.read/write`, `sequenceStates.read/write`, `sequenceTemplates.all`, `templates.all`, `mailboxes.read`, `mailings.read/write`, `tasks.read/write`, `emailAddresses.read/write`. `schedules.read` is often missing — diagnose schedule issues from the UI. Adding scopes requires reconnecting the integration in the Onfire app before the new scopes take effect.
