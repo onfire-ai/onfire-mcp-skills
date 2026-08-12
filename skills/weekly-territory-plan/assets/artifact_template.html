@@ -6,10 +6,10 @@
 <!-- This document holds callMcpTool, so injected markup here is not a defacement
      but a route to a connected tool. The policy below is deliberately partial:
      no default-src, because the cowork bridge's transport is host-defined and a
-     blanket connect-src would silently kill every reveal. What it does buy is the
-     two channels injected markup would actually reach for -- a remote <script>
-     and an <img> beacon carrying the board off-origin. Inline script and style
-     stay allowed because the whole template is one file. -->
+     blanket connect-src would silently kill every reveal. What it does buy is
+     the two channels injected markup would actually reach for: a remotely
+     loaded script, and an image request beaconing the board off-origin. Inline
+     script and style stay allowed because the whole template is one file. -->
 <meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>My Plan</title>
 <style>
