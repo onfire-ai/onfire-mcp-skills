@@ -80,8 +80,17 @@ surviving placeholder is a signal, not a bug: `resolveTool` treats it as unavail
 the affected control renders disabled with a reason. The pre-delivery checklist greps
 for placeholders so an unsubstituted one never reaches a rep unnoticed.
 
-A runtime fallback covers a stale id — a workspace reconnected since the last render —
-by matching a listed tool whose name ends with the short name.
+There is **no runtime fallback**, deliberately. `resolveTool` used to cover a stale id —
+a workspace reconnected since the last render — by scanning the ambient tool list for a
+name ending in the short name. Short names are guessable, so that handed the decision to
+whichever server answered first: any other connector in the workspace could register
+`<anything>__contact_data_enrichment` and receive a rep's prospect list, or reply with
+enrichment nobody paid for and nobody can trace. A stale id costs one disabled button
+until the next render, which is Monday. An impostor costs the prospect list.
+
+So the only accepted identifier is the one you substituted, and it must still end in the
+short name it is registered under — a mis-paste fails closed the same way a placeholder
+does.
 
 ### One unwrap, not three
 

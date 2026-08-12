@@ -1,0 +1,49 @@
+Copyright (c) 2026 Onfire AI Ltd. All rights reserved.
+
+This repository is published so that Onfire customers and prospective customers
+can read, evaluate and install these Claude Agent Skills. It is not open source.
+
+GRANT
+
+Subject to the conditions below, Onfire grants you a non-exclusive,
+non-transferable, revocable licence to:
+
+  1. read and evaluate the contents of this repository; and
+  2. install and run these skills, in unmodified form, in your own agent
+     environment for the purpose of using the Onfire MCP service under a valid
+     agreement with Onfire.
+
+Installing the plugin necessarily copies these files onto your machine and loads
+them into your agent. That copying, and local configuration of which skills are
+enabled, is permitted by the grant above.
+
+RESERVED
+
+Except as expressly granted, no rights are given. In particular you may not,
+without prior written permission from Onfire:
+
+  1. copy, publish, redistribute, sublicense, sell or host this repository or
+     any substantial portion of it;
+  2. modify it or create derivative works from it, including adapting these
+     skills for another data provider or agent platform;
+  3. use its contents to train or fine-tune a model; or
+  4. remove or obscure this notice.
+
+NO WARRANTY
+
+THE CONTENTS OF THIS REPOSITORY ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+EVENT SHALL ONFIRE BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THIS REPOSITORY OR ITS USE.
+
+These skills instruct an autonomous agent, and several of them write to
+connected systems (CRM, sales engagement platforms) on your behalf. You remain
+responsible for reviewing what you enable and for the actions taken in your own
+environment.
+
+CONTACT
+
+Licensing questions: onfire-ai@onfire.ai
+Security and privacy reports: security@onfire.ai (see SECURITY.md)

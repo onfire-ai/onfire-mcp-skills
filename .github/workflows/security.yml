@@ -1,0 +1,53 @@
+# The repo already had gitleaks rules and a pre-commit config. What it did not have was
+# anywhere those actually ran: the hooks need `pre-commit install` in every clone, and
+# `git commit --no-verify` walks past them. On a public repo with PII rules that is a
+# policy, not a control. This workflow is the control.
+name: security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  secrets-and-pii:
+    name: gitleaks (secrets + PII)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: the pre-push hook scans every commit, so CI must too, or a
+          # secret that landed behind --no-verify stays invisible to both.
+          fetch-depth: 0
+
+      # Pinned image rather than gitleaks-action, which wants a licence key for
+      # organisation repos. Same binary, same .gitleaks.toml as the local hooks.
+      - name: Scan full history
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo \
+            zricethezav/gitleaks:v8.30.1 \
+            git --redact --verbose --config .gitleaks.toml
+
+  skill-policy:
+    name: skill policy (audit regressions)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the patterns the security audit asked us to remove
+        run: python3 scripts/check_skill_policy.py
+
+  workbook-builder:
+    name: workbook builder tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned deps
+        run: python3 -m pip install --quiet "openpyxl==3.1.5"
+      - name: Run tests
+        run: python3 -m unittest discover -s tests -v

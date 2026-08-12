@@ -12,10 +12,21 @@ leak. Email **security@onfire.ai** with details and we will respond privately.
 
 ## What is automatically enforced
 
+- **CI on every PR and every push to `main`** (`.github/workflows/security.yml`):
+  gitleaks over the full history using the same `.gitleaks.toml` as the local
+  hooks, the skill-policy checks, and the workbook-builder tests. This is the
+  gate that cannot be skipped — the hooks below are opt-in per clone and a
+  `--no-verify` walks past them, so CI is what actually holds the line for the
+  custom PII rules (GitHub's own push protection covers secrets, not those).
 - **Local pre-commit/pre-push hook** (gitleaks) scans staged changes and full
   history for secrets and PII (emails, phones, SSNs, cards, LinkedIn URLs, and
   hidden/invisible Unicode). See `.gitleaks.toml` / `.pre-commit-config.yaml`.
   Install once per clone: `pre-commit install --hook-type pre-commit --hook-type pre-push`.
+- **Skill policy checks** (`scripts/check_skill_policy.py`) fail the build when a
+  skill reintroduces a pattern a security review removed: global `pip install`
+  into the user's interpreter, remote webfonts in generated reports, MCP tool
+  resolution by scanning the ambient tool list, raw tool responses in logs,
+  unescaped agent-authored markup, or internal warehouse identifiers.
 - **Branch protection on `main`**: PRs only, one non-author approval, code-owner
   review, admins included; only the `developers` team can merge.
 - On the public repo, GitHub **secret scanning + push protection** provide a

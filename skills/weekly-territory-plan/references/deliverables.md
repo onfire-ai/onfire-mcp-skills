@@ -68,11 +68,20 @@ why-now, with the warm-intro sentence appended when there is one.
 
 ### Building it
 
-`assets/pg_plan_builder.py` maintains the workbook. It needs `openpyxl`:
+`assets/pg_plan_builder.py` maintains the workbook. It needs `openpyxl`, pinned, in a
+throwaway venv beside the output — never installed into the user's interpreter:
 
 ```bash
-pip install openpyxl --break-system-packages
+python3 -m venv .venv-plan && .venv-plan/bin/pip install --quiet "openpyxl==3.1.5"
 ```
+
+Then run the builder with that interpreter (`.venv-plan/bin/python`, not `python3`).
+
+<!-- policy-ok: names the banned flag in order to ban it -->
+`--break-system-packages` was here before and should not come back. It suppresses the
+guard that stops a rep's system Python from being rewritten by a report generator, and
+an unpinned name resolves to whatever the index serves that morning — a build step no
+one reviewed, running on a laptop that has CRM credentials on it.
 
 ```python
 from pg_plan_builder import add_week
