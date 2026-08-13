@@ -54,29 +54,86 @@ tags = ["skill-safety", "hidden-unicode", "prompt-injection"]
 
 # ---------------------------------------------------------------------------
 # Allowlist — the repo's intentional synthetic placeholders (not real PII).
-# Keep this list tight: only obviously-fake documentation values belong here.
+#
+# This repo is 24 skills of worked examples, so it carries ~86 fake emails,
+# handles and phone numbers. Every one of them trips a PII rule, which means
+# this allowlist is not a footnote: it is what decides whether a contributor
+# writing an example gets a green build or a red one.
+#
+# It used to work by enumeration — a list of the specific fake strings already
+# in the tree. That fails the next author by construction. A phone number is
+# the clearest case: exactly one fake number was listed, so `+14155551234`
+# (obviously fictional, 555 in the subscriber position) failed CI while
+# `+15551234567` passed, for no reason a contributor could infer.
+#
+# So the rules below are STRUCTURAL: ranges that cannot be real, rather than
+# strings that happen not to be. Anything a contributor writes inside a
+# reserved range passes without touching this file. Anything outside one is
+# treated as real PII, which is the safe default for a public repo.
+#
+# Adding to this file: prefer a reserved range over a literal. If you find
+# yourself pasting a specific value, ask whether the example could use a
+# reserved one instead — it almost always can.
 # ---------------------------------------------------------------------------
 [allowlist]
-description = "Documentation placeholders — synthetic, not real PII"
+description = "Documentation placeholders — reserved-by-standard ranges, not real PII"
 regexTarget = "match"
 regexes = [
-  # placeholder email domains used throughout the skill examples
-  '''@(?:x|acme|co|company|yourcompany|techcorp|startup|example|random)\.(?:com|io|org)''',
-  # the two gmail example addresses (gmail.com is NOT blanket-allowlisted)
-  '''\bbob@gmail\.com\b''',
-  '''\bc@gmail\.com\b''',
-  # org contact address (company role address, not personal PII)
+  # -- Email ---------------------------------------------------------------
+  # RFC 2606 / RFC 6761 reserve these for documentation. IANA will not
+  # delegate them, so no address here can belong to a real person.
+  #
+  # Anchored with $ (regexTarget is "match", so $ is the end of the matched
+  # address). The anchor is the whole safety property: an unanchored \b let the
+  # reserved word match as a SUBDOMAIN label, because a "." satisfies \b -- so
+  # an address at test.<any real company>.com, or localhost.<any real company>.io,
+  # was exempted. The reserved name has to be the LAST label to mean anything.
+  '''@(?:[A-Za-z0-9-]+\.)*example\.(?:com|net|org)$''',
+  '''@(?:[A-Za-z0-9-]+\.)*(?:example|invalid|test|localhost)$''',
+  # Onfire role addresses (a company inbox, not a person's mailbox)
   '''@onfire\.ai''',
-  # canonical fake phone number (+1 555-1234567 / 555-01xx reserved test range)
-  '''\+?1?555123456\d''',
-  '''\b555[-.]?01\d{2}\b''',
-  # placeholder LinkedIn personal handles used in the skill examples
+  # Legacy informal domains already used across the skill examples. These are
+  # NOT reserved — acme.com, co.com and x.com are real registered domains, so
+  # exempting them is a compromise for the examples already in the tree, not a
+  # pattern to copy. New examples should use example.com and friends above.
+  # Removing these means rewriting ~18 examples across a dozen skills; worth
+  # doing, tracked separately, deliberately not bundled into a security fix.
+  '''@(?:x|acme|co|company|yourcompany|techcorp|startup|random)\.(?:com|io|org)''',
+  '''\b(?:bob|c)@gmail\.com\b''',   # two long-standing consumer-mailbox examples
+
+  # -- Phone ---------------------------------------------------------------
+  # NANP never assigns 555 as an area code, so +1555xxxxxxx cannot ring anyone.
+  '''\+?1?[-.\s]?\(?555\)?[-.\s]?\d{3}[-.\s]?\d{4}''',
+  # The 555 EXCHANGE, in any area code. Note this is deliberately wider than
+  # the standard: NANP formally reserves only 555-0100..0199 for fiction, so
+  # 415-555-1234 is not guaranteed unassignable (555-1212 is real directory
+  # assistance in some areas). We exempt the whole exchange anyway, for a
+  # threat-model reason rather than a standards one — the leak this rule exists
+  # to catch is a real prospect's phone pasted into an example, and no
+  # consumer line is ever issued in the 555 exchange. Treating the universally
+  # recognised fake-number pattern as suspicious costs a red build on every
+  # example and buys no protection against the thing we care about.
+  '''\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?555[-.\s]?\d{4}\b''',
+  '''\b555[-.]?01\d{2}\b''',   # bare 555-01xx, no area code
+
+  # -- LinkedIn ------------------------------------------------------------
+  # "example-" prefixed handles are the repo's synthetic-person convention. No
+  # digit-count anchor: the old \d{2} meant example-person-7 failed and
+  # example-person-100 failed, which is a trap with no upside.
+  '''linkedin\.com/in/example-[A-Za-z0-9._-]*''',
+  # Placeholder-register names (the Jane Doe / John Doe set) used in older
+  # examples. Bounded on purpose — this is a closed list, not a pattern.
   '''linkedin\.com/in/(?:johndoe|janedoe|alice-smith|alicejohnson|bob-jones|\.\.\.)$''',
-  # namespaced synthetic handles for multi-person skill fixtures. "example-" cannot be
-  # mistaken for a real handle, and \d{2} bounds the namespace to 100 slots.
-  '''linkedin\.com/in/example-person-\d{2}$''',
 ]
-# don't scan the config files that legitimately contain these example patterns
+# Only this config, which necessarily contains the patterns it defines.
+#
+# scripts/check_pii_allowlist.py was briefly listed here too, so that its
+# must-be-caught test vectors would not be reported by the repo scan. That was
+# the wrong trade twice over: it put realistic identifiers in a public repo, and
+# it did so in the one file the scanner had been told to ignore. The vectors are
+# now assembled from fragments at runtime, so no matchable literal exists in the
+# source and the file is scanned like everything else. Keep this list at one
+# entry -- an exclusion is a hole, and a hole in a PII scanner is where PII goes.
 paths = [
   '''\.gitleaks\.toml$''',
 ]

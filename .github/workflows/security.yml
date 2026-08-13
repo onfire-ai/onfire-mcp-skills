@@ -23,6 +23,18 @@ jobs:
           # secret that landed behind --no-verify stays invisible to both.
           fetch-depth: 0
 
+      # The allowlist decides whether a contributor's example is a leak or a
+      # placeholder, so it gets tested before it is trusted. Runs first: if the
+      # allowlist is wrong, the scan below is meaningless in either direction.
+      - name: PII allowlist exempts fakes and still catches real PII
+        run: |
+          python3 scripts/check_pii_allowlist.py --write-fixtures /tmp/pii-fixtures
+          docker run --rm -v /tmp/pii-fixtures:/fixtures -v "$PWD/.gitleaks.toml:/config/.gitleaks.toml" \
+            zricethezav/gitleaks:v8.30.1 \
+            dir --config /config/.gitleaks.toml --report-format json \
+                --report-path /fixtures/report.json --exit-code 0 --no-banner /fixtures
+          python3 scripts/check_pii_allowlist.py --verify /tmp/pii-fixtures/report.json
+
       # Pinned image rather than gitleaks-action, which wants a licence key for
       # organisation repos. Same binary, same .gitleaks.toml as the local hooks.
       - name: Scan full history
@@ -30,6 +42,37 @@ jobs:
           docker run --rm -v "$PWD:/repo" -w /repo \
             zricethezav/gitleaks:v8.30.1 \
             git --redact --verbose --config .gitleaks.toml
+
+      # gitleaks prints redacted findings and no guidance, which reads as "you
+      # leaked a secret" even when the hit is a made-up phone number in an
+      # example. Most hits on this repo are the latter, so say so here rather
+      # than leaving each contributor to work it out from a stack of Fingerprints.
+      - name: Explain a failure
+        if: failure()
+        run: |
+          cat <<'EOF'
+          ================================================================
+          A finding above is one of two things.
+
+          1. REAL secret or PII -> do not just delete the line and re-push.
+             Anything that reached a push is disclosed: rotate the credential,
+             and treat personal data as leaked. Removing the commit does not
+             recall it (pushed objects stay reachable through the API).
+
+          2. A synthetic example that fell outside the allowlist. Use a
+             reserved range and it passes by construction, no config edit:
+
+               email     pat@example.com, x@anything.test, dev@foo.invalid
+               phone     +15551234567, +1 (555) 123-4567, 555-0142
+                         (any 555 area code, or 555 exchange)
+               linkedin  linkedin.com/in/example-<anything>
+               names     Jane Doe / John Doe / Northwind (placeholder register)
+
+          Full conventions: README.md, "Rules that are enforced, not suggested".
+          Genuinely need a new range? Add it to .gitleaks.toml AND add a vector
+          to scripts/check_pii_allowlist.py so the next widening stays honest.
+          ================================================================
+          EOF
 
   skill-policy:
     name: skill policy (audit regressions)

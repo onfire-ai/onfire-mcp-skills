@@ -49,9 +49,23 @@ Docker over the full history.
 
 ### Rules that are enforced, not suggested
 
-- **No real personal data anywhere**, including examples. Use the placeholder register
-  (`Jane Doe`, `Northwind`, `example.com`). Gitleaks blocks emails, phones, SSNs, cards
-  and LinkedIn profile URLs; names it cannot catch, so reviewers must.
+- **No real personal data anywhere**, including examples. Gitleaks blocks emails, phones,
+  SSNs, cards and LinkedIn profile URLs; names it cannot catch, so reviewers must. Write
+  examples inside these ranges and they pass by construction — no config edit, no red
+  build:
+
+  | Kind | Use | Why it is safe |
+  |---|---|---|
+  | Email | `pat@example.com`, `x@anything.test`, `dev@foo.invalid` | RFC 2606 / 6761 reserved — IANA will not delegate them |
+  | Phone | `+15551234567`, `+1 (555) 123-4567`, `555-0142` | 555 is never assigned as an area code, and no consumer line is issued in the 555 exchange |
+  | LinkedIn | `linkedin.com/in/example-<anything>` | `example-` is the repo's synthetic-person prefix |
+  | Names | `Jane Doe`, `John Doe`, `Northwind` | placeholder register |
+
+  A value outside these ranges is treated as real PII, which is the right default for a
+  public repo. If you genuinely need a new range, add it to `.gitleaks.toml` **and** add
+  a vector to `scripts/check_pii_allowlist.py` — that test asserts both directions
+  (fakes stay exempt, realistic values stay caught) so a widening can't open a hole
+  quietly.
 - **Generated files are self-contained.** No remote fonts, scripts, stylesheets or
   images in a report — they travel to people the author did not choose, and a remote
   fetch tells a third party who opened it and when.

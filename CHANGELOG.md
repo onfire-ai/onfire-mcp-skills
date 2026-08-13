@@ -37,6 +37,12 @@ static security, privacy and compliance review of `2338e01`.
   a brief was disclosing that to a third party. System stacks via `--font-sans` /
   `--font-serif`.
 - **Public-repo hygiene.** Internal warehouse identifiers removed from a skill doc.
+- **PII scanner false positives.** The gitleaks allowlist worked by enumerating the fake
+  values already in the tree, so it failed the next author by construction: `+14155551234`
+  was rejected while `+15551234567` passed, for no reason a contributor could infer. It
+  now exempts *reserved ranges* instead of specific strings — RFC 2606/6761 domains, the
+  555 phone space, `example-` LinkedIn handles. Same detection, no guesswork. A failure
+  now also prints the conventions instead of a bare list of redacted fingerprints.
 
 ### Added
 
@@ -46,6 +52,14 @@ static security, privacy and compliance review of `2338e01`.
   `--no-verify` walks past them.
 - `scripts/check_skill_policy.py` — 10 rules, one per pattern this release removed,
   with a `policy-ok` escape hatch for docs that show the wrong way on purpose.
+- `scripts/check_pii_allowlist.py` — 28 vectors asserting the gitleaks allowlist in both
+  directions: synthetic placeholders stay exempt, out-of-range values stay caught. Runs
+  in CI before the repo scan, because an untested allowlist makes the scan meaningless
+  either way. The boundary vectors are the point — a reserved word as a *subdomain* must
+  not exempt the real domain under it, and `examplary-` is not `example-`. Every
+  must-be-caught vector is assembled at runtime from NANP-invalid number ranges and
+  non-existent TLDs, so the file contains no matchable literal, belongs to nobody, and
+  needs no exclusion from the scanner.
 - `tests/test_pg_plan_builder.py` — 13 tests asserting the property (zero formula
   elements in a saved workbook) rather than the implementation.
 - `LICENSE` — proprietary, with an explicit grant to install and use. The repo was
