@@ -427,6 +427,13 @@ component snippets.
    enrichment into it and labelling it an intent signal - hiring activity
    is hiring activity. If the account may be filed under a sibling domain,
    one extra `query_intent_signals` call with that domain is worthwhile.
+   Some rows are prior-relationship signals - a person the tenant sold to
+   or worked with at a former customer, now at this account. Slice them
+   with `WHERE signal_type IN ('Champion Moved','Contact Moved','Champion
+   Move','Ex-Customer Contact Move','Ex-Customer Hire')`, filtering on
+   `signal_type` and never `source_name`. Tag the `Champion` types "Former
+   champion" and the rest "Known contact" - never a contact as a champion -
+   and show the move date, which is often years old.
 6. **Solution fit divider + section head** - hairline divider followed
    by a single eyebrow line "Solution fit - [Tenant Display Name] use
    cases at [Account Display Name]" introducing the use case cards
@@ -646,6 +653,9 @@ query_datasets(
 Common patterns:
 - Signal source mix: `SELECT source_name, COUNT(*) FROM dataset GROUP BY 1`
 - Filter signals by event: `WHERE source_name = 'SecureCon 2026'`
+- Prior-relationship signals: `WHERE signal_type IN ('Champion Moved',
+  'Contact Moved', 'Champion Move', 'Ex-Customer Contact Move',
+  'Ex-Customer Hire')`
 - Filter prospects by team: `WHERE LOWER(TITLE_NAME) LIKE '%cloud%'`
 - Pull a specific 10-K paragraph: `SELECT FULL_MARKDOWN FROM dataset` then
   substring locally.

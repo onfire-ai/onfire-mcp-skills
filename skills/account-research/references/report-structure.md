@@ -637,6 +637,8 @@ Never frame a contractor as an "internal champion" or "in seat".
 | LinkedIn | "Digital intent signal" |
 | Reddit | "Professional community" |
 | GitHub | "Developer community signal" |
+| Champion Moved, Champion Move | "Former champion - [Former Company]" |
+| Contact Moved, Ex-Customer Contact Move, Ex-Customer Hire | "Known contact - [Former Company]" |
 | Company Change | "Company change - [New Company]" |
 | Promotion | "Promotion - [New Title]" |
 | Event Attendee (generic) | "[Event Name] - attendee" |
