@@ -7,7 +7,9 @@ description: Generate a full account research report for any company. The Onfire
 
 ## What this skill does
 
-The Onfire MCP owns the data pipeline. This skill owns the rendering.
+The Onfire MCP owns the data pipeline. This skill owns the rendering, and
+owns the two derivations the orchestrator does lossily: the tenant's use-case
+taxonomy and its vendor/persona resolution (Step 1a).
 
 Given a **company website** (e.g. `meridianbank.com`) and a **tenant ID**
 (e.g. `ironwall`), this skill:
@@ -15,21 +17,26 @@ Given a **company website** (e.g. `meridianbank.com`) and a **tenant ID**
 1. Calls `account_research` for the non-prospect data sources: tenant
    config + derived use cases, 10-K extracts, LinkedIn footprint, intent
    signals, and the inline `render_spec` that defines the rendering
-   contract. **Ignore any `prospects` block the orchestrator returns** —
-   prospects come from the dedicated tool below.
-2. Calls `ai_prospecting` (action="run") directly to get the ranked
-   prospect set for the account. This is the authoritative source for
-   every prospect rendered in the report.
-3. **Enriches the report with warehouse signals the orchestrator does
-   not pre-pull** — hiring momentum, event attendance, persona/tech
-   growth trends, dated deployment proof, and active hiring managers —
-   by authoring structured `ask_onfire` queries (see Step 1d). These
-   feed the Why-Now, Confirmed-deployment, and Key-contacts sections.
-4. Enforces the rendering contract on a self-contained A4 HTML file.
-5. Runs the pre-delivery checklist before delivery.
-6. Handles follow-up questions by slicing the datasets the orchestrator
-   and `ai_prospecting` already produced, or by calling `ask_onfire` /
-   one of the narrow typed tools when the user asks for genuinely new data.
+   contract.
+2. **Re-derives the tenant's taxonomy** (Step 1a). The envelope's
+   `derived_use_cases` and `footprint_keywords` are coarser than the tenant's
+   own configuration and their resolution is not match-quality gated, so the
+   skill resolves the tenant's personas and vendor list itself, behind a
+   match-tier gate.
+3. Takes the prospect set from the envelope when it is already complete, and
+   only calls `ai_prospecting` directly to poll a run that is still going.
+4. **Enriches the report with warehouse signals the orchestrator does not
+   pre-pull** - hiring momentum, active hiring managers, growth direction,
+   the real competitor/technology footprint, and golden-persona contacts -
+   via a fixed set of structured `ask_onfire` queries (Step 1d). These feed
+   the Why-Now, Confirmed-deployment, and Key-contacts sections.
+5. Builds the company card from warehouse firmographics when the account is
+   not an SEC filer (Step 1e), instead of narrating unsourced figures.
+6. Enforces the rendering contract on a self-contained A4 HTML file.
+7. Runs the pre-delivery checklist before delivery.
+8. Handles follow-up questions by slicing the datasets already produced, or
+   by calling `ask_onfire` / one of the narrow typed tools when the user asks
+   for genuinely new data.
 
 The skill **never** writes raw SQL and never touches Snowflake or the
 signals database directly. All data plumbing lives inside the Onfire
@@ -63,47 +70,106 @@ Onfire MCP: account_research(
 ```
 
 The `filings_10k`, `linkedin_footprint`, and `intent_signals` blocks are
-always complete on the first call. **The `prospects` block on this
-response is ignored by this skill** — prospects are sourced from the
-explicit `ai_prospecting` call in Step 1b. If the envelope returns
-`status="still_running"` solely because of a prospecting run, you do
-not need to poll the orchestrator; move on to Step 1b which owns
-prospect data end-to-end.
+always complete on the first call. The `prospects` block is the output of the
+orchestrator's own `ai_prospecting` run - read it (Step 1b) rather than
+re-running prospecting from scratch.
 
-## Step 1b - Call `ai_prospecting` directly for the prospect set (REQUIRED)
+Fire `ai_prospecting_field_glossary` (Step 1c) concurrently with this call. It
+has no dependency on the envelope, and waiting for prospects before loading it
+adds a round trip for nothing.
 
-The report's prospect rows come from a standalone `ai_prospecting`
-run, not from the orchestrator envelope. Requires the company LinkedIn
-URL — if you do not have it, resolve it first via the `match-company`
-skill (or reuse `company.linkedin_url` from the orchestrator envelope).
 
-```
-Onfire MCP: ai_prospecting(
-  action="run",
-  company_linkedin_url="<company_linkedin_url>"
-)
-```
+## Step 1a - Resolve the tenant's real taxonomy and vendor list (REQUIRED)
 
-Polling pattern: if the response is `status="still_running"`, re-call
-with either the returned `run_ids` (`ai_prospecting(action="run",
-run_ids=[...])`) or the identical arguments. Phoenix's server-side
-dedup never creates a duplicate run. Keep polling until you get
-`status="completed"`.
+`tenant_config.derived_use_cases` and `tenant_config.footprint_keywords` arrive
+pre-computed, but both are coarser than what the tenant's own configuration
+supports:
 
-Render every prospect on the report from this response — both the
-inline-shape `prospects` array (when present) and the preview-shape
-`top_picks` + `preview_rows` arrays. Treat the response's `dataset.id`
-as the authoritative prospect dataset for any follow-up slicing
-(`query_datasets`) and for CSV download (`download_dataset`).
+- The use-case set is a generic security-category mapping. It does not always
+  contain the category the tenant actually sells, and a card can be produced by
+  a loose keyword hit rather than real evidence.
+- The keyword list is resolved without a match-quality gate and is truncated, so
+  it can under-cover a tenant's competitors while over-matching on broad
+  infrastructure terms. Nothing in the envelope flags either case.
 
-When tenant config has `prospecting_enabled=false`, or when
-`ai_prospecting` returns zero prospects (`top_picks: []` and either
-`prospects: []` or no `prospects` key), skip the prospects-driven
-sections (Section 8 "Key contacts per use case", and the prospect
-columns inside Section 7 "Use case cards"). Do not fall back to the
-orchestrator's `prospects` block — it is not used.
+Neither is a reason to distrust the envelope's data blocks - they are the reason
+to derive the *taxonomy* yourself, in two calls:
+
+1. `get_tenant_settings(tenant_id)` - returns the full
+   `account_research.queries_sections` (`competitors`, `organization`,
+   `technologies`, `cloud_providers`), plus `golden_persona` and
+   `display_names_mapping`.
+2. `resolve_insights(concepts=[...], kind="technology")` - ONE call carrying
+   every `competitors` + `technologies` value, **with the trailing `" Insight"`
+   suffix stripped**. Tenant config stores vendors with that suffix and it is
+   not part of any catalog name, so leaving it on drops every concept to the
+   `partial` tier - where the top candidate may be the wrong kind entirely (a
+   suffixed `Datadog` ranks the persona `data` first), too broad, or right but
+   unverified. Stripped, the same vendors resolve `match: "exact"`. See the
+   worked before/after tables in `references/ask-onfire-signals.md`.
+
+Then resolve the personas the same way with `kind="persona"`: every
+`queries_sections.organization` value plus `golden_persona`.
+
+**Match-tier gate (non-negotiable).** Every candidate carries a `match` tier.
+Keep `exact` and `synonym`. Treat `partial` and `fuzzy` as unresolved and never
+search on them. Do not try to judge a `partial` candidate by whether its value
+looks plausible - some are right and some are a persona wearing a technology's
+name; the tier is the signal, not the value. Never render the unresolved list in
+the customer report; it is an internal detail.
+
+### Use cases: prefer the tenant's own taxonomy
+
+Build the use-case set from the resolved `organization` personas, labelled via
+`display_names_mapping` (the tenant already ships human labels, e.g.
+`email_security` -> "Email Security Specialist"). Keep 3-5, ordered by the
+evidence you actually found for this account in Step 1d.
+
+This deliberately overrides `tenant_config.derived_use_cases`. When you do:
+
+- Colors come **only** from `render_spec.use_case_palette`. Assign an existing
+  palette entry per card; never invent a hex, never emit a tag class that is not
+  a palette key.
+- Never render a card whose only evidence is a single partial keyword match.
+- Every card must position the tenant on the product it actually sells. If a
+  card has no honest tie to that product, drop the card - do not manufacture an
+  angle.
+- Fall back to the orchestrator's `derived_use_cases` when
+  `get_tenant_settings` errors or the tenant has no `organization` list.
+
+
+## Step 1b - Prospect set: read the envelope first, poll only if needed
+
+The orchestrator already runs `ai_prospecting(action="run", use_cache=True)`
+inside its own fan-out, so the envelope's `prospects` block is that tool's
+output, not a lesser copy of it.
+
+- `envelope.prospects.status == "completed"` -> **use it as-is.** Do not re-call
+  `ai_prospecting`; that spends another round trip of up to 50s for rows you
+  already hold.
+- `still_running`, `skipped`, or an `error` -> poll with
+  `ai_prospecting(action="run", company_linkedin_url="<url>")`, re-calling with
+  the returned `run_ids` (or identical arguments) until `status="completed"`.
+  Phoenix dedups server-side, so this joins the in-flight run instead of
+  starting a second one.
+- Prospecting needs the company LinkedIn URL. Resolve it with the
+  `match-company` skill first when the envelope has none.
+
+Render every prospect from whichever response completed - both the inline
+`prospects` array and the preview-shape `top_picks` + `preview_rows`. Treat its
+`dataset.id` as the authoritative prospect dataset for `query_datasets` slicing
+and for `download_dataset`.
+
+When `prospecting_enabled` is false, or the completed response carries zero
+prospects, do **not** drop Section 8. Fill it from the Step 1d contact sources:
+active hiring managers and golden-persona contacts, each labelled with where it
+came from.
+
 
 ## Step 1c - Load the prospecting field glossary (REQUIRED when prospects are present)
+
+**Fetch this concurrently with Step 1**, not after prospects land - it has no
+dependency on either.
 
 The `ai_prospecting` response carries fields whose meaning is non-obvious
 and easy to invert (e.g. `MASTER_SCORE_PRIORITY` is a tier where **lower
@@ -114,6 +180,7 @@ produces wrong reports. Before rendering any prospect, call:
 ```
 Onfire MCP: ai_prospecting_field_glossary()
 ```
+
 
 This returns a self-describing contract for every prospect field:
 `type`, `values` (enum or bounded range), `what_it_means`, `how_to_use`,
@@ -143,53 +210,80 @@ The `ai_prospecting` response also carries:
 When `ai_prospecting` returned zero prospects, do not call the
 glossary -- there's nothing to interpret yet.
 
-## Step 1d - Enrich with `ask_onfire` warehouse signals (recommended)
+## Step 1d - Enrich with `ask_onfire` warehouse signals (REQUIRED)
 
 The orchestrator pulls four blocks (filings, footprint, intent signals,
-prospects). The Onfire warehouse holds several more signal surfaces that
-are **not** in the envelope but materially strengthen the report. Pull
-the relevant ones with `ask_onfire`, scoped to this account by its
-LinkedIn URL, and fold them into the sections noted below.
+prospects). Several signal surfaces that materially decide whether this report
+is worth reading are **not** in the envelope. Pull them, scoped to the account
+by its LinkedIn URL.
 
-`ask_onfire` takes a structured `QueryIR` (entity + filters +
-insight_filters + limit), validates it against the semantic model, and
-returns rows. **Read `references/ask-onfire-signals.md` for the exact
-per-entity recipes** — it lists the entity names, the company-scoping
-filter, the bound-concept resolution step, and a worked `QueryIR` for
-each. Author every query from that reference (and confirm field names
-with `describe_onfire_schema([entity])` if unsure); never guess field
-names or write SQL.
+This step used to be optional and self-selected, which is why two runs of the
+same account produced different reports. The mandatory set below is now fixed.
 
-Targeted pulls and the section each feeds:
+`ask_onfire` takes a structured `QueryIR` (entity + filters + insight_filters +
+limit), validates it against the semantic model, and returns rows. **Read
+`references/ask-onfire-signals.md` for the exact per-entity recipes.** Never
+guess field names and never write SQL.
+
+### Schema lookups: one call, not one per entity
+
+`describe_onfire_schema` accepts a **list**. When you need to confirm fields,
+make a single `describe_onfire_schema(["job_post", "hiring_manager_signal",
+...])` call rather than one per entity.
+
+### Mandatory pulls
 
 | Pull | Entity | Feeds |
 |---|---|---|
 | Open roles / hiring momentum | `job_post` | Why-Now (Section 3), use-case account-signals |
 | Active hiring managers (decision-makers) | `hiring_manager_signal` | Key contacts (Section 8), Why-Now |
-| Event / conference presence | `event_company` (counts), `event_contact` (who) | Why-Now, Intent signals (Section 5) |
-| Persona / technology adoption trend | `growth_insight_monthly` | Why-Now ("signal is growing") |
-| Total-headcount growth trend | `headcount_monthly` | Why-Now, company card |
-| Dated deployment proof ("since when") | `insight_evidence` | Confirmed deployment (Section 4) |
-| Developer engagement with an OSS project | `github_member` | Why-Now / use-case signals (eng personas) |
-| Prior employer / alumni at the account | `people_experiences` | Key contacts (warm-path context) |
+| Growth direction | `growth_insight_monthly` or `headcount_monthly` | Why-Now, company card |
+| **Competitor / technology footprint** (the Step 1a resolved list) | `contact` + `insight_filters` `kind=technology` | Confirmed deployment (Section 4) |
+| **Golden-persona contacts** | `contact` + `insight_filters` `kind=persona` | Key contacts (Section 8), use-case cards |
 
-**Billing (important).** Unlike the orchestrator's footprint pull (which
-the MCP runs unbilled), a direct `ask_onfire` call **bills 1 credit per
-row returned**. So:
+The last two exist because the orchestrator's own footprint searched a truncated,
+badly resolved keyword list. Yours searches the vendors the tenant actually
+competes with and the persona it actually sells to.
 
-- Always set an explicit, small `limit` (5-10 is plenty for report
-  evidence). Never leave `limit` unset.
-- If `ask_onfire` returns `needs_confirmation` (`stage: "row_budget"`),
-  the match is larger than your budget — it did **not** bill and
-  returned no rows. Lower `limit` to what you actually need and resubmit
-  (do not blindly set `confirmed: true` just to push it through).
-- Skip a pull entirely when its section already has enough evidence from
-  the orchestrator blocks. Enrichment is additive, not mandatory; a pull
-  that would return zero useful rows is wasted credit.
+### Optional pulls - only when a section is still thin
 
-Requires `company_linkedin_url` (reuse `company.linkedin_url` from the
-envelope, or resolve via the `match-company` skill). Without it, skip
-this step and render from the orchestrator blocks alone.
+`event_company` / `event_contact` (event presence), `insight_evidence` (dated
+"in production since" proof), `product_adoption` (incumbent adoption quarter and
+likely renewal quarter - **BETA, both dates are estimates**, so any figure from
+it must be labelled as an estimate), `github_member` (developer engagement),
+`people_experiences` (alumni / warm-path context).
+
+### Two mechanics that matter
+
+1. **OR in a single call.** An `insight_filters` entry accepts a **list** as its
+   `value`, so the whole competitor set is one query, not one per vendor:
+   `insight_filters: [{kind: "technology", value: ["CrowdStrike",
+   "SentinelOne", "Microsoft Defender"]}]`. Separate entries AND together; a
+   list inside one entry ORs.
+2. **Always set an explicit `limit`.** A direct `ask_onfire` call returns rows
+   per the limit you set; 5-10 is plenty for report evidence, 25-30 for the
+   competitor footprint. If the response is `needs_confirmation`
+   (`stage: "row_budget"`) it returned no rows - tighten a filter or lower
+   `limit` and resubmit. Do not blindly set `confirmed: true`.
+
+Requires `company_linkedin_url` (reuse `company.linkedin_url` from the envelope,
+or resolve via the `match-company` skill). Without it, skip this step and render
+from the orchestrator blocks alone.
+
+## Step 1e - Company profile when the account is not an SEC filer
+
+`filings_10k.found = false` is the common case, not the exception - non-US and
+privately held companies have no 10-K. When it is false, do **not** narrate
+figures you cannot source. Build the company card from:
+
+- `ask_onfire` on `company` for firmographics (industry, HQ, size band, type),
+- `get_company_headcount` for current headcount,
+- the Step 1d `headcount_monthly` pull for direction,
+- `search_offices` when geographic footprint is relevant.
+
+Any figure that does not come from one of those must carry its source inline in
+the card, or be left out. An empty stat is better than an uncited one.
+
 
 ## Response shape (the envelope you render from)
 
@@ -220,7 +314,7 @@ this step and render from the orchestrator blocks alone.
     // and evidence_sentence (BEST-EFFORT — may be null; see Section 4)
   },
   "intent_signals": { dataset, preview_rows, facets, total_count },
-  "prospects": { /* IGNORED by this skill — see Step 1b */ },
+  "prospects": { /* the orchestrator's own ai_prospecting run - see Step 1b */ },
   "datasets": { filings_10k, linkedin_footprint, intent_signals, prospects },
   "render_spec": {
     "section_order": [...],
@@ -242,7 +336,8 @@ own section order, palette, or rules. Read each from `render_spec`:
 - `render_spec.hard_rules` - every constraint you must apply
 - `render_spec.use_case_palette` - the only colors allowed for use case tags
 - `render_spec.page_setup` - A4 dimensions, font stack, print-color-adjust CSS
-- `render_spec.pre_delivery_checklist` - the four checks you must run
+- `render_spec.pre_delivery_checklist` - the server's baseline checks; Step 3
+  runs those plus the skill's own (see Step 3)
 
 **The report's color palette is Onfire's, not the tenant's.** The
 `--brand` (navy) / `--accent` (purple) tokens are hard-coded in the CSS
@@ -272,10 +367,12 @@ component snippets.
    (base64, when provided), brand display name, "Account Research -
    [Company]" eyebrow, and date.
 2. **Company header card** - name (LinkedIn link), ticker, HQ, stat
-   grid, overview.
+   grid, overview. When `filings_10k.found` is false, build the stat grid
+   from the Step 1e warehouse pulls; every figure carries a source or is
+   dropped. Never narrate an uncited financial number.
 3. **Why this account - why now** - 3-5 points sourced from
    `filings_10k.filings[].sections`, `intent_signals.preview_rows`,
-   `linkedin_footprint.top_profiles`, **and the Step 1d `ask_onfire`
+   the footprint dataset, **and the Step 1d `ask_onfire`
    enrichment** — open-role surges (`job_post`, with `date_posted`),
    active hiring managers (`hiring_manager_signal`, with `signal_date`),
    event presence (`event_company` attendee counts, with the event
@@ -284,13 +381,34 @@ component snippets.
    point carries a parenthetical date or "current role" citation. Render
    either as numbered prose rows or as a severity-tinted alert stack
    (see `references/report-structure.md` Section 3 Style A vs B).
-4. **Confirmed technology deployment** - render
-   `linkedin_footprint.top_profiles`. The footprint is now
-   **insight-based**: each person genuinely carries the tenant's
-   technology insight, and `matched_keyword` is the **canonical
-   technology name** (use it for the confirmation label, e.g. "CrowdStrike
-   confirmed"). `evidence_sentence` is **best-effort and may be null**
-   (the insight tag does not require the literal term in the bio):
+4. **Confirmed technology deployment** - render from the **Step 1d
+   competitor/technology footprint pull**, plus the orchestrator's
+   footprint **dataset** (not its `top_profiles`).
+   `top_profiles` is a **small inline preview**, not the result set - it
+   commonly carries 3 rows where the account matched dozens of people. The
+   dataset holds the full pull; slice it instead. It typically yields 20-30
+   evidence-backed rows:
+   ```
+   query_datasets(
+     datasets={"footprint": "<envelope.datasets.linkedin_footprint>"},
+     sql="SELECT full_name, linkedin_url, job_title, location_name,
+                 matched_keyword, evidence_sentence
+          FROM footprint WHERE evidence_sentence IS NOT NULL"
+   )
+   ```
+   Dataset slicing is free, so there is no reason to render only 3.
+   **Confirm only what resolved cleanly.** A confirmation label may name a
+   vendor only if it came back `exact` or `synonym` from Step 1a. If a row's
+   `matched_keyword` is not a **product name** - a hardware architecture, a
+   networking or infrastructure category, an analysis-technique acronym, or a
+   vendor's parent brand where the config named a specific product - it is not
+   a deployment confirmation. Drop the row instead of claiming a vendor is in
+   place. Test: could you say "the account runs <matched_keyword>" to their
+   CISO without it sounding wrong? If not, drop it.
+   Each person genuinely carries the insight, and `matched_keyword` is the
+   **canonical technology name** (use it for the confirmation label, e.g.
+   "CrowdStrike confirmed"). `evidence_sentence` is **best-effort and may be
+   null** (the insight tag does not require the literal term in the bio):
    - When present, quote it **verbatim** in the evidence block (same
      rule as before).
    - When null, render the confirmation from the matched technology
@@ -298,19 +416,37 @@ component snippets.
      deployment signal; do NOT invent a sentence.
    Optionally strengthen an entry with a Step 1d `insight_evidence` pull
    to add a "in production since [start_date]" date. Skip the whole
-   section when `linkedin_footprint` is skipped or returns zero people.
+   section only when both the Step 1d pull and the dataset are empty.
 5. **Intent signals** - render `intent_signals.preview_rows` with each
    signal's `message_text` quoted **verbatim** in a grey evidence block.
    See "Quote, never rewrite" below. Omit the entire section when
    there are zero signals - do not render a negative-state placeholder.
+   This block is scoped by an exact `account_website` match and is
+   genuinely sparse (commonly 0-2 rows per account), so a thin or absent
+   section here is normal. Do not compensate by promoting Step 1d
+   enrichment into it and labelling it an intent signal - hiring activity
+   is hiring activity. If the account may be filed under a sibling domain,
+   one extra `query_intent_signals` call with that domain is worthwhile.
+   Some rows are prior-relationship signals - a person the tenant sold to
+   or worked with at a former customer, now at this account. Slice them
+   with `WHERE signal_type IN ('Champion Moved','Contact Moved','Champion
+   Move','Ex-Customer Contact Move','Ex-Customer Hire')`, filtering on
+   `signal_type` and never `source_name`. Tag the `Champion` types "Former
+   champion" and the rest "Known contact" - never a contact as a champion -
+   and show the move date, which is often years old.
 6. **Solution fit divider + section head** - hairline divider followed
    by a single eyebrow line "Solution fit - [Tenant Display Name] use
    cases at [Account Display Name]" introducing the use case cards
    (no separate title/subtitle).
-7. **Use case cards** - one per entry in `tenant_config.derived_use_cases`,
-   in the order provided (highest evidence first). The set is dynamic -
-   render exactly the use cases the orchestrator returned, no more, no
-   fewer. Each card pulls relevant signals + verbatim talking-point
+7. **Use case cards** - one per entry in the **Step 1a derived use-case
+   set** (which overrides `tenant_config.derived_use_cases`; see Step 1a
+   for why), ordered by the evidence actually found for this account.
+   Keep 3-5. Drop any card whose only evidence is a single partial keyword
+   match, and any card with no honest tie to what the tenant sells - a
+   shorter report beats a wrong one. Every card's alignment column
+   positions the tenant on **its own product**; never argue an adjacent
+   security category the tenant does not sell. Each card pulls relevant
+   signals + verbatim talking-point
    quote (10-K, LinkedIn profile, public talk, or any other verifiable
    source - see `report-structure.md` "Talking-points source citation")
    + prospect rows that map to that use case. The right column is
@@ -333,12 +469,20 @@ component snippets.
    team is a live decision-maker / budget owner. Surface them alongside
    the `ai_prospecting` contacts (tag them "actively hiring -
    [job_post_title]"), mapping each to its use case via the role being
-   hired for. When prospecting is disabled or empty, hiring managers can
-   stand alone as the key-contacts source for a use case.
+   hired for.
+   **Golden-persona contacts** from the Step 1d persona pull are the second
+   complementary source: people at the account carrying the tenant's
+   `golden_persona` are its literal buying persona. Tag them with the
+   persona's `display_names_mapping` label.
+   When prospecting is disabled or returns zero, these two sources carry
+   Section 8 on their own. Label each contact with the source it came from,
+   and never print a bare "no prospect list available this cycle" line as
+   the section's only content - if all three sources are empty, omit the
+   section.
 
 When surfacing prospect rows in sections 7 and 8, interpret every
 field through the `ai_prospecting_field_glossary` contract loaded
-in Step 1a - never invent score semantics.
+in Step 1c - never invent score semantics.
 
 ### Hard rules (from `render_spec.hard_rules` - non-negotiable)
 
@@ -375,7 +519,8 @@ is `message_text` or nothing. If `message_text` is empty or null,
 render `(no message text on record)` or skip the evidence block; do
 not fabricate or substitute another field.
 
-The same rule applies to `linkedin_footprint.top_profiles[].evidence_sentence`.
+The same rule applies to every `evidence_sentence` - from `top_profiles`,
+from the sliced footprint dataset, or from a Step 1d pull.
 
 ### Page setup (from `render_spec.page_setup`)
 
@@ -389,44 +534,44 @@ The same rule applies to `linkedin_footprint.top_profiles[].evidence_sentence`.
 
 ### Use case palette (from `render_spec.use_case_palette`)
 
-Only use the tag classes that appear in the palette. The set is
-tenant-driven: render exactly the use cases `derived_use_cases`
-returned and color each with its `tag`'s entry from
-`use_case_palette`. Never invent a color. Never assume a fixed list
-(no hardcoded "four canonical use cases").
+Only use the tag classes that appear in the palette. The palette is the
+**colour** contract; Step 1a owns the **card set**. So: render the Step 1a
+use cases, and assign each one an existing `use_case_palette` entry.
 
-If `derived_use_cases` returns a tag that has no matching entry in
-`use_case_palette` (a schema drift), skip the color and fall back to
-the neutral `--low-bg` / `--low-text` tokens rather than guessing.
+- Never invent a colour and never emit a tag class that is not a palette key.
+- Reuse a palette entry whose semantics are closest to the card, or simply
+  assign entries in order. The palette has 7 slots; keep to 3-5 cards.
+- Never assume a fixed list of use cases (no hardcoded "four canonical
+  use cases").
+- If a card has no sensible palette entry, fall back to the neutral
+  `--low-bg` / `--low-text` tokens rather than guessing a hex.
 
 ---
 
 ## Step 3 - Pre-delivery checklist (from `render_spec.pre_delivery_checklist`)
 
-Before saving the final HTML and calling `present_files`, run these
-four checks. All four must pass.
+Before saving the final HTML and calling `present_files`, run every check
+below. All must pass.
 
 1. **Use case tags constrained to the palette**
    `grep -oE 'class="tag" style="background:var\\(--[a-z]+-bg' report.html`
-   Every tag class must be one of the palette keys returned in
+   Every tag class must be one of the palette keys in
    `render_spec.use_case_palette`. No invented tags.
 
-2. **No internal tool names**
-   `grep -iE 'phoenix|metabase|mcp|onfire' report.html` -> must return zero matches.
+2. **No internal tool names, no em dashes outside verbatim quotes**
+   One pass does both:
+   `grep -niE 'phoenix|metabase|mcp|onfire|—' report.html`
+   Zero matches, except a U+2014 inside a `class="evidence"` /
+   `class="quote"` block (those preserve `message_text` byte-for-byte).
 
-3. **No em dashes outside verbatim quotes**
-   `grep -- '-' report.html` -> must return zero matches outside text
-   inside `class="evidence"` / `class="quote"` blocks (which preserve
-   verbatim message_text byte-for-byte).
-
-4. **Why Now evidence references**
+3. **Why Now evidence references**
    Every `<div class="why-row">` body must contain a parenthetical in
    its bold strong tag - `(... [date] / [date range] / "current role")`
    - with one of the acceptable source types (10-K, LinkedIn profile,
    conference, community Slack/Discord, LinkedIn post, company-change
    records). No date-less Why Now points.
 
-5. **Prospect field interpretation**
+4. **Prospect field interpretation**
    If the `ai_prospecting` response from Step 1b carries real rows
    (not `still_running` / zero-result), confirm
    `ai_prospecting_field_glossary` was loaded and every
@@ -435,12 +580,28 @@ four checks. All four must pass.
    `how_to_use` entry in the glossary. If you cannot point to the
    glossary entry that justifies a phrase, remove the phrase.
 
-6. **Prospect source provenance**
-   Every prospect rendered on the report must originate from the
-   Step 1b `ai_prospecting` call — not from the orchestrator's
-   `prospects` block. If you find yourself reading
-   `envelope.prospects.top_picks`, stop and re-source from the
-   standalone `ai_prospecting` response.
+5. **Prospect source provenance**
+   Every prospect must come from a **completed** `ai_prospecting` response -
+   either the envelope's block (Step 1b, preferred) or the standalone poll.
+   Never render rows from a `still_running` response.
+
+6. **Vendor confirmations traced to a clean resolution**
+   Every "X confirmed" label in the Confirmed-deployment section names a
+   vendor that resolved `exact` or `synonym` in Step 1a, and the label names a
+   product - never a hardware architecture, an infrastructure category, an
+   analysis-technique acronym, or a parent brand standing in for a specific
+   product. If you cannot point at the resolution that justifies a label,
+   remove the row.
+
+7. **Deployment section not needlessly truncated**
+   If the footprint dataset holds more evidence-backed rows than the report
+   renders, you rendered the inline preview instead of slicing the dataset.
+   Go back to Section 4.
+
+8. **Use cases are the tenant's own, and honestly positioned**
+   Each card traces to a Step 1a persona (or to the documented fallback),
+   no card rests on a single partial keyword match, and no card argues a
+   product category the tenant does not sell.
 
 If any check fails, fix the report and rerun all checks. Do not
 deliver until all pass.
@@ -492,6 +653,9 @@ query_datasets(
 Common patterns:
 - Signal source mix: `SELECT source_name, COUNT(*) FROM dataset GROUP BY 1`
 - Filter signals by event: `WHERE source_name = 'SecureCon 2026'`
+- Prior-relationship signals: `WHERE signal_type IN ('Champion Moved',
+  'Contact Moved', 'Champion Move', 'Ex-Customer Contact Move',
+  'Ex-Customer Hire')`
 - Filter prospects by team: `WHERE LOWER(TITLE_NAME) LIKE '%cloud%'`
 - Pull a specific 10-K paragraph: `SELECT FULL_MARKDOWN FROM dataset` then
   substring locally.
@@ -505,7 +669,11 @@ relevant narrow typed tool. **Never write raw SQL.**
 |---------------|------|
 | Signals on a topic outside the tenant's keyword set (e.g. NIS2, DORA) | `query_intent_signals(tenant_id, account_website, keyword_match=[...])` |
 | A 10-K section the report didn't surface (e.g. a specific exec name) | `query_company_filings(website, keywords=[...])` |
-| Employees carrying a different product / competitor | `ask_onfire` — `entity=contact`, filter `current_company_url eq <url>`, `insight_filters=[{kind:technology, value:<product>}]` (NOT a raw `JOB_SUMMARY` ILIKE) |
+| Employees carrying a different product / competitor | `ask_onfire` — `entity=contact`, filter `current_company_url eq <url>`, `insight_filters=[{kind:technology, value:[<product>, ...]}]` — a **list ORs in one call** (NOT a raw `JOB_SUMMARY` ILIKE) |
+| People in a given role / persona at the account | `ask_onfire` — `entity=contact`, filter `current_company_url eq <url>`, `insight_filters=[{kind:persona, value:<resolved persona>}]` |
+| When the incumbent was adopted / when they renew | `ask_onfire` — `entity=product_adoption`, filter `company_linkedin_url eq <url>` (BETA - estimates, label them) |
+| Firmographics for a company with no 10-K | `ask_onfire` — `entity=company`, filter `linkedin_url eq <url>`, plus `get_company_headcount` |
+| More employee-footprint rows than the report showed | `query_datasets` on `envelope.datasets.linkedin_footprint` — free, no row budget |
 | Open roles / what the company is hiring for | `ask_onfire` — `entity=job_post`, filter `company_url eq <url>` (+ `job_function`/`seniority`/`open`) |
 | Who is actively hiring (decision-makers) | `ask_onfire` — `entity=hiring_manager_signal`, filter `company_url eq <url>` (+ `person_seniority`) |
 | Who attended an event / company event presence | `ask_onfire` — `entity=event_contact` (who) or `event_company` (counts), filter `event eq <resolved>` + `company_url eq <url>` |
@@ -526,17 +694,21 @@ further sliceable via `query_datasets`.
 
 | Situation | Action |
 |-----------|--------|
-| `account_research` returns `status="still_running"` solely because of prospecting | Ignore — Step 1b owns prospect data. Use the completed non-prospect blocks. |
-| `filings_10k.found` is `false` | Skip 10-K sections silently; note non-SEC-registered company in the report header if relevant. |
+| `account_research` returns `status="still_running"` solely because of prospecting | Use the completed non-prospect blocks and poll prospects per Step 1b. Do not re-call the orchestrator. |
+| `get_tenant_settings` fails or the tenant has no `organization` list | Fall back to `tenant_config.derived_use_cases`, and treat the resulting use-case set as generic rather than tenant-specific. |
+| Every vendor in Step 1a resolves only `partial` / `fuzzy` | Run no technology footprint pull. Render Confirmed deployment from the orchestrator dataset only, and only for rows whose `matched_keyword` is a real vendor. Never confirm a vendor off a partial match. |
+| Step 1d competitor footprint returns zero rows | Normal for a small or thinly covered account. Fall back to the orchestrator's footprint dataset; if that is empty too, omit the section. |
+| Golden-persona pull returns zero rows | Section 8 falls back to hiring managers, then to prospects. If all are empty, omit Section 8. |
 | `linkedin_footprint.skipped` is `true` | Skip the "Confirmed deployment" section silently. |
-| `linkedin_footprint` returns zero people (empty `top_profiles` / `total_count` 0), or every tenant keyword is in `unresolved_keywords` | Skip the "Confirmed deployment" section silently. Never render `unresolved_keywords` in the customer report (internal detail). |
+| `linkedin_footprint` returns zero people (`total_count` 0), or every tenant keyword is in `unresolved_keywords` | Fall back to the Step 1d pull; skip the section only if both are empty. Never render `unresolved_keywords` in the customer report (internal detail). An empty `top_profiles` alone is NOT an empty footprint - it is only a preview; check `total_count` and the dataset. |
 | `linkedin_footprint` row has a null `evidence_sentence` | Render the confirmation from `matched_keyword` without a quoted evidence block; never fabricate a sentence. |
-| `intent_signals.total_count` is 0 | Show "No live signals found". |
+| `intent_signals.total_count` is 0 | Omit the Intent signals section entirely (per Section 5). Common and expected - do not backfill it with Step 1d enrichment. |
 | Step 1d `ask_onfire` returns `needs_confirmation` (`stage: "row_budget"`) | No rows billed. Lower `limit` to what the section needs and resubmit; do not blindly set `confirmed: true`. |
 | Step 1d `ask_onfire` returns zero rows or an `error` | Skip that enrichment silently; render from the orchestrator blocks. Never fail the report. |
 | `ai_prospecting` returns `status="still_running"` | Re-call with the returned `run_ids` (or identical args). Phoenix dedups server-side. |
-| `ai_prospecting` returns zero prospects (`top_picks: []`) or `tenant_config.prospecting_enabled` is `false` | Skip Section 8 and the prospect columns in Section 7 cards; hiring-manager contacts from Step 1d may still stand in. |
-| Company has no LinkedIn URL even after `match-company` | Skip Step 1b AND Step 1d entirely; render from `company_website`-scoped blocks only. |
+| `ai_prospecting` returns zero prospects (`top_picks: []`) or `tenant_config.prospecting_enabled` is `false` | Drop the prospect columns in Section 7 cards, but keep Section 8 and fill it from the Step 1d hiring-manager and golden-persona pulls. Omit Section 8 only when all three sources are empty. |
+| Company has no LinkedIn URL even after `match-company` | Skip Steps 1b and 1d entirely; render from `company_website`-scoped blocks only. Step 1a still runs - the taxonomy is tenant-scoped, not account-scoped. |
+| `filings_10k.found` is false | Expected for non-US and private companies. Run Step 1e and source every company-card figure. |
 | One of `*.error` keys is set | Skip that section; never fail the whole report. |
 
 ---
@@ -544,7 +716,7 @@ further sliceable via `query_datasets`.
 ## Reference files
 
 - `references/report-structure.md` - Full HTML template, CSS, layout rules
-- `references/ask-onfire-signals.md` - Step 1d `ask_onfire` QueryIR recipes (hiring, events, growth, dated proof, github, alumni) + billing rules
+- `references/ask-onfire-signals.md` - Step 1a resolution gate + Step 1d `ask_onfire` QueryIR recipes (hiring, events, growth, dated proof, github, alumni, competitor footprint, golden-persona contacts, product adoption, firmographics) + row-budget rules
 - `references/persona-to-usecase.md` - Map prospect titles -> use cases for the use-case-cards section
 - `references/pdf-generation.md` - PDF conversion instructions
 - `references/use-case-mapping.md` - (informational) the keyword-bucket mapping the orchestrator uses server-side; the skill no longer applies this mapping itself
