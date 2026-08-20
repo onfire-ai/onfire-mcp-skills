@@ -5,7 +5,7 @@ description: Run SENTIMENT analysis over the Onfire community-messages corpus (S
 
 # community_messages_sentiment
 
-Semantic vector retrieval (the same ranker behind `community-message-search`) + Vertex (Gemini) per-message aspect scoring over the Onfire community-messages corpus. **Pure top-k**: `target_messages` is the number of most-relevant messages we retrieve, the number we LLM-score, and the cap on what we return and bill. Company enrichment via `silver.dataspring.dataspring_people_full` + `gold.entities.companies` resolves each sender's employer so you get a by-company breakdown in addition to the by-community one.
+Semantic vector retrieval (the same ranker behind `community-message-search`) + Vertex (Gemini) per-message aspect scoring over the Onfire community-messages corpus. **Pure top-k**: `target_messages` is the number of most-relevant messages we retrieve, the number we LLM-score, and the cap on what we return and bill. Company enrichment against Onfire's people and company records resolves each sender's employer so you get a by-company breakdown in addition to the by-community one.
 
 ## Routing gate — answer this BEFORE using this skill
 
@@ -80,7 +80,7 @@ window is the scope, not a count. Use when the user wants exhaustive coverage:
 
 **Always do this before passing `exclude_companies`.**
 
-Exclusion drops senders whose resolved current employer (from `silver.dataspring.dataspring_people_full`, matched by company LinkedIn URL) is in your list. The only accepted key is the canonical company **LinkedIn URL** — the tool now **rejects a bare company name with an error** (it can't reliably match "Nexagon" to "Nexagon, Inc.").
+Exclusion drops senders whose resolved current employer (from Onfire's people records, matched by company LinkedIn URL) is in your list. The only accepted key is the canonical company **LinkedIn URL** — the tool now **rejects a bare company name with an error** (it can't reliably match "Nexagon" to "Nexagon, Inc.").
 
 **Rule: if the user supplies a company name (or domain) for exclusion, call `match_company` for each one first and use the returned LinkedIn URL.**
 
@@ -196,7 +196,7 @@ The subject framing is what makes this aspect-based: "I love Slack but Nexagon's
 
 The persisted CSV includes: `linkedin_url`, `sender_name`, `sender_job_title`, `company_linkedin_url`, `company_name`, `company_industry`, `company_size`, `company_country`, `community_type`, `community_name`, `message_timestamp`, `message_text`, `sentiment_subject`, `sentiment_value`, `confidence`, `reason`, `relevance_score`, `message_id`.
 
-`relevance_score` is the semantic match score (0–1) of the message to the subject. Company fields are populated for senders whose LinkedIn URL matches a record in `silver.dataspring.dataspring_people_full`. Senders not found there have null company fields.
+`relevance_score` is the semantic match score (0–1) of the message to the subject. Company fields are populated for senders whose LinkedIn URL matches a person record Onfire holds. Senders with no match have null company fields.
 
 ## The post-call playbook (READ THIS)
 
@@ -233,7 +233,7 @@ Only re-run `community_messages_sentiment` when the user genuinely changes the i
 - `discarded_off_topic` is the count of scored candidates that mentioned the subject but didn't carry an opinion about it. A high ratio of `discarded_off_topic` to `total_scanned` means the subject/keywords were too broad — tighten them. These are NOT billed. (Candidates that *failed* scoring are counted separately in `scoring_errors`, also not billed.)
 - `counts` is over the **returned** messages only (positive/negative/neutral); `irrelevant`/`error` show 0 there by design.
 - `unique_senders_with_linkedin` is the people reach number — how many authors you can follow up with.
-- `unique_companies_resolved` tells you how many employers are represented. A high ratio of resolved companies means the `by_company` breakdown is reliable; a low ratio means many senders weren't in dataspring.
+- `unique_companies_resolved` tells you how many employers are represented. A high ratio of resolved companies means the `by_company` breakdown is reliable; a low ratio means many senders had no matching person record.
 - `total_returned < target_messages` means the relevant pool ran out — **say so** (don't imply we found exactly what was asked).
 
 ## Hard rules
@@ -242,7 +242,7 @@ Only re-run `community_messages_sentiment` when the user genuinely changes the i
 - When `total_returned < target_messages`, **lead with that** ("only N relevant messages existed for this subject/window") before quoting numbers.
 - For drill-downs, use `query_datasets` — never re-run for slicing.
 - Don't quote `message_text` as gospel — it's truncated to 500 chars. Tell the user if they want the full text of a specific message it isn't available.
-- Company fields are null for senders not found in dataspring. Don't claim company-level insight for messages where `company_name` is null.
+- Company fields are null for senders with no matching person record. Don't claim company-level insight for messages where `company_name` is null.
 
 ## Common pitfalls
 

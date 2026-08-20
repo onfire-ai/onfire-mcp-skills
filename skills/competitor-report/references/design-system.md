@@ -35,6 +35,10 @@ per-section layouts.
   --neutral:    #94A3B8;   /* neutrals in stacked bars */
   --accent-1:   #5A8FA8;   /* second accent (IT services blue) */
   --accent-2:   #806B91;   /* third accent (media purple) */
+
+  /* Type stacks — resolved on the reader's machine, never fetched. See Typography. */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, 'Times New Roman', serif;
 }
 ```
 
@@ -42,20 +46,23 @@ per-section layouts.
 
 ## Typography
 
-Two font families, both loaded from Google Fonts:
+Two font stacks, both resolved on the reader's machine. **No `<link>` to Google Fonts,
+or to any other remote host.** These briefs name a competitor and get forwarded to
+people the author did not pick; a webfont link makes every one of those opens a request
+to a third party carrying the reader's IP, timestamp and user-agent, and makes the
+brief's typography depend on a host that can change under it. The PDF path never
+rendered them anyway — WeasyPrint blocks external fetches, so the remote link was
+already falling back to these same stacks in print while leaking in the browser.
 
-```html
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+Pro:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
-```
+Both stacks are declared with the design tokens above — `--font-sans` and `--font-serif`.
+Use the variables everywhere; never restate a family inline.
 
-| Use | Family | Weight |
+| Use | Stack | Weight |
 |---|---|---|
-| Body text, captions, labels | Inter | 400 / 500 / 600 |
-| Page eyebrows, micro-labels (all-caps) | Inter | 600-700 + `letter-spacing: 0.08em` |
-| `.action-title` (the McKinsey title) | Source Serif Pro | 700 |
-| Hero numbers (`.num.serif`) | Source Serif Pro | 700 |
+| Body text, captions, labels | `--font-sans` | 400 / 500 / 600 |
+| Page eyebrows, micro-labels (all-caps) | `--font-sans` | 600-700 + `letter-spacing: 0.08em` |
+| `.action-title` (the McKinsey title) | `--font-serif` | 700 |
+| Hero numbers (`.num.serif`) | `--font-serif` | 700 |
 
 Default body sizing: **9pt** line-height **1.5**. Action titles are
 **16-18pt**. Hero numbers are **24-32pt**.
@@ -70,9 +77,8 @@ Default body sizing: **9pt** line-height **1.5**. Action titles are
 <head>
   <meta charset="utf-8">
   <title>{Competitor} - Competitor Intelligence Brief</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- No remote font, stylesheet, script or image. This file travels; keep it
+       self-contained so opening it tells no one that it was opened. -->
   <style>
     /* Reset */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -85,7 +91,7 @@ Default body sizing: **9pt** line-height **1.5**. Action titles are
 
     /* Body */
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: var(--font-sans);
       font-size: 9pt;
       line-height: 1.5;
       color: var(--ink);
@@ -155,7 +161,7 @@ Default body sizing: **9pt** line-height **1.5**. Action titles are
       margin-bottom: 6pt;
     }
     .action-title {
-      font-family: 'Source Serif Pro', Georgia, serif;
+      font-family: var(--font-serif);
       font-size: 17pt;
       font-weight: 700;
       color: var(--ink);
@@ -178,7 +184,7 @@ Default body sizing: **9pt** line-height **1.5**. Action titles are
       text-transform: uppercase;
     }
     .stat .num {
-      font-family: 'Source Serif Pro', Georgia, serif;
+      font-family: var(--font-serif);
       font-size: 24pt;
       font-weight: 700;
       color: var(--ink);

@@ -32,6 +32,17 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      # Patterns the security audit asked us to remove, kept out by grep. Runs
+      # here for the fast local signal and in CI (.github/workflows/security.yml)
+      # because these hooks are opt-in per clone and skippable with --no-verify.
+      - id: skill-policy
+        name: skill policy — audit regressions
+        description: Fail if a skill reintroduces a pattern the security audit removed.
+        entry: python3 scripts/check_skill_policy.py
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
       # Safety net on `git push`: full-history scan, catches anything that
       # slipped past the commit gate (e.g. a `git commit --no-verify` bypass).
       - id: gitleaks-full

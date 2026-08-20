@@ -1025,7 +1025,9 @@ at 13 pages (the split absorbs the freed slot).
 These come from the canonical Nexagon brief. Violate at peril:
 
 - **A4 paged media.** `@page` block with 18mm margins.
-- **Fonts.** Inter for body, Source Serif Pro for `.action-title`
+- **Fonts.** `var(--font-sans)` for body, `var(--font-serif)` for `.action-title`. Both
+  are system stacks — never add a webfont `<link>`; the brief must not phone home when
+  a recipient opens it.
   headings. Both loaded from Google Fonts CDN (only network call the
   template makes).
 - **`.act` page break.** Every section above except the cover carries
@@ -1092,9 +1094,14 @@ After the HTML is assembled, render to PDF:
 python3 -c "from weasyprint import HTML; HTML('competitor-brief.html').write_pdf('competitor-brief.pdf')"
 ```
 
-If WeasyPrint is not installed:
+If WeasyPrint is not installed, put it in a throwaway venv at a pinned version and use
+<!-- policy-ok: names the banned flag in order to ban it -->
+that interpreter. Never `--break-system-packages`: a brief for one competitor is not a
+reason to overwrite packages the user's system Python depends on, and an unpinned name
+resolves to whatever the index serves that morning.
 ```bash
-pip install weasyprint --break-system-packages
+python3 -m venv .venv-pdf && .venv-pdf/bin/pip install --quiet "weasyprint==69.0"
+.venv-pdf/bin/python -c "from weasyprint import HTML; HTML('competitor-brief.html').write_pdf('competitor-brief.pdf')"
 ```
 
 Present both files to the user via `mcp__cowork__present_files`.
