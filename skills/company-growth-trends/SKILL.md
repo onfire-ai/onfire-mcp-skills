@@ -14,9 +14,13 @@ Two complementary data sources:
 | **Technology / persona growth** (e.g. Sentinex, data engineer) | `ask_onfire` → entity `growth_insight_monthly` | Pre-computed monthly count + `growth_rate` |
 | **Full employee roster / headcount distribution** (count by title, role, location, …) | `ask_onfire` → gated entity `experiences_pool` (stints) / `people_pool` (profiles) | The extended pool that backs the roster — query directly with `allow_extended_pool=true` |
 
-> **Rule:** For the **wired-up roster** (joiners/leavers with prior/next-company self-joins already attached), `get_company_headcount` is the convenient one-call path — `ask_onfire`'s `headcount_monthly` is trend-only. But the underlying rows are **no longer unreachable**: the full roster lives in the gated `experiences_pool` / `people_pool` entities, queryable via `ask_onfire` with `allow_extended_pool=true` (see below) when you need a custom cut (e.g. a distribution by title/location) the tool doesn't give you. For a pure headcount trend, either tool works.
+> **Rule:** For the **wired-up roster** (joiners/leavers with prior/next-company self-joins already attached), `get_company_headcount` is the convenient one-call path — `ask_onfire`'s `headcount_monthly` is trend-only. For a custom cut the tool doesn't give you (a distribution by title/location), the gated `experiences_pool` / `people_pool` entities cover the same *population* — see below.
+>
+> **Do not mix the two in one comparison.** `get_company_headcount` and the pool entities read **different curation layers** of the employment data, not the same table. Their counts for the same company can legitimately differ. Pick ONE source for any number you are going to compare over time or across accounts, and say which one you used.
 
-> **Note:** The raw-SQL `query_onfire` tool has been **removed**. Growth/headcount queries now go through `ask_onfire`, which takes a structured **QueryIR** (not SQL). `insight` values are resolved server-side — see `resolve_insights`.
+> **Note:** The raw-SQL `query_onfire` tool has been **removed**. Growth/headcount queries now go through `ask_onfire`, which takes a structured **QueryIR** (not SQL). `insight` values are resolved server-side.
+>
+> **Check `get_company_headcount` is actually listed for your session before routing to it.** It is enabled per tenant and is absent for some. When it isn't in your tool list, everything below is reachable through `ask_onfire`: the `headcount_monthly` entity for the trend, and `experiences_pool` / `people_pool` for the roster.
 
 ---
 
@@ -42,9 +46,10 @@ Skip this for:
 > is backed by `ONFIRE.PEOPLE_GRAND_EXPERIENCES` (tenure/stint rows) +
 > `ONFIRE.PEOPLE_GRAND` (profile enrichment). These rows **are no longer
 > unreachable from `ask_onfire`** — they now exist as the **gated** semantic
-> entities `experiences_pool` (the full employment-history pool, mirrors
-> `PEOPLE_GRAND_EXPERIENCES`) and `people_pool` (the full people pool, mirrors
-> `PEOPLE_GRAND`). To query them you must set `allow_extended_pool=true` **and**
+> entities `experiences_pool` (the full employment-history pool) and
+> `people_pool` (the full people pool) — the same POPULATION at a different
+> curation layer, so counts can differ from this tool's (see the Rule above).
+> To query them you must set `allow_extended_pool=true` **and**
 > name the entity explicitly; they carry **no insight search** (route any
 > persona/technology query to `growth_insight_monthly` / `contact` / `company`).
 > Keep `get_company_headcount` as the convenient point lookup — it returns the
@@ -169,8 +174,8 @@ The roster rows behind `get_company_headcount` are now **queryable** through
 
 | Entity | Mirrors | Grain | Use it for |
 |---|---|---|---|
-| `experiences_pool` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | one row per person-stint | roster / org-movement cuts; `is_primary = true` is the current role |
-| `people_pool` | `ONFIRE.PEOPLE_GRAND` | one row per person | whole-pool identity / profile lookups |
+| `experiences_pool` | `ONFIRE.EXPERIENCES_FULL` | one row per person-stint | roster / org-movement cuts; `is_primary = true` is the current role |
+| `people_pool` | `ONFIRE.PEOPLE_FULL` | one row per person | whole-pool identity / profile lookups |
 
 > **Gated — opt in explicitly.** Both are withheld from the routing catalog.
 > To query either you MUST (1) name the entity in the QueryIR `entity` field and

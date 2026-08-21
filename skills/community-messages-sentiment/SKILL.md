@@ -162,8 +162,8 @@ The subject framing is what makes this aspect-based: "I love Slack but Nexagon's
   },
   "unique_senders_with_linkedin": 128,
   "unique_companies_resolved": 64,
-  "by_community": [
-    { "community_type": "Slack", "community_name": "DevSecOps Community",
+  "by_platform": [
+    { "community_type": "Slack",
       "positive": 18, "negative": 29, "neutral": 9, "irrelevant": 0, "error": 0 },
     ...
   ],
@@ -176,7 +176,7 @@ The subject framing is what makes this aspect-based: "I love Slack but Nexagon's
   "top_positive": [
     { "linkedin_url": "...", "sender_name": "...", "sender_job_title": "Staff Engineer",
       "company_name": "Acme Corp", "company_industry": "Computer Software",
-      "community_type": "Slack", "community_name": "DevSecOps Community",
+      "community_type": "Slack",
       "message_text": "...", "confidence": 0.92, "reason": "..." },
     ...up to 5
   ],
@@ -194,7 +194,13 @@ The subject framing is what makes this aspect-based: "I love Slack but Nexagon's
 
 ### Dataset columns
 
-The persisted CSV includes: `linkedin_url`, `sender_name`, `sender_job_title`, `company_linkedin_url`, `company_name`, `company_industry`, `company_size`, `company_country`, `community_type`, `community_name`, `message_timestamp`, `message_text`, `sentiment_subject`, `sentiment_value`, `confidence`, `reason`, `relevance_score`, `message_id`.
+The persisted CSV includes: `linkedin_url`, `sender_name`, `sender_job_title`, `company_linkedin_url`, `company_name`, `company_industry`, `company_size`, `company_country`, `community_type`, `message_timestamp`, `message_text`, `sentiment_subject`, `sentiment_value`, `confidence`, `reason`, `relevance_score`.
+
+> **`community_type` is the PLATFORM, and it is all you get about origin.** The
+> specific community's name and URL, and the message id (which reconstructs a
+> permalink on several platforms), are **not returned** — not inline and not in
+> the CSV. Never name the workspace/server a message came from and never offer a
+> source link; cite a message by quoting its text with its date and platform.
 
 `relevance_score` is the semantic match score (0–1) of the message to the subject. Company fields are populated for senders whose LinkedIn URL matches a person record Onfire holds. Senders with no match have null company fields.
 
@@ -204,7 +210,7 @@ The persisted CSV includes: `linkedin_url`, `sender_name`, `sender_job_title`, `
 
 After every successful call, do these four things in order:
 
-1. **State the headline.** One sentence from `counts` + `by_community` + `by_company`, e.g. *"Sentiment toward Nexagon skewed negative — 71 negative vs 47 positive across 128 unique authors from 64 companies, heaviest in r/devops and the DevSecOps Slack; Acme Corp and Beta Inc employees are the most vocal critics."* If `total_returned` is less than `target_messages` (see `note`), **say so explicitly** ("only 142 relevant messages existed for this subject/window").
+1. **State the headline.** One sentence from `counts` + `by_platform` + `by_company`, e.g. *"Sentiment toward Nexagon skewed negative — 71 negative vs 47 positive across 128 unique authors from 64 companies, heaviest on Reddit and Slack; Acme Corp and Beta Inc employees are the most vocal critics."* Attribute by PLATFORM, never by named community. If `total_returned` is less than `target_messages` (see `note`), **say so explicitly** ("only 142 relevant messages existed for this subject/window").
 
 2. **Quote 1-2 exemplars from `top_positive` and `top_negative`** with the author's LinkedIn URL, job title, and company. These are sorted by confidence — they're the most defensible quotes you have.
 

@@ -1,13 +1,13 @@
 ---
 name: entity-people-search
-description: Search for people/prospects directly from Onfire's LinkedIn people entity (ONFIRE.PEOPLE = entity `contact`) using the `ask_onfire` tool. Use when the user wants to find prospects by job title, company, location, seniority, persona/role, technology footprint, or keywords in their profile — phrases like "find engineers at Northwind", "who are the VPs of Security at banks in the US", "show me people with 'Loglytics' in their job summary", "look up this LinkedIn URL", or any people search that doesn't require Forschung's cross-database scoring.
+description: Search for people/prospects directly from Onfire's LinkedIn people entity (the `contact` entity) using the `ask_onfire` tool. Use when the user wants to find prospects by job title, company, location, seniority, persona/role, technology footprint, or keywords in their profile — phrases like "find engineers at Northwind", "who are the VPs of Security at banks in the US", "show me people with 'Loglytics' in their job summary", "look up this LinkedIn URL", or any people search that doesn't require Forschung's cross-database scoring.
 ---
 
 # entity-people-search
 
 Direct lookup of the canonical LinkedIn people entity via `ask_onfire`.
-The people table `ONFIRE.PEOPLE` is the `contact` entity in the semantic
-model. `ask_onfire` does **not** take SQL — it takes a structured
+People live on the `contact` entity in the semantic model. `ask_onfire` does
+**not** take SQL — it takes a structured
 **QueryIR** (`query={...}`) that the server compiles for you. No external
 API hop.
 
@@ -77,16 +77,60 @@ Role, department, **seniority**, and technology/vendor are not columns —
 they live in the insight catalog and go in `insight_filters` as *concepts*
 (one concept per filter; multiple insight_filters are **AND**-ed):
 
-- `{kind: "persona", value: "<role/department>"}` — e.g. `"appsec"`, `"CISO"`, `"data engineering"`.
+- `{kind: "persona", value: "<role/department>"}` — e.g. `"appsec"`, `"devops"`, `"data engineering"`. A job-TITLE ("CISO", "VP Security") is the wrong thing to put here — see the population rule below.
 - `{kind: "persona", value: "seniority_executive"}` — seniority is a **persona**, not a dimension.
   Use `seniority_executive` (covers VP / C-suite) / `seniority_director` / `seniority_teamlead` / `seniority_ic`.
 - `{kind: "technology", value: "<tool/vendor>"}` — e.g. `"Sentinex"`. This is the
   correct replacement for the old "keyword in job summary" lookup when the
   keyword is a technology or vendor.
 
-Values are resolved server-side to an exact `insight_name`; if unsure,
-confirm the canonical value with `resolve_insights` (carrying `kind`)
-first. The server bounces back suggestions if it can't resolve.
+Values are resolved server-side to an exact `insight_name`, and an unresolvable
+value bounces back with suggestions before anything runs or bills — so submit
+the user's wording rather than pre-checking it. `resolve_insights` (carrying
+`kind`) is for reading the vocabulary: an unresolved concept whose suggestions
+weren't enough, an exact spelling to reuse, or an insight's `coverage` band.
+
+### Which POPULATION you search — the choice that decides your results
+
+Onfire holds a curated (ICP-filtered) people set and a much larger full
+population. **The shape of your filter picks one**, and you never switch
+entities or set a flag to do it:
+
+| Filter | Population | Use for |
+|---|---|---|
+| `insight_filters` | curated only | cohorts, counts, qualified segments — deduped, active-employment-aware, high precision |
+| `job_title contains [...]` | the FULL population | finding a specific person or title at a named company |
+
+A query with no `insight_filters` that is scoped to a company/person, or filters
+a title with `contains`, is served from the full population automatically. The
+response then carries a `coverage` block naming which population ran and an
+`exhaustive` note — **read it**: it means there is no broader set to escalate to,
+so a small result is a finding, not a reason to re-query wider.
+
+So **"who is the CISO of Acme"** is a title query, not a persona query:
+
+```
+ask_onfire(query={
+  entity: "contact",
+  select: ["linkedin_url", "full_name", "job_title", "location_name"],
+  filters: [
+    {dimension: "current_company_url", op: "eq", value: "linkedin.com/company/acme"},
+    {dimension: "job_title", op: "contains",
+     value: ["security", "cyber", "infosec", "ciso"]}   // family = ONE filter, OR
+  ],
+  limit: 25
+})
+```
+
+Do **not** reach for `insight_filters` here. Personas are derived from profile
+SIGNAL rather than the job title, so a scoped persona lookup can return someone
+whose own title contradicts it *and* miss a real title-holder outside the curated
+slice — you end up spending a second query to verify. A curated persona can
+legitimately have **zero** holders at a company that plainly employs the role, so
+0 rows from an `insight_filter` is not proof of absence, and never a reason to
+fall back to web search. Report the closest titles you did find, or say plainly
+that the title isn't in the data.
+
 
 ## Billing — read before calling
 
@@ -97,11 +141,13 @@ first. The server bounces back suggestions if it can't resolve.
 - If you do **not** know how many rows the user wants, leave `limit` unset:
   `ask_onfire` then returns how many rows match **without billing** so you
   can confirm the count and resubmit.
-- If the response is `needs_confirmation` (the row-budget gate — triggered
-  when `limit` is unset or larger than ~50 rows and not yet confirmed),
-  **nothing was billed and no rows came back**. Lower `limit` to what you
-  actually need and resubmit. Do **not** reflexively set `confirmed: true`
-  just to push a large pull through.
+- If the response is `needs_confirmation` (the row-budget gate — triggered when
+  the query's ACTUAL match count exceeds ~500 rows and `confirmed` is not set),
+  **nothing was billed and no rows came back**. A generous `limit` over a small
+  match set runs fine; the gate is about how many rows really match. Lower
+  `limit` or tighten the filters and resubmit. Do **not** reflexively set
+  `confirmed: true` just to push a large pull through — that flag records the
+  USER's authorization.
 
 ## QueryIR templates
 
@@ -176,6 +222,40 @@ ask_onfire(query={
 })
 ```
 
+## Aggregate mode (distributions, counts, trends)
+
+Set `group_by` and/or `aggregations` and leave `select` **empty** — the result
+columns are the group keys plus the aggregation names. Never pull raw rows to
+count them yourself.
+
+```
+ask_onfire(query={
+  entity: "contact",
+  filters: [{dimension: "current_company_url", op: "eq",
+             value: "linkedin.com/company/acme"}],
+  group_by: ["job_title_role"],
+  aggregations: [{name: "people", fn: "count_distinct", field: "linkedin_url"}],
+  order_by: [{field: "people", direction: "desc"}]
+})
+```
+
+`fn`: count | count_distinct | sum | avg | min | max (`count` omits `field`).
+`having: [{measure, op, value}]` filters on an aggregation after grouping.
+Aggregates always run against the curated set, so two aggregates in one analysis
+stay comparable.
+
+## Reusing a list another tool returned
+
+If a previous tool handed you a `dataset` (match_company, ai_prospecting, a
+prior ask_onfire), filter by the HANDLE instead of re-typing the values:
+
+```
+filters: [{dimension: "current_company_url", op: "in",
+           from_dataset: "ds_ab12cd34", column: "linkedin_url"}]
+```
+
+`describe_dataset` lists a dataset's columns.
+
 ## Output handling
 
 `ask_onfire` returns a `dataset` handle + `preview_rows` (first 20).
@@ -202,8 +282,9 @@ expressible against `contact` — do not try to fake them:
   is a role/department → use `insight_filters kind=persona`. If it is
   genuinely arbitrary free text with no insight equivalent, it cannot be
   filtered here — say so rather than fabricating a filter.
-- **GROUP BY distributions, aggregations beyond `contact_count`, window
-  functions, or temporal math** — not supported.
+- **Window functions and arbitrary temporal math** — not supported. (GROUP BY
+  distributions and aggregations ARE supported: set `group_by` + `aggregations`
+  and leave `select` empty — see "Aggregate mode" below.)
 
 ## Common pitfalls
 
