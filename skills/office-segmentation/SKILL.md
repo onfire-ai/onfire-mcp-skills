@@ -80,6 +80,13 @@ get_company_headcount(
 
 Use `months=1` — you only need the current snapshot, not historical trends.
 
+> **If `get_company_headcount` isn't in your tool list**, it isn't enabled for
+> this tenant. Get the same snapshot from `ask_onfire`: the `company` entity's
+> `employee_count` dimension for the current figure, or the `headcount_monthly`
+> entity (filter `company_url`, take the latest `month`) for the series. Don't
+> skip the step or leave the total blank — and say which source you used, since
+> the two read different curation layers and can differ.
+
 **From the response:**
 
 - `headcount.preview_rows[0].employee_count` → total current employees (use for % calculations).
