@@ -1,9 +1,9 @@
 ---
-name: community-message-search
+name: community-intent-signals-message-search
 description: Find people and companies by what they SAID in community/social messages (Slack, Discord, Reddit, StackOverflow, GitHub, etc.) using the `search_community_messages` tool — semantic vector search that returns the SENDERS of messages mentioning or discussing a topic, regardless of how they feel about it. Use for message-based discovery and prospecting — phrases like "find relevant people talking about my competitors", "who's discussing [topic]", "companies whose employees mentioned [topic]", "people raising [pain point]", "find prospects discussing [category]", "relevant chatter about [theme] for this account", "who's asking about [problem]". This is MENTION / discovery, NOT opinion — if the user wants positive/negative sentiment, complaints, or advocacy, use community-messages-sentiment instead; if they want who JOINED a named community, use community-join-signals; for non-message signals (job changes, events, job posts) use query_intent_signals.
 ---
 
-# community-message-search
+# community-intent-signals-message-search
 
 Semantic (vector) search over Onfire's community-message data via the
 `search_community_messages` tool. You give 1–3 natural-language phrasings of
