@@ -22,7 +22,7 @@ You can either inline the contact dicts (best for small ad-hoc lists or a user-p
 | Pattern | Use when | What you pass |
 |---|---|---|
 | Inline contacts | User picked a specific subset, or the rows came from a CSV/CRM dump that isn't already a dataset. | `contacts=[…dicts…]` + the three column-name params for the keys you used. |
-| Dataset passthrough | Enrich the full result of an `ai_prospecting` run, or a dataset built via `query_datasets(persist_as_dataset=True)`. | `dataset_id="ds_…"` + the three column-name params for the **dataset's** column names (e.g. `LINKEDIN_URL`, `COMPANY_LINKEDIN_URL`, `FULL_NAME` for an `ai_prospecting` dataset). |
+| Dataset passthrough | Enrich the full result of an `ai_prospecting` run, or a dataset built via `query_datasets(persist_as_dataset=True)`. | `dataset_id="ds_…"` + the column-name params for the **dataset's** column names (e.g. `LINKEDIN_URL`, `COMPANY_LINKEDIN_URL`, `FULL_NAME`, `LOCATION_COUNTRY` for an `ai_prospecting` dataset). |
 
 Dataset passthrough is the canonical path after an `ai_prospecting` run — the run already returns a `dataset_id`, and reusing it avoids rebuilding contact dicts and getting the column names wrong. Set `total_count` from the run's `filtered_prospects` (or `dataset.row_count`).
 
@@ -36,6 +36,30 @@ These four are required by the schema, even on the consent phase:
 - `person_name_column` — name of the column that holds the person's full name.
 
 The column-name params tell the tool how to read your rows. When passing inline contacts, use the keys you put in `contacts`. When passing `dataset_id`, use the **dataset's** column names.
+
+## Pass the person's country when your rows have one
+
+- `location_country_column` — name of the column holding each person's country.
+
+Tenants on **geo-based waterfalls** choose a region-specific provider order from
+this, which changes which emails and phones actually get found. Passing it is not
+extra work — the country usually comes for free with the rows you already have:
+
+| Where your rows came from | Column to pass |
+|---|---|
+| `ai_prospecting` dataset | `LOCATION_COUNTRY` (already in every run's dataset) |
+| `ask_onfire` over the `contact` entity | `location_country` — add it to your `select` |
+| `deanonymize_emails` results | `location_country` |
+| `match_person` | *nothing* — it returns no country; those rows fall back |
+
+The tool auto-detects a country column from the rows, so a row that carries one
+is handled even if you don't name it. Name it explicitly when your column has a
+non-obvious name.
+
+**Never block or delay a call over a missing country.** It is optional: a person
+without one is enriched through the tenant's default waterfall exactly as before.
+Do not run an extra lookup just to obtain it, and do not drop contacts that lack
+it.
 
 ## Optional arguments
 
@@ -59,12 +83,14 @@ The column-name params tell the tool how to read your rows. When passing inline 
 ```python
 contact_data_enrichment(
     contacts=[
-        {"name": "John Smith", "linkedin": "https://linkedin.com/in/...", "website": "acme.com"},
+        {"name": "John Smith", "linkedin": "https://linkedin.com/in/...", "website": "acme.com",
+         "country": "united states"},
         ...  # up to 10
     ],
     linkedin_url_column="linkedin",
     account_website_column="website",
-    person_name_column="name"
+    person_name_column="name",
+    location_country_column="country"
 )
 ```
 
@@ -82,7 +108,8 @@ contact_data_enrichment(
     total_count=150,
     linkedin_url_column="linkedin",
     account_website_column="website",
-    person_name_column="name"
+    person_name_column="name",
+    location_country_column="country"
 )
 ```
 
@@ -117,7 +144,8 @@ for batch in chunked(contacts, 20):
         confirmation_token=token_from_phase_1,
         linkedin_url_column="linkedin",
         account_website_column="website",
-        person_name_column="name"
+        person_name_column="name",
+        location_country_column="country"
     )
 ```
 
@@ -135,7 +163,8 @@ Loop until everyone is processed. **Accumulate results across calls.** Flag any 
 ## Common pitfalls
 
 - **Forgetting the column-name params.** They're required even on the empty-contacts consent call and on dataset-passthrough calls.
-- **Using the wrong column names with `dataset_id`.** When you pass an `ai_prospecting` dataset, the columns are `LINKEDIN_URL`, `COMPANY_LINKEDIN_URL`, `FULL_NAME` — not whatever your inline-contacts dicts would have used.
+- **Using the wrong column names with `dataset_id`.** When you pass an `ai_prospecting` dataset, the columns are `LINKEDIN_URL`, `COMPANY_LINKEDIN_URL`, `FULL_NAME`, `LOCATION_COUNTRY` — not whatever your inline-contacts dicts would have used.
+- **Dropping the country on the floor.** If your rows carry a country and you don't pass it, a geo-routed tenant silently gets its default waterfall instead of the regional one — no error, just worse hit rates. Conversely, do NOT fetch the country separately or withhold contacts that lack it.
 - **Passing both `contacts` and `dataset_id` with non-empty contacts.** Pick one source. Dataset passthrough wants `contacts=[]`.
 - **Skipping phase 1 for "just 12 contacts".** The threshold is >10, not >20. Twelve triggers two-phase.
 - **Sending phase 2 with the wrong `total_count`.** It must match phase 1.
@@ -150,7 +179,8 @@ contact_data_enrichment(
     contacts=[...8 dicts...],
     linkedin_url_column="linkedin",
     account_website_column="website",
-    person_name_column="name"
+    person_name_column="name",
+    location_country_column="country"
 )
 ```
 Done in one call. Render results.
@@ -170,7 +200,8 @@ contact_data_enrichment(
     contacts=[...10 dicts built from preview_rows + dataset slice...],
     linkedin_url_column="LINKEDIN_URL",
     account_website_column="COMPANY_LINKEDIN_URL",
-    person_name_column="FULL_NAME"
+    person_name_column="FULL_NAME",
+    location_country_column="LOCATION_COUNTRY"
 )
 ```
 ≤10, so single call.
@@ -188,6 +219,7 @@ contact_data_enrichment(
     linkedin_url_column="LINKEDIN_URL",
     account_website_column="COMPANY_LINKEDIN_URL",
     person_name_column="FULL_NAME",
+    location_country_column="LOCATION_COUNTRY",
 )
 # Show user_facing_message verbatim. Stop. After explicit yes:
 
@@ -203,6 +235,7 @@ for offset in range(0, 42, 20):
         linkedin_url_column="LINKEDIN_URL",
         account_website_column="COMPANY_LINKEDIN_URL",
         person_name_column="FULL_NAME",
+        location_country_column="LOCATION_COUNTRY",
     )
 ```
 

@@ -89,6 +89,12 @@ match_person(entities=[{
 ```
 Use the returned `linkedin_url` for `contact_data_enrichment`, and the `company_linkedin_url` for company-scoped tools.
 
+`match_person` returns no country, so rows resolved this way reach enrichment
+without one and run the tenant's default waterfall. That is fine — do not add a
+lookup to fill it in. If you happen to be enriching people you *also* pulled from
+`ask_onfire` or an `ai_prospecting` dataset, carry their `location_country`
+through; see `contact-data-enrichment`.
+
 **Bulk CRM resolve.**
 ```python
 match_person(entities=[

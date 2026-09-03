@@ -143,7 +143,7 @@ crm_write(
 Notes that matter here:
 
 - **`linkedin_url` is now load-bearing, not optional.** It is the proof-match key. A prospect that lands in the CRM without one mints **no proof row**, and you will not be able to create them in the SEP at all. If you're missing LinkedIn URLs, resolve them with `match_person` *before* this call.
-- **`email` is the join key for the hydration sync.** Record it exactly as you send it — you need the identical string in STEP 4. If you're missing emails, run `contact_data_enrichment` first (or pass `contact_data_enrich=True`).
+- **`email` is the join key for the hydration sync.** Record it exactly as you send it — you need the identical string in STEP 4. If you're missing emails, run `contact_data_enrichment` first (or pass `contact_data_enrich=True`). If the rows you're enriching carry a country, pass it as `location_country_column` — geo-routed tenants pick a region-specific waterfall from it. See `contact-data-enrichment`.
 - **Keep prospects and accounts in separate jobs.** Proof minting checks the entity type of the job's **first record** only, so a job that leads with an account record mints nothing for the prospects behind it. One `crm_write` per entity type.
 - **Do not set the owner yourself.** The tenant's field mapping already maps owner to the exporting person, and the CRM's routing has the final word. Trying to force it fights both.
 - Confirm the record list with the user before calling — these are live CRM writes.

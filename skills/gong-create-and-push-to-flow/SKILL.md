@@ -63,7 +63,7 @@ Always include `v2/` in the Gong `relative_url`.
 
 ## STEP 1 — Enrich + create the CRM record (Salesforce)
 
-If you don't already have the person's email/phone, enrich first (`contact_data_enrichment`; ≤10 contacts = single call, no consent gate). You need at least a name and company; email/phone are nice-to-have but Gong keys off the **CRM record Id**, not the email.
+If you don't already have the person's email/phone, enrich first (`contact_data_enrichment`; ≤10 contacts = single call, no consent gate). You need at least a name and company; email/phone are nice-to-have but Gong keys off the **CRM record Id**, not the email. If the rows you're enriching carry a country, pass it as `location_country_column` — geo-routed tenants pick a region-specific waterfall from it. See `contact-data-enrichment`.
 
 Create the record with **`crm_write`** — the CRM export path. It resolves the CRM integration internally (no `integration_id`), and it respects the tenant's configured **CRM field mapping**, which decides whether a prospect lands as a Lead or a Contact and which owner it gets. Don't try to hand-write a raw Salesforce object here: bypassing the mapping is how records end up owned by the Onfire integration user instead of the rep.
 
