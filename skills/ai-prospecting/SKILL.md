@@ -342,6 +342,12 @@ Phrase it naturally:
 
 The dataset_id from the run can be passed straight to `contact_data_enrichment(dataset_id="ds_…", ...)` to enrich the entire run set without rebuilding contact dicts; for a custom subset, build dicts from the rows the user picked. See `contact-data-enrichment`.
 
+Every run's dataset already carries `LOCATION_COUNTRY`, so pass
+`location_country_column="LOCATION_COUNTRY"` on the enrichment call — tenants on
+geo-based waterfalls use it to pick a region-specific provider order, and it
+costs you nothing here since the column is already in the rows. Keep it on the
+`LOCATION_COUNTRY` key when you build dicts for a user-picked subset too.
+
 This is part of the playbook, not a polite extra.
 
 ## The download offer (also required)

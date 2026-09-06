@@ -307,6 +307,12 @@ matters:
   passed none of them for a long time and survived only because its contact-dict keys
   happened to match the server's defaults — an undeclared dependency, and a candidate for
   the reported case where a profile with known contact data read as empty.
+- `location_country_column` is **not** passed, and cannot be yet: `personContact()`
+  builds each dict from the plan's person record, which stores only `li` and `name`.
+  Geo-routed tenants therefore get their default waterfall for 5x5 reveals. Wiring it
+  up means carrying a country onto the person record at plan-build time (the
+  `ai_prospecting` rows behind the plan do have `LOCATION_COUNTRY`) and adding the key
+  in `personContact()` plus the param in `enrichArgs()`.
 - Two paths that each decide for themselves which field names count and which badges to
   set will drift, and the drift shows up as one surface finding contact data that the
   other reports as missing.

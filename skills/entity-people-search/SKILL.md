@@ -61,7 +61,7 @@ ask_onfire(query={
 | `job_title` | Free-text current title. Use `op: "contains"` for a keyword. |
 | `job_title_role` | Normalised role category (e.g. "engineering") |
 | `job_title_sub_role` | Finer role category |
-| `location_country` | Stored lowercased — match lowercase literals (e.g. `"united states"`) |
+| `location_country` | Stored lowercased — match lowercase literals (e.g. `"united states"`). **Add it to `select` when these rows are headed for `contact_data_enrichment`** — geo-routed tenants pick a region-specific waterfall from it. |
 | `location_region` | State / region (lowercased) |
 | `location_locality` | City (lowercased) |
 | `industry` | Person-level industry (lowercased) |
@@ -169,7 +169,8 @@ ask_onfire(query={
 ask_onfire(query={
   entity: "contact",
   select: ["linkedin_url", "full_name", "job_title", "seniority_levels",
-           "current_company_name", "current_company_url", "location_name", "summary"],
+           "current_company_name", "current_company_url", "location_name",
+           "location_country", "summary"],
   filters: [{dimension: "linkedin_url", op: "eq",
              value: "https://www.linkedin.com/in/johndoe"}],
   limit: 1
