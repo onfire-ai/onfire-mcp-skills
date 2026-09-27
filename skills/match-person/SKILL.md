@@ -69,7 +69,7 @@ Same-order alignment with the input. The output already includes `company_linked
 - Batch ≤ 100 per call.
 - Name without email **requires** `company_name`.
 - Surface low-confidence matches (`match_score` low, `matched: false`). Ask the user to confirm rather than silently picking the top result.
-- Pass every signal you have. `job_title` and `company_linkedin_url` materially improve accuracy.
+- Supply every signal you have. `job_title` and `company_linkedin_url` materially improve accuracy.
 
 ## Common pitfalls
 

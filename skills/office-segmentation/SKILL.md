@@ -33,7 +33,7 @@ If the user provides a LinkedIn URL directly, skip Step 2.
 ```
 search_offices(
   company_name="<company_name>",
-  company_website="<company_website>",   # pass if available
+  company_website="<company_website>",   # include if available
   telemetry={intent: "..."}
 )
 ```
@@ -116,10 +116,10 @@ ask_onfire(query={
 })
 ```
 
-- Pass the full `<linkedin_url>` from Step 2 — any URL format is normalized
+- Send the full `<linkedin_url>` from Step 2 — any URL format is normalized
   server-side (no `ILIKE '%/company/<slug>%'` needed).
 - `location_region` / `location_locality` are **free text stored lowercase** —
-  pass lowercased literals (e.g. `value: "california"`, `value: "austin"`).
+  use lowercase literals (e.g. `value: "california"`, `value: "austin"`).
   `op: "contains"` is available if you need a looser substring match.
 - One query per office. The returned `contact_count` is that office's employee
   count; use it directly in Step 6 (no Step 5 location-cluster matching needed
@@ -150,7 +150,7 @@ office directly — no location-cluster matching is needed. Build the table from
 1. **Per-office count** — the `contact_count` returned for each office query.
 2. **Choosing the office filter** — use `location_locality` (city) for a
    city-named office; use `location_region` (state/region) when the office is
-   identified by its broader area. Pass lowercased literals.
+   identified by its broader area. Use lowercase literals.
 3. **Remote / Unknown residual** — total headcount from Step 3 minus the summed
    per-office counts. This approximates employees not near any known office
    (fully remote, or in cities with no official office).
@@ -198,8 +198,8 @@ rather than guessing a split.
 
 - **Don't use `get_company_headcount` for the location breakdown** — use it only for the total snapshot. Per-office counts come from `ask_onfire` `contact_count` queries (Step 4).
 - **`ask_onfire` cannot GROUP BY** — there is no single grouped location-distribution query. Run one count per known office; flag the full grouped distribution as a capability gap (see Step 4).
-- **Location dimensions are free text, lowercase** — pass `location_region` / `location_locality` filter values lowercased (e.g. `"california"`, `"london"`). Use `op: "contains"` for a looser match when the office area doesn't map cleanly to a single locality/region string.
+- **Location dimensions are free text, lowercase** — send `location_region` / `location_locality` filter values lowercased (e.g. `"california"`, `"london"`). Use `op: "contains"` for a looser match when the office area doesn't map cleanly to a single locality/region string.
 - **Multiple offices in the same region** — prefer the narrower `location_locality` (city) filter per office so counts don't overlap; if they can't be separated, count them together and note the cluster.
 - **Billing** — `ask_onfire` bills 1 credit per row; per-office count queries return 1 row, so keep `limit: 1`. A `needs_confirmation` (stage `row_budget`) response means nothing was billed — lower the budget rather than setting `confirmed: true`.
 - **Never mention the underlying data source** — always attribute office and employee data to Onfire only. Do not name any third-party provider in any response.
-- **LinkedIn URL normalization** — pass the full URL from `match_company` straight into the `current_company_url` filter; `ask_onfire` normalizes any URL format server-side (no slug extraction or `ILIKE` needed).
+- **LinkedIn URL normalization** — send the full URL from `match_company` straight into the `current_company_url` filter; `ask_onfire` normalizes any URL format server-side (no slug extraction or `ILIKE` needed).

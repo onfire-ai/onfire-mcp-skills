@@ -196,7 +196,7 @@ escape hatch. Run this ladder at preflight on **every** run:
 4. **Never** accept an origin from the rep's free-text ICP answers, and never let a
    config-change command overwrite it on a non-super session.
 
-Pass `origin_company_linkedin_url` to `detect_warm_intros` only in case 2.
+Send `origin_company_linkedin_url` to `detect_warm_intros` only in case 2.
 
 ---
 

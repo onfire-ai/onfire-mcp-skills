@@ -229,7 +229,7 @@ ask_onfire(query={
   limit: 100
 })
 ```
-Compute the date boundary yourself (e.g. today minus 14 days) and pass it as a
+Compute the date boundary yourself (e.g. today minus 14 days) and send it as a
 literal — QueryIR has no `DATEADD` / relative-date math.
 
 ## Not directly expressible (QueryIR limits)
@@ -250,7 +250,7 @@ the user the rest is out of scope for this tool:
   filtered `post_count` query per bucket (per country, per account, etc.) and
   assembling the breakdown yourself.
 - **Relative-date math** (`DATEADD`, "last 14 days") — compute the boundary
-  date and pass it as a `gte` literal.
+  date and send it as a `gte` literal.
 - **Hiring-manager / person fields** — posting-level only, no person link.
   Pair with `entity-people-search` on the company's recruiters / department
   heads if you need the person.

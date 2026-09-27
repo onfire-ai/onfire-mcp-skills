@@ -89,7 +89,7 @@ query=[
 ]
 ```
 
-Never pass bare keywords or a lone vendor list — describe the intent in natural
+Never send bare keywords or a lone vendor list — describe the intent in natural
 language, or the vector match degrades.
 
 ## Time window — REQUIRED: ask before searching

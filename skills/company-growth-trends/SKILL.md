@@ -248,17 +248,17 @@ month-over-month change (positive = growing). Coverage is a trailing ~12 months.
 
 | Field | Kind | Notes |
 |---|---|---|
-| `company_url` | dimension | Company identifier. Pass a LinkedIn URL in any format — normalized server-side. |
-| `insight` | dimension (bound) | Persona OR technology **concept**, resolved server-side. Pass the human/canonical value (e.g. `Sentinex`, `data engineer`) — **do not add a `growth-` prefix**; the server scopes it to the growth series. |
+| `company_url` | dimension | Company identifier. Send a LinkedIn URL in any format — normalized server-side. |
+| `insight` | dimension (bound) | Persona OR technology **concept**, resolved server-side. Give the human/canonical value (e.g. `Sentinex`, `data engineer`) — **do not add a `growth-` prefix**; the server scopes it to the growth series. |
 | `month` | dimension (date) | First day of the month. Filter a window with `gte` / `lte`. |
 | `num_on_insight` | attribute (numeric) | Contacts carrying the insight that month. TEXT-stored; compiler casts numerically. |
 | `growth_rate` | attribute (numeric) | Pre-computed MoM change. TEXT-stored; compiler casts numerically. Read it directly. |
 
 > **Resolve the concept first.** `insight` is a bound concept, not a literal.
-> Pass the human term and the server resolves it (bouncing suggestions if it
+> Give the human term and the server resolves it (bouncing suggestions if it
 > can't), or confirm the canonical value with `resolve_insights`. The old
 > `growth-<slug>` stored prefix and `LOWER(insight_name) = ...` matching are
-> gone — never pass a prefix yourself.
+> gone — never send a prefix yourself.
 
 > **Billing / row budget.** `ask_onfire` **bills 1 credit per row returned**.
 > Always set a small explicit `limit` — `12` covers a year of monthly rows. If
@@ -303,7 +303,7 @@ ask_onfire(query={
 > `YYYY-MM-01` value (`gte`/`lte`), or just pull the trailing window and slice
 > client-side. **FLAG:** the old "all insights, last 3 months" template relied
 > on `DATEADD(month, -3, CURRENT_DATE())` — not expressible as-is; compute the
-> cutoff date yourself and pass it as a literal `month gte`.
+> cutoff date yourself and send it as a literal `month gte`.
 
 #### Multiple companies — which insight is growing fastest?
 
@@ -384,7 +384,7 @@ ask_onfire(query={
   `month` + `num_on_insight` + `growth_rate` and ORDERs by `month`. Any
   comparison the stored `growth_rate` doesn't already give you (e.g. first-vs-last
   month, multi-month averages) you compute **yourself over the pulled rows**.
-- `insight` is resolved server-side — pass the human/canonical concept, never a
+- `insight` is resolved server-side — give the human/canonical concept, never a
   `growth-` prefix or a stored slug.
 
 ---
@@ -406,6 +406,6 @@ ask_onfire(query={
 - **Expecting `experiences_pool` to compute joiners/leavers or prior/next-company in one query** — it can't (TEXT dates, no self-join/date math in QueryIR). Use `get_company_headcount`, or pull stints and derive movement client-side.
 - **Expecting `ask_onfire` to compute MoM deltas / trend math in SQL** — it can't. Read the stored `growth_rate`; compute anything else yourself over the pulled rows.
 - **Treating `next_company_name` as "current employer"** — it's the *next* stint after this one. For still-active people (`end_date IS NULL`) it's NULL. Use `current_company_name` for "where they work now".
-- **Adding a `growth-` prefix or stored slug to `insight`** — pass the human/canonical concept; the server resolves and scopes it. Use `resolve_insights` if unsure.
+- **Adding a `growth-` prefix or stored slug to `insight`** — give the human/canonical concept; the server resolves and scopes it. Use `resolve_insights` if unsure.
 - **Leaving `limit` unset / pushing a big pull through** — `ask_onfire` bills 1 credit/row. Set a small explicit `limit` (e.g. 12); on `needs_confirmation` (stage `row_budget`) lower it, don't reflexively set `confirmed: true`.
 - **`start_date` / `end_date` in the employee roster are `YYYY-MM` strings**, not full dates. Treat them as month granularity.

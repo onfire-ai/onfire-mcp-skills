@@ -89,7 +89,7 @@ Exclusion drops senders whose resolved current employer (from Onfire's people re
 match_company("Nexagon")
 # → { "linkedin_url": "linkedin.com/company/nexagon", "name": "Nexagon", ... }
 
-# Then pass the LinkedIn URL to the tool:
+# Then send the LinkedIn URL to the tool:
 community_messages_sentiment(
     ...,
     exclude_companies=["linkedin.com/company/nexagon"],
@@ -132,7 +132,7 @@ community_messages_sentiment(
 
 ### How to phrase `sentiment_subject`
 
-This is the **aspect** the LLM judges against AND the phrasing that drives candidate relevance — be specific, don't just pass the keyword.
+This is the **aspect** the LLM judges against AND the phrasing that drives candidate relevance — be specific, don't just send the keyword.
 
 | Bad | Good |
 |---|---|
@@ -246,14 +246,14 @@ Only re-run `community_messages_sentiment` when the user genuinely changes the i
 
 ## Common pitfalls
 
-- **Calling without asking how many.** `target_messages` is required; if you don't pass it the tool just asks you to get a count. Decide the volume with the user FIRST (frame as volume, not cost).
+- **Calling without asking how many.** `target_messages` is required; if you don't send it the tool just asks you to get a count. Decide the volume with the user FIRST (frame as volume, not cost).
 - **Stopping at the inline counts.** The user will ask follow-ups. Surface the dataset_id.
 - **Re-running for "show me only negatives".** Wasteful. Use `query_datasets`.
 - **Using a vague `sentiment_subject` like `"Nexagon"`.** The aspect framing is what makes this worth the LLM cost — and a sharper subject means fewer off-topic drops, so you hit your target.
 - **Forgetting date math.** "Last 3 months" → convert before calling.
 - **Treating `top_positive`/`top_negative` as exhaustive.** They are 5 exemplars sorted by confidence.
 - **Ignoring null company fields.** `unique_companies_resolved` < `unique_senders_with_linkedin` means some senders weren't resolved — the by_company breakdown is a subset, not the full picture.
-- **Passing a bare company name to `exclude_companies`.** This now raises a validation error. Always resolve via `match_company` first and pass the LinkedIn URL.
+- **Passing a bare company name to `exclude_companies`.** This now raises a validation error. Always resolve via `match_company` first and send the LinkedIn URL.
 
 ## Worked examples
 

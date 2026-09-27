@@ -63,7 +63,7 @@ Always include `v2/` in the Gong `relative_url`.
 
 ## STEP 1 — Enrich + create the CRM record (Salesforce)
 
-If you don't already have the person's email/phone, enrich first (`contact_data_enrichment`; ≤10 contacts = single call, no consent gate). You need at least a name and company; email/phone are nice-to-have but Gong keys off the **CRM record Id**, not the email. If the rows you're enriching carry a country, pass it as `location_country_column` — geo-routed tenants pick a region-specific waterfall from it. See `contact-data-enrichment`.
+If you don't already have the person's email/phone, enrich first (`contact_data_enrichment`; ≤10 contacts = single call, no consent gate). You need at least a name and company; email/phone are nice-to-have but Gong keys off the **CRM record Id**, not the email. If the rows you're enriching carry a country, send it as `location_country_column` — geo-routed tenants pick a region-specific waterfall from it. See `contact-data-enrichment`.
 
 Create the record with **`crm_write`** — the CRM export path. It resolves the CRM integration internally (no `integration_id`), and it respects the tenant's configured **CRM field mapping**, which decides whether a prospect lands as a Lead or a Contact and which owner it gets. Don't try to hand-write a raw Salesforce object here: bypassing the mapping is how records end up owned by the Onfire integration user instead of the rep.
 
@@ -246,8 +246,8 @@ The full `overrides` object (all optional, Beta Phase):
 
 Gong returns **HTTP 200 and assigns the prospect** even if your override block uses wrong field names — it just drops the unknown fields, and the composer opens with the flow's default template (empty/`Test`). There is **no error to catch**. Names that were tried and silently ignored: `flowInstanceContent`, `stepsContentOverride`, `stepNumber`, `bodyHtml`. The only accepted names are exactly: **`overrides` → `steps` → `number` / `subject` / `body`**. If the user reports the composer is empty after your assign, this is why — restage with the correct schema.
 
-### ⚠️ Pass `flowId` as a STRING
-Gong flow ids are 19-digit Longs (e.g. `6498280454937525788`) that exceed JavaScript's safe-integer range. If you pass it as a JSON **number** it gets rounded (→ `...526000`) and Gong returns `404 "Flow not found"`. Always quote it as a string so the exact value is preserved. Same care applies to any Gong id you round-trip.
+### ⚠️ Send `flowId` as a STRING
+Gong flow ids are 19-digit Longs (e.g. `6498280454937525788`) that exceed JavaScript's safe-integer range. If you send it as a JSON **number** it gets rounded (→ `...526000`) and Gong returns `404 "Flow not found"`. Always quote it as a string so the exact value is preserved. Same care applies to any Gong id you round-trip.
 
 Success looks like:
 
@@ -306,7 +306,7 @@ Warn the user before unassigning: restaging **kills the current instance's progr
 
 > **Tool routing quirk:** Gong's read-shaped POSTs (`v2/flows/steps`, `v2/flows/prospects`) are rejected by `sep_read` ("not a read-shaped request"). Send them through `sep_write` — they're still reads on Gong's side.
 
-Bearer scopes (for reference): `api:flows:read` for the reads, `api:flows:write` for assign/unassign. The Onfire engine handles auth; you don't pass tokens.
+Bearer scopes (for reference): `api:flows:read` for the reads, `api:flows:write` for assign/unassign. The Onfire engine handles auth; you don't send tokens.
 
 ## Common failure → cause
 

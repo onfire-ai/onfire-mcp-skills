@@ -15,11 +15,11 @@ Adds verified emails and phones to contact records. **Paid: 1 credit per contact
 
 If the rows don't have LinkedIn URLs yet, run `match-person` first to fill them in — this tool needs LinkedIn URLs to do its best work.
 
-## Two ways to pass contacts
+## Two ways to supply contacts
 
 You can either inline the contact dicts (best for small ad-hoc lists or a user-picked subset) or hand the tool an existing dataset and let it page through it (best for "enrich everything from that prospecting run"):
 
-| Pattern | Use when | What you pass |
+| Pattern | Use when | What you send |
 |---|---|---|
 | Inline contacts | User picked a specific subset, or the rows came from a CSV/CRM dump that isn't already a dataset. | `contacts=[…dicts…]` + the three column-name params for the keys you used. |
 | Dataset passthrough | Enrich the full result of an `ai_prospecting` run, or a dataset built via `query_datasets(persist_as_dataset=True)`. | `dataset_id="ds_…"` + the column-name params for the **dataset's** column names (e.g. `LINKEDIN_URL`, `COMPANY_LINKEDIN_URL`, `FULL_NAME`, `LOCATION_COUNTRY` for an `ai_prospecting` dataset). |
@@ -37,7 +37,7 @@ These four are required by the schema, even on the consent phase:
 
 The column-name params tell the tool how to read your rows. When passing inline contacts, use the keys you put in `contacts`. When passing `dataset_id`, use the **dataset's** column names.
 
-## Pass the person's country when your rows have one
+## Send the person's country when your rows have one
 
 - `location_country_column` — name of the column holding each person's country.
 
@@ -45,7 +45,7 @@ Tenants on **geo-based waterfalls** choose a region-specific provider order from
 this, which changes which emails and phones actually get found. Passing it is not
 extra work — the country usually comes for free with the rows you already have:
 
-| Where your rows came from | Column to pass |
+| Where your rows came from | Column to send |
 |---|---|
 | `ai_prospecting` dataset | `LOCATION_COUNTRY` (already in every run's dataset) |
 | `ask_onfire` over the `contact` entity | `location_country` — add it to your `select` |
@@ -67,9 +67,9 @@ it.
 - `confirmation_token` — required on every phase 2 call. Server-issued in phase 1.
 - `include_email` *(default `True`)*
 - `include_phone` *(default `True`)* — turn one off if the user only wants the other; halves the cost.
-- `dataset_id` — enrich rows from an existing MCP dataset (e.g. an `ai_prospecting` run dataset). Pass `contacts=[]` when using this; the tool reads from the dataset.
+- `dataset_id` — enrich rows from an existing MCP dataset (e.g. an `ai_prospecting` run dataset). Send `contacts=[]` when using this; the tool reads from the dataset.
 - `limit`, `offset` — page through a dataset when you don't want the whole thing.
-- **Never pass `target_tenant_id`** — tenant comes from OAuth.
+- **Never send `target_tenant_id`** — tenant comes from OAuth.
 
 ## The flow at a glance
 
@@ -158,13 +158,13 @@ Loop until everyone is processed. **Accumulate results across calls.** Flag any 
 - **Never bundle more than 20 contacts in a phase-2 call.** The server rejects it.
 - **Show `user_facing_message` verbatim.** Paraphrasing the cost defeats the consent flow.
 - **Don't treat the original user request as approval** for the dollar amount they haven't seen yet.
-- **Never pass `target_tenant_id`.**
+- **Never send `target_tenant_id`.**
 
 ## Common pitfalls
 
 - **Forgetting the column-name params.** They're required even on the empty-contacts consent call and on dataset-passthrough calls.
-- **Using the wrong column names with `dataset_id`.** When you pass an `ai_prospecting` dataset, the columns are `LINKEDIN_URL`, `COMPANY_LINKEDIN_URL`, `FULL_NAME`, `LOCATION_COUNTRY` — not whatever your inline-contacts dicts would have used.
-- **Dropping the country on the floor.** If your rows carry a country and you don't pass it, a geo-routed tenant silently gets its default waterfall instead of the regional one — no error, just worse hit rates. Conversely, do NOT fetch the country separately or withhold contacts that lack it.
+- **Using the wrong column names with `dataset_id`.** When you send an `ai_prospecting` dataset, the columns are `LINKEDIN_URL`, `COMPANY_LINKEDIN_URL`, `FULL_NAME`, `LOCATION_COUNTRY` — not whatever your inline-contacts dicts would have used.
+- **Dropping the country on the floor.** If your rows carry a country and you don't send it, a geo-routed tenant silently gets its default waterfall instead of the regional one — no error, just worse hit rates. Conversely, do NOT fetch the country separately or withhold contacts that lack it.
 - **Passing both `contacts` and `dataset_id` with non-empty contacts.** Pick one source. Dataset passthrough wants `contacts=[]`.
 - **Skipping phase 1 for "just 12 contacts".** The threshold is >10, not >20. Twelve triggers two-phase.
 - **Sending phase 2 with the wrong `total_count`.** It must match phase 1.

@@ -50,7 +50,7 @@ from the curated catalog and applied as a semi-join.
 | `location_country` | dimension (filter) | Free text, lowercased server-side |
 
 **The product is NOT a column.** It is an `insight_filters` entry:
-`{kind: "technology", value: "<product>"}`. Pass the human term; the
+`{kind: "technology", value: "<product>"}`. Give the human term; the
 server canonicalises it. If unsure of the canonical name, call
 `resolve_insights` (carrying `kind: "technology"`) first to confirm —
 e.g. a query for `devops` will not match the catalog name `DevOps`.

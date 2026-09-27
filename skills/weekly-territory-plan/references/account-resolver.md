@@ -44,7 +44,7 @@ worth engineering against.
 | Prospecting unavailable | Do **not** proceed silently. State that the people layer will be title-pull-only and ask whether to continue. |
 | Buying-committee personas empty | State that committee coverage cannot be guaranteed; offer to proceed on the tenant's golden persona alone. |
 | An entity named here is absent from the catalog | Skip that layer, score its dimension `null`, redistribute the weight, note it internally. |
-| A concept fails to resolve | Drop that concept, note it internally. Never pass an unresolved term as a literal. |
+| A concept fails to resolve | Drop that concept, note it internally. Never send an unresolved term as a literal. |
 
 ---
 
@@ -220,7 +220,7 @@ ask_onfire(query={
 ```
 
 `attendee_count` is pre-aggregated per company and event — read it, never re-aggregate.
-The stored event form is prefixed; pass the human term and let it resolve.
+The stored event form is prefixed; give the human term and let it resolve.
 
 ### Technology and competitor footprint
 
@@ -298,7 +298,7 @@ Four things this entity will punish you for:
   or `evidence_type`. An unconstrained pull is the most expensive mistake available in
   this file.
 - **`evidence_type` is filtered by its human name**, not by an id — the server resolves
-  the name against its vocabulary. Do not pass the stored numeric value.
+  the name against its vocabulary. Do not send the stored numeric value.
 - **The community fields are populated only for community-membership evidence**, so
   the `evidence_type` filter is not optional garnish; without it they come back null.
 - **`start_date` / `end_date` here are TEXT (`YYYY-MM`), not dates.** `community_joined_at`
@@ -617,7 +617,7 @@ Never fail the run on a single layer. Every row below degrades.
 | A layer returns zero rows | Score that dimension `null`, redistribute the weight, continue. |
 | A layer errors | Same as zero rows, and note it internally. |
 | An entity is absent from the catalog | Skip the layer entirely; do not substitute a guess. |
-| A concept fails to resolve | Drop that concept; never pass the raw term as a literal filter value. |
+| A concept fails to resolve | Drop that concept; never send the raw term as a literal filter value. |
 | The CRM read fails | Skip the CRM inputs and the state gate; continue on the remaining sources. |
 | The approved sheet is unreachable | Skip it; continue. Never fail the run on an optional external input. |
 | `match_company` finds no confident match | Drop the candidate — an unresolvable company cannot be scoped or scored. |

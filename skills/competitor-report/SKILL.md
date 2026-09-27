@@ -86,7 +86,7 @@ Phase 4   Pre-delivery checklist        (~1 minute)
 ```
 
 **Phase 3.5 is non-negotiable.** Every brief that has shipped without
-this pass has contained at least one self-contradiction a careful
+this check has contained at least one self-contradiction a careful
 reader catches in five minutes. Triple-check every number, every
 percentage, every cross-page reference. The brief is one argument
 across all pages — if any two pages disagree on the same fact, the
@@ -389,7 +389,7 @@ So **pull the constrained `insight_evidence` rows with a bounded
 client-side in `query_datasets` (DuckDB).** `insight_value` is bound
 and resolved server-side (`resolve_insights` shares the
 persona/technology vocabulary), so the old `ILIKE` casing workaround
-is gone — pass the competitor name and the resolver canonicalises it.
+is gone — send the competitor name and the resolver canonicalises it.
 `insight_evidence` is ~1B rows, so the `insight_value` + `start_date`
 window is what keeps the pull bounded; the row budget bills 1 credit
 per row, so set `limit` to the cohort size and confirm against the
@@ -703,7 +703,7 @@ client-side roll-up produced — no `query_datasets` aggregation needed).
 The old numeric `JOB_COMPANY_LINKEDIN_ID` disambiguation guard (needed
 when the slug was ambiguous, e.g. `packmint` vs `packmints`) is no
 longer available — ask_onfire has no numeric-ID dimension on `contact`.
-Pass the **verified `company_linkedin_url`** from Phase 0
+Send the **verified `company_linkedin_url`** from Phase 0
 `match_company` as `current_company_url`; it is normalized server-side
 and resolves to the one canonical company, so it does not pollute with a
 same-named neighbour the way a bare slug `ILIKE` did.
@@ -771,7 +771,7 @@ Two capability notes vs the raw query:
 
 - **No numeric-ID disambiguation.** The raw query keyed on
   `company_linkedin_id` (numeric) to avoid same-named-company pollution.
-  ask_onfire has no numeric-ID dimension — pass the **verified
+  ask_onfire has no numeric-ID dimension — send the **verified
   `company_linkedin_url`** from Phase 0 `match_company` (normalized
   server-side, resolves to the one canonical company).
 - **Per-event grouping.** The named-attendee pull above cannot also
@@ -1534,7 +1534,7 @@ pool, not the production-depth cluster.
 
 ### 2026-05-27 (v3) — Packmint re-edit round 2: snapshot delta, external-only joiners, event-attendance page, Phase 3.5 self-validation
 
-Continuation of the in-session edit pass on the Packmint 12-month
+Continuation of the in-session edit round on the Packmint 12-month
 brief. Every change below was triggered by a real inconsistency a
 reader caught in the rendered PDF.
 
@@ -1662,7 +1662,7 @@ snapshot delta**
 
 ### 2026-05-27 — Packmint re-edit: page 2 geo card, leavers logic fix, page 12/13 swap
 
-All changes shaken out by an in-session edit pass on the Packmint
+All changes shaken out by an in-session edit round on the Packmint
 12-month brief.
 
 **Page 2 — Geographic footprint card (new)**

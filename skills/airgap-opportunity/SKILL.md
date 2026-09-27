@@ -150,7 +150,7 @@ Confirm with `resolve_insights(["air-gapped environment","cross domain solution"
 }
 ```
 
-For people use `entity: "contact"` with the same filter, selecting `full_name, job_title, current_company_name, linkedin_url`. Pass both values as a **list inside one filter** to OR them; use separate `insight_filters` entries only when both must be true.
+For people use `entity: "contact"` with the same filter, selecting `full_name, job_title, current_company_name, linkedin_url`. Put both values as a **list inside one filter** to OR them; use separate `insight_filters` entries only when both must be true.
 
 Always call `describe_onfire_schema(["contact","company"])` before authoring the QueryIR — field names are specific (`current_company_name`, not `company_name`).
 
@@ -160,7 +160,7 @@ Narrow firmographically with `entity-company-search` / `entity-people-search`, a
 
 Curated insights give the account list; messages give the quote a rep can open with.
 
-- `search_community_messages` — semantic. Pass 1–3 natural-language phrasings of the same intent, e.g. `["deploying software in an air-gapped or disconnected environment", "securing OT/ICS networks isolated from the internet", "remote access into segmented industrial or classified networks"]`. Ask the user for a time window before searching. Rows hit by 2–3 phrasings are the strongest.
+- `search_community_messages` — semantic. Send 1–3 natural-language phrasings of the same intent, e.g. `["deploying software in an air-gapped or disconnected environment", "securing OT/ICS networks isolated from the internet", "remote access into segmented industrial or classified networks"]`. Ask the user for a time window before searching. Rows hit by 2–3 phrasings are the strongest.
 - `query_intent_signals` — structured non-message events (job changes, job posts, event attendance) with `keyword_match` set to Group A terms.
 - `detect_warm_intros` — a path in once an account is chosen.
 

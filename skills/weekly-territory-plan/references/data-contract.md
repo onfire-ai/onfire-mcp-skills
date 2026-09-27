@@ -19,7 +19,7 @@ call live tools. So the contract is two-tier, and it is not optional:
 | Tier | Fields | Handling |
 |---|---|---|
 | **Markup allowed** (agent-authored) | `glance`, `mail.b` | `<b>` and `<br>` only. No other tags, no attributes. Rendered through `escRich()`, which escapes everything and then re-admits exactly those two tags. |
-| **Text only** (everything else) | `name`, `title`, `loc`, `p`, `meta`, `tier`, `stack[]`, `layers[]`, `covered[]`, `evidence[].*`, `signal.*`, `points[]`, `why`, `warm`, `mail.s` | Must pass through `escHtml()`, which escapes `& < > " '`. |
+| **Text only** (everything else) | `name`, `title`, `loc`, `p`, `meta`, `tier`, `stack[]`, `layers[]`, `covered[]`, `evidence[].*`, `signal.*`, `points[]`, `why`, `warm`, `mail.s` | Must go through `escHtml()`, which escapes `& < > " '`. |
 
 The allowance in the first row is enforced, not trusted. It used to be trusted — both
 fields went into the page raw, on the theory that the agent authors them and the agent
