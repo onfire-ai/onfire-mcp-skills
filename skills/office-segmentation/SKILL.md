@@ -1,6 +1,7 @@
 ---
 name: office-segmentation
-description: Build a geographic office segmentation for any company — where are the offices and how many employees work near each one. Orchestrates four tools in sequence: search_offices (discover office locations from Onfire's market intelligence), match_company (resolve LinkedIn URL), get_company_headcount (current employee count), and ask_onfire (per-office employee counts from the contact entity / ONFIRE.PEOPLE). Use when the user asks anything like "how are employees distributed across offices?", "how many people work in the London office?", "what's the geographic footprint of Northwind?", "which office is the biggest?", "map employees to office locations", or "where does the bulk of the workforce sit?".
+description: >-
+  Build a geographic office segmentation for any company — where are the offices and how many employees work near each one. Orchestrates four tools in sequence: search_offices (discover office locations from Onfire's market intelligence), match_company (resolve LinkedIn URL), get_company_headcount (current employee count), and ask_onfire (per-office employee counts from the contact entity / ONFIRE.PEOPLE). Use when the user asks anything like "how are employees distributed across offices?", "how many people work in the London office?", "what's the geographic footprint of Northwind?", "which office is the biggest?", "map employees to office locations", or "where does the bulk of the workforce sit?".
 ---
 
 # Office Segmentation

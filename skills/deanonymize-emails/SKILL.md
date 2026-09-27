@@ -1,6 +1,7 @@
 ---
 name: deanonymize-emails
-description: Identify the person and company behind a list of email addresses — name, LinkedIn URL, current title, employer, location — using the Onfire `deanonymize_emails` tool. Use when the user has a list of emails (work or personal: Gmail, iCloud, Yahoo) and wants to know who they belong to. PAID per successful match — has a strict two-phase consent flow above 10 emails. Lists larger than 25 emails must be split into batches of 25 per call.
+description: >-
+  Identify the person and company behind a list of email addresses — name, LinkedIn URL, current title, employer, location — using the Onfire `deanonymize_emails` tool. Use when the user has a list of emails (work or personal: Gmail, iCloud, Yahoo) and wants to know who they belong to. PAID per successful match — has a strict two-phase consent flow above 10 emails. Lists larger than 25 emails must be split into batches of 25 per call.
 ---
 
 # deanonymize_emails (atomic)
