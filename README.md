@@ -8,6 +8,24 @@ and a house style for the customer-facing reports.
 Installed as a Claude Code plugin. When someone enables it, **these instructions are
 followed by their agent** — see [SECURITY.md](SECURITY.md) before contributing.
 
+## Setup
+
+The plugin bundles the Onfire MCP connector (`https://mcp.onfire.ai/v1/mcp`). Connect it
+from the plugin's Connectors tab (or `/mcp` in Claude Code) and sign in with your Onfire
+account. An Onfire workspace is required.
+
+## What this plugin runs, sends and fetches
+
+- **Network:** tool calls go to the Onfire MCP connector only. CRM and sales-engagement
+  actions run through that connector; paid operations ask for consent first.
+- **Credentials:** none. The plugin reads no tokens, environment variables or local config
+  files; sign-in is the connector's OAuth.
+- **Local code:** no hooks and no background processes. Some skills write local files and
+  install one pinned package into a throwaway virtual environment to do it: the weekly
+  territory plan's bundled `pg_plan_builder.py` writes an `.xlsx` with `openpyxl==3.1.5`,
+  and the report skills render PDFs with `weasyprint==69.0`.
+- **Generated files:** reports are self-contained, with no remote fonts, scripts or images.
+
 ## What's here
 
 24 skills:
