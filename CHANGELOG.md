@@ -3,6 +3,26 @@
 Versions match `.claude-plugin/plugin.json`, which is what the marketplace serves.
 This file starts at 0.5.1; earlier versions predate it.
 
+## 0.6.0 — 2026-09-27
+
+Plugin directory readiness.
+
+### Added
+
+- **Bundled connector.** `.mcp.json` declares the Onfire MCP connector, so installing
+  the plugin adds the tools its skills call.
+- **Directory icon.** `.claude-plugin/icon.svg`.
+- **README setup and disclosure.** How to connect, and what the plugin runs and sends.
+
+### Fixed
+
+- **Credential false positive.** The directory validator read the verb "pass" as the
+  `pass` password manager. Skill prose now says send / give / supply, and
+  `check_skill_policy.py` keeps it that way.
+- **Skill frontmatter.** Four descriptions contained an unquoted `: `, so their
+  frontmatter did not parse and the skills loaded without a description. Now folded
+  scalars; text unchanged.
+
 ## 0.5.1 — 2026-08-12
 
 Security and privacy hardening. Closes every code-level finding from a customer's
