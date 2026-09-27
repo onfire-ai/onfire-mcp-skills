@@ -70,6 +70,14 @@ FORBIDDEN = [
         r"\b(silver|gold)\.[a-z_]+\.[a-z_]+",
         "skills/**/*.md",
     ),
+    (
+        "pass-verb-reads-as-credential",
+        "The plugin directory's validator reads \"pass <argument>\" as the `pass` password\n"
+        "     manager and holds the plugin for credential exfiltration. Say send / give /\n"
+        "     supply / use instead.",
+        r"(?<![-\w])[Pp]ass\s+[\w`\"'<*]",
+        "skills/**/*.md",
+    ),
 ]
 
 # (id, human message, compiled pattern, path) -- absence is a failure.

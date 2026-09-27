@@ -81,6 +81,11 @@ Docker over the full history.
 traces to a finding in a security, privacy and compliance review; if you have a genuine
 counter-example (documentation showing the wrong way), mark the line `policy-ok: <why>`.
 
+The plugin is distributed through Anthropic's plugin directory, which validates every new
+version. Check changes against the
+[plugin pre-submission checklist](https://claude.com/docs/plugins/pre-submission-checklist)
+and run `claude plugin validate .claude-plugin/plugin.json` before opening a PR.
+
 ## Reporting a security or privacy problem
 
 Email **security@onfire.ai**. Do not open a public issue. See
