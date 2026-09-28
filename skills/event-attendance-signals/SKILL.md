@@ -47,7 +47,7 @@ Skip this for:
 
 | Logical field | Notes |
 |---------------|-------|
-| `event` | Bound concept — the event name. Stored as `Event - <name>` and resolved server-side from the events vocabulary. Pass the human term (e.g. `"CloudCon 2025"`); never `LOWER`/`LIKE` it. |
+| `event` | Bound concept — the event name. Stored as `Event - <name>` and resolved server-side from the events vocabulary. Give the human term (e.g. `"CloudCon 2025"`); never `LOWER`/`LIKE` it. |
 | `contact_url` | Attendee's LinkedIn URL (any URL format is normalized server-side) |
 | `company_url` | Employer's LinkedIn URL at time of event |
 | `contact_country` | Lowercase country (e.g. `"united states"`) |
@@ -69,7 +69,7 @@ and titles, query `entity: "contact"` and add a filter-only join to
 ## Resolving the event name
 
 The `event` value is a **concept**, not a literal. The server resolves it from
-the events vocabulary (`Event - <name>`). Pass the human term and let
+the events vocabulary (`Event - <name>`). Give the human term and let
 `ask_onfire` resolve it; if you want to confirm the canonical wording first,
 call `resolve_insights`. Never `LOWER`/`LIKE`/substring-match the event field.
 
@@ -218,7 +218,7 @@ relevant).
 
 ## Common pitfalls
 
-- **`event` is a bound concept** — pass the human term (`"CloudCon 2025"`); the
+- **`event` is a bound concept** — give the human term (`"CloudCon 2025"`); the
   server resolves it to the stored `Event - CloudCon 2025`. Never
   `LOWER`/`LIKE`/substring-match it.
 - **`event_contact` has no name/title fields** — to return profiles, query

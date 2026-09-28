@@ -120,7 +120,7 @@ ask_onfire(query={
   limit: 100
 })
 ```
-Technology/persona values are concepts, not literals — pass the human term and
+Technology/persona values are concepts, not literals — give the human term and
 the server canonicalises it, or confirm the exact value with `resolve_insights`
 (carry `kind`) first. Multiple `insight_filters` AND together — run one query per
 concept and merge if you need an OR.

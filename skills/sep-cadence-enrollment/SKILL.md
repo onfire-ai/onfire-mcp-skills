@@ -143,7 +143,7 @@ crm_write(
 Notes that matter here:
 
 - **`linkedin_url` is now load-bearing, not optional.** It is the proof-match key. A prospect that lands in the CRM without one mints **no proof row**, and you will not be able to create them in the SEP at all. If you're missing LinkedIn URLs, resolve them with `match_person` *before* this call.
-- **`email` is the join key for the hydration sync.** Record it exactly as you send it — you need the identical string in STEP 4. If you're missing emails, run `contact_data_enrichment` first (or pass `contact_data_enrich=True`). If the rows you're enriching carry a country, pass it as `location_country_column` — geo-routed tenants pick a region-specific waterfall from it. See `contact-data-enrichment`.
+- **`email` is the join key for the hydration sync.** Record it exactly as you send it — you need the identical string in STEP 4. If you're missing emails, run `contact_data_enrichment` first (or send `contact_data_enrich=True`). If the rows you're enriching carry a country, send it as `location_country_column` — geo-routed tenants pick a region-specific waterfall from it. See `contact-data-enrichment`.
 - **Keep prospects and accounts in separate jobs.** Proof minting checks the entity type of the job's **first record** only, so a job that leads with an account record mints nothing for the prospects behind it. One `crm_write` per entity type.
 - **Do not set the owner yourself.** The tenant's field mapping already maps owner to the exporting person, and the CRM's routing has the final word. Trying to force it fights both.
 - Confirm the record list with the user before calling — these are live CRM writes.
@@ -301,7 +301,7 @@ Gong flow ids are 19-digit values that exceed JavaScript's safe-integer range �
 
 One enrollment write per person. These bodies are the ones the platform actually accepts.
 
-**Attribution is set here, explicitly.** A person you created in STEP 4 is owned SEP-side by the integration's token holder, not by the CRM's routing — so the rep the cadence runs under is whatever you pass in `user_id` / the mailbox relationship / `flowInstanceOwnerEmail`. Resolve the intended rep and pass them. Never leave it to chance and never assume an inherited owner.
+**Attribution is set here, explicitly.** A person you created in STEP 4 is owned SEP-side by the integration's token holder, not by the CRM's routing — so the rep the cadence runs under is whatever you send in `user_id` / the mailbox relationship / `flowInstanceOwnerEmail`. Resolve the intended rep and send them. Never leave it to chance and never assume an inherited owner.
 
 ### Salesloft
 
@@ -441,7 +441,7 @@ For read-only asks ("what cadences do we have", "is she already in a sequence", 
 - **One `crm_write` call** for the whole batch (up to 10,000 records / 25 MB) — not one per person. Prospects only; keep accounts in a separate job.
 - **One `crm_write_results` call** for that job. It mints every proof row in the batch in one shot.
 - **Partition on the results dataset** — `succeeded` + has `linkedin_url` goes forward; everything else gets reported with its error. Don't send failed rows into the SEP.
-- **One existence-check pass** over the batch before creating, then create only the people who aren't there.
+- **One existence check** over the batch before creating, then create only the people who aren't there.
 - **Creates and enrollments are one write per person** on Salesloft, Outreach and Reply.io. Gong batches up to 100 per assign when there are no per-prospect overrides — and consumes one proof row per id.
 - **Cadences cap adds per user per 24 hours** (Outreach defaults to 50). Warn the user before a large list, and expect the overflow to queue.
 

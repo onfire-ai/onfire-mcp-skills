@@ -70,7 +70,7 @@ Phase 2 sends batches of **twenty or fewer**, each carrying the phase-1 token an
 same `total_count`.
 
 Never fabricate a token, never reuse one across unrelated requests, never exceed the
-batch cap, and **never pass `target_tenant_id`**.
+batch cap, and **never send `target_tenant_id`**.
 
 Two failure modes specific to this skill: a scheduled run has nobody present to
 approve, so it must never reach a paid pull; and a rep asking "enrich these five

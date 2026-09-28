@@ -29,7 +29,7 @@ ask_onfire(query={
    the envelope). Any URL format is normalized server-side. This is what
    keeps the pull small and on-topic.
 2. **Resolve bound concepts first, and check the match tier.** A persona /
-   technology / event name is a *concept*, not a literal. Pass it through
+   technology / event name is a *concept*, not a literal. Run it through
    `resolve_insights` (carrying `kind`) to get the canonical value.
    **Every candidate carries a `match` tier: `exact`, `synonym`, `partial`
    or `fuzzy`. Only `exact` and `synonym` are usable.** See "The
@@ -329,7 +329,7 @@ ask_onfire(query={
 The Step 1d footprint pull, and the shape to use for any "who runs product
 X here" question. **The whole resolved vendor set goes in one call.**
 
-The vendor list below is **an example only** - always pass the tenant's own
+The vendor list below is **an example only** - always send the tenant's own
 resolved set, whatever category it competes in (endpoint, network, email,
 observability, identity):
 

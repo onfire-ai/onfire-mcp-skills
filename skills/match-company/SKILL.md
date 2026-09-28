@@ -26,7 +26,7 @@ match_company(companies=[
 ])
 ```
 
-Each entry can mix `names`, `websites`, and `linkedin_urls` (all are arrays — accept multiple variants per field). At least one signal is required. **More signals → better match accuracy.** If the user gave you both a name and a website, pass both.
+Each entry can mix `names`, `websites`, and `linkedin_urls` (all are arrays — accept multiple variants per field). At least one signal is required. **More signals → better match accuracy.** If the user gave you both a name and a website, supply both.
 
 **Batch cap: 100 entries per call.** For lists longer than 100, chunk them.
 

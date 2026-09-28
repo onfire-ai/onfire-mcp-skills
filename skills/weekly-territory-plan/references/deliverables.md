@@ -106,7 +106,7 @@ add_week(
 
 `accounts` is a list of `{name, contacts[]}`. Each contact takes `name`, `title`,
 `email`, `phone`, `linkedin`, `notes`, and optionally `warm`. Leave `email` and `phone`
-as empty strings. Pass `touchpoints` and `banner` from `plan_format` rather than
+as empty strings. Send `touchpoints` and `banner` from `plan_format` rather than
 relying on the defaults, so a tenant's own vocabulary reaches the file.
 
 ### Why a workbook and not a Sheet

@@ -559,7 +559,7 @@ below. All must pass.
    `render_spec.use_case_palette`. No invented tags.
 
 2. **No internal tool names, no em dashes outside verbatim quotes**
-   One pass does both:
+   One grep does both:
    `grep -niE 'phoenix|metabase|mcp|onfire|—' report.html`
    Zero matches, except a U+2014 inside a `class="evidence"` /
    `class="quote"` block (those preserve `message_text` byte-for-byte).

@@ -134,7 +134,7 @@ ask_onfire(query={
 
 ### By technology footprint (replaces "keyword in job summary")
 A tool/vendor keyword (e.g. Sentinex) is a **technology insight**, not a
-profile substring — pass it as an `insight_filter`, not a `job_summary`
+profile substring — send it as an `insight_filter`, not a `job_summary`
 match (`job_summary` is selectable but not filterable):
 ```
 ask_onfire(query={

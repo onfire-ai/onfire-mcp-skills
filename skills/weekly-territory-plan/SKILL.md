@@ -228,7 +228,7 @@ Never fail the whole run for one layer.
 | Territory is broad and no other strong gate is set | **Do not refuse.** Say what a plan on it would be, offer the three narrowings, and proceed on confirmation with `territory_breadth: "broad"` and the raised floor. |
 | A rep asks to hide a layer they have not seen yet | Decline the hide, explain it needs a week on the page first, and offer to weight it down instead. |
 | An entity is absent from the schema catalog | Skip that layer, score its dimension `null`, redistribute the weight, note internally. |
-| A concept fails to resolve | Drop it. Never pass an unresolved term as a literal filter value. |
+| A concept fails to resolve | Drop it. Never send an unresolved term as a literal filter value. |
 | `ask_onfire` returns `needs_confirmation` (`stage: "row_budget"`) when you wanted rows | Nothing billed. Lower `limit` and resubmit. Do not set `confirmed: true` to force it through. |
 | A signal layer returns zero rows or errors | Dimension scores `null`, weight redistributes, continue. |
 | `ai_prospecting` returns `still_running` | Re-call with the returned `run_ids`. The server dedups. |

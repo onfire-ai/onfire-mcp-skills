@@ -75,7 +75,7 @@ queryable when you need a cut the tool does not pre-compute.)
 
 Persona / technology / event / evidence-type values are *concepts*, not
 literals — `ask_onfire` resolves them server-side (via `resolve_insights`
-/ the bound vocabularies); pass the human term or pre-resolve it. Free-
+/ the bound vocabularies); give the human term or pre-resolve it. Free-
 text dimensions (country, industry) are stored lowercased and normalized
 server-side; URL dimensions accept any format.
 
@@ -584,7 +584,7 @@ in `query_datasets`.**
 
 `insight_value` is a bound concept resolved server-side (it shares the
 persona/technology vocabulary), so the old `ILIKE` casing workaround is
-gone — pass the competitor name and the resolver canonicalises it. The
+gone — send the competitor name and the resolver canonicalises it. The
 table is ~1B rows, so the `insight_value` constraint is what keeps the
 pull bounded (always present here):
 

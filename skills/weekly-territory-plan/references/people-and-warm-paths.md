@@ -59,7 +59,7 @@ ai_prospecting(action="run", company_linkedin_url="<account linkedin url>")
 ```
 
 - **`action="run"` is the only action.** There is no single-person scoring path.
-- **Never pass `target_tenant_id`.** The tenant comes from the session.
+- **Never send `target_tenant_id`.** The tenant comes from the session.
 - **Polling:** a `still_running` response returns `run_ids`. Re-call with
   `ai_prospecting(action="run", run_ids=[...])`, or with the identical arguments —
   the server dedups and never creates a duplicate run. Keep polling until complete.
@@ -220,7 +220,7 @@ Attach the touchpoint plan from `plan_format.touchpoints`.
 | Prospecting returns zero prospects, or is disabled | Fall back to the title pull plus hiring managers. Note internally; never surface it to a customer. |
 | Prospecting returns a preview shape | Slice the dataset id with `query_datasets`. Never re-run to see more rows. |
 | The title pull returns zero rows for a persona | Leave that seat as a labelled TBD. Do not widen the persona to fill it. |
-| `resolve_insights` cannot resolve a persona | Skip that persona and note it; never pass the raw term as a filter value. |
+| `resolve_insights` cannot resolve a persona | Skip that persona and note it; never send the raw term as a filter value. |
 | The account has no LinkedIn URL even after `match_company` | Skip the people layer for that account entirely — every recipe here is scoped by company URL. |
 | The warm-intro tool errors or is unavailable | Walk the degradation ladder. Never fail the run. |
 | A person has no LinkedIn URL | Do not surface them as a named contact — they cannot be deduped or enriched. Use a TBD seat. |

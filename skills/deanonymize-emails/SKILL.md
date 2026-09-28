@@ -1,6 +1,7 @@
 ---
 name: deanonymize-emails
-description: Identify the person and company behind a list of email addresses — name, LinkedIn URL, current title, employer, location — using the Onfire `deanonymize_emails` tool. Use when the user has a list of emails (work or personal: Gmail, iCloud, Yahoo) and wants to know who they belong to. PAID per successful match — has a strict two-phase consent flow above 10 emails. Lists larger than 25 emails must be split into batches of 25 per call.
+description: >-
+  Identify the person and company behind a list of email addresses — name, LinkedIn URL, current title, employer, location — using the Onfire `deanonymize_emails` tool. Use when the user has a list of emails (work or personal: Gmail, iCloud, Yahoo) and wants to know who they belong to. PAID per successful match — has a strict two-phase consent flow above 10 emails. Lists larger than 25 emails must be split into batches of 25 per call.
 ---
 
 # deanonymize_emails (atomic)
@@ -152,7 +153,7 @@ Accumulate results across all calls. Surface emails that came back `matched: fal
 
 - **Never fabricate a `confirmation_token`.** Only use what phase 1 actually returned. A made-up token is rejected.
 - **Never send more than 25 emails in a single call.** Split every list larger than 25.
-- **Always pass `total_count` on every phase-2 call.** The server uses it to verify the token — omitting it causes a hard error.
+- **Always send `total_count` on every phase-2 call.** The server uses it to verify the token — omitting it causes a hard error.
 - **Show `user_facing_message` verbatim.** Paraphrasing the cost defeats the consent flow.
 - **Don't treat the original user request as approval** for credits they haven't seen yet.
 - **Don't reuse a `confirmation_token` across unrelated requests.** Tokens are scoped to one approved batch.
@@ -192,7 +193,7 @@ One call, done. Render results.
 ```
 
 **Mixed personal and work emails.**
-The tool handles Gmail, iCloud, Yahoo, and work addresses uniformly — no special handling needed. Just pass them all in the same list.
+The tool handles Gmail, iCloud, Yahoo, and work addresses uniformly — no special handling needed. Just send them all in the same list.
 
 ## What this skill does NOT do
 
