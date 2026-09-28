@@ -34,8 +34,8 @@ Confirm the tenant's CRM + Gong are connected (get_tenant_settings)
 | Get tenant config + integration ids | `get_tenant_settings()` |
 | Enrich email + phone | `contact_data_enrichment` (see the contact-data-enrichment skill) |
 | Resolve a person → LinkedIn + title/company | `match_person` |
-| **Read** Gong | `sep_read(relative_url, http_method="GET", params=…)` — **no** `integration_id` |
-| **Write** to Gong (assign flow) | `sep_write(http_method, relative_url, json_body=…, params=…)` — **no** `integration_id` |
+| **Read** Gong | `sales_engagement_read(relative_url, http_method="GET", params=…)` — **no** `integration_id` |
+| **Write** to Gong (assign flow) | `sales_engagement_write(http_method, relative_url, json_body=…, params=…)` — **no** `integration_id` |
 | **Read** your CRM (Salesforce) | `crm_read(integration_id, relative_url, params=…)` — this one **does** take `crm.integration_id` |
 | **Create** the CRM record | `crm_write(entity_type, records)` → `crm_write_status(job_id)` → `crm_write_results(job_id)` |
 
@@ -45,7 +45,7 @@ Confirm the tenant's CRM + Gong are connected (get_tenant_settings)
 
 1. **Confirm the integrations, every session.** Call `get_tenant_settings()` and check `sep.type == "gong"` and `crm.enabled == true`. If `sep.type` is something else, this skill's endpoints don't apply — use **`sep-cadence-enrollment`** (or `outreach-sequence-email-composer` for Outreach).
 
-   `sep_read`/`sep_write` and `crm_write` take **no `integration_id`** — the engine resolves each integration internally, so there is no id to fetch or keep fresh. Only `crm_read` still takes one; read it from `crm.integration_id` fresh each session, since **ids rotate** after a reconnect.
+   `sales_engagement_read`/`sales_engagement_write` and `crm_write` take **no `integration_id`** — the engine resolves each integration internally, so there is no id to fetch or keep fresh. Only `crm_read` still takes one; read it from `crm.integration_id` fresh each session, since **ids rotate** after a reconnect.
 
 2. **The CRM → Gong sync is not instant.** Gong does not accept a brand-new person directly — it builds its prospect list by mirroring the connected CRM (Salesforce). So the order is always **create in Salesforce first, then wait for sync, then assign the flow**. There is no API to force or read the sync cadence from tenant settings; it typically runs several times a day / at least daily. Don't promise a time — poll Gong for the person (Step 3) and only assign once they appear. Offer to schedule a re-check if they haven't synced yet.
 
@@ -103,7 +103,7 @@ Gong mirrors the Salesforce record on its own schedule. Don't assume it's there.
 Use Gong's data-privacy lookup (a GET, keyed by email) to verify the mirror exists and grab the CRM linkage:
 
 ```
-sep_read(
+sales_engagement_read(
   relative_url   = "v2/data-privacy/data-for-email-address",
   params         = {"emailAddress": "john.doe@acme.com"}
 )
@@ -127,7 +127,7 @@ A synced person returns a `customerData[].objects[]` entry like:
 List flows the owner can use. **The engine accepts `flowOwnerEmail`** as the query param (Gong's docs also call it `flowEmailOwner`; `flowOwnerEmail` is what worked in practice). Omitting it returns `400 flowOwnerEmail parameter is missing`.
 
 ```
-sep_read(
+sales_engagement_read(
   relative_url   = "v2/flows",
   params         = {"flowOwnerEmail": "<owner@company.com>"}
 )
@@ -141,10 +141,10 @@ Returns `flows[]` with `id`, `name`, `visibility`. Show the user the candidates 
 
 **Do this BEFORE assigning whenever the user wants a personalized/custom email.** The content override targets a step **number**, so you must know which step is the email step — and whether one exists at all.
 
-Endpoint: **`POST /v2/flows/steps`** (body: `flowIds`, up to 20 flow ids, as strings). Note: the Onfire read tool rejects Gong POSTs as "not read-shaped", so this read goes through `sep_write` (it's still a read — Gong just models it as POST):
+Endpoint: **`POST /v2/flows/steps`** (body: `flowIds`, up to 20 flow ids, as strings). Note: the Onfire read tool rejects Gong POSTs as "not read-shaped", so this read goes through `sales_engagement_write` (it's still a read — Gong just models it as POST):
 
 ```
-sep_write(
+sales_engagement_write(
   http_method    = "POST",
   relative_url   = "v2/flows/steps",
   json_body = {"flowIds": ["1328474376461590521"]}
@@ -200,7 +200,7 @@ All fields go in the **JSON body**, not the query string (putting them in `param
 **Plain assign (no custom email):** you can batch up to 100 prospects in one call:
 
 ```
-sep_write(
+sales_engagement_write(
   http_method    = "POST",
   relative_url   = "v2/flows/prospects/assign",
   json_body = {
@@ -214,7 +214,7 @@ sep_write(
 **Personalized assign (custom email per prospect): ONE prospect per call**, because the `overrides` block applies to every prospect in the call. The exact, verified schema (from the live Gong API spec — field names matter, see the warning below):
 
 ```
-sep_write(
+sales_engagement_write(
   http_method    = "POST",
   relative_url   = "v2/flows/prospects/assign",
   json_body = {
@@ -267,7 +267,7 @@ Report the `flowName`, `flowInstanceStatus`, and the linked CRM Id back to the u
 
 ## STEP 8 — Verify
 
-1. **API-side:** re-run `POST v2/flows/prospects` (body: `{"crmProspectsIds": [...]}`; like `v2/flows/steps`, this POST-read must go through `sep_write`) and confirm each prospect has exactly one instance on the target flow with `flowInstanceStatus: "Running"`. Note: there is **no API to read back the override content** of an instance — a 200 on assign plus correct field names is your only API-side guarantee.
+1. **API-side:** re-run `POST v2/flows/prospects` (body: `{"crmProspectsIds": [...]}`; like `v2/flows/steps`, this POST-read must go through `sales_engagement_write`) and confirm each prospect has exactly one instance on the target flow with `flowInstanceStatus: "Running"`. Note: there is **no API to read back the override content** of an instance — a 200 on assign plus correct field names is your only API-side guarantee.
 2. **UI-side (the real proof):** have the user open the prospect's **"Send email" to-do** — Engage → To-dos, or Engage → People → the person → To-dos tab → click the "Send email / Step 1" row. The composer must show the custom subject and body. **If they had a composer window open from before the restage, it shows stale cached content — close and re-open the to-do.**
 
 ---
@@ -305,7 +305,7 @@ Warn the user before unassigning: restaging **kills the current instance's progr
 | Unassign by CRM prospect id | `POST v2/flows/prospects/unassign-flows-by-crm-id` |
 | Unassign by flow instance id | `POST v2/flows/prospects/unassign-flows-by-instance-id` |
 
-> **Tool routing quirk:** Gong's read-shaped POSTs (`v2/flows/steps`, `v2/flows/prospects`) are rejected by `sep_read` ("not a read-shaped request"). Send them through `sep_write` — they're still reads on Gong's side.
+> **Tool routing quirk:** Gong's read-shaped POSTs (`v2/flows/steps`, `v2/flows/prospects`) are rejected by `sales_engagement_read` ("not a read-shaped request"). Send them through `sales_engagement_write` — they're still reads on Gong's side.
 
 Bearer scopes (for reference): `api:flows:read` for the reads, `api:flows:write` for assign/unassign. The Onfire engine handles auth; you don't send tokens.
 
@@ -318,7 +318,7 @@ Bearer scopes (for reference): `api:flows:read` for the reads, `api:flows:write`
 - `prospectsNotAssigned` non-empty → the CRM record hasn't synced into Gong yet; re-run the Step 3 lookup and retry once it appears.
 - Write rejected / id not found → you used a stale integration id. Re-fetch ids from `get_tenant_settings()`.
 - Assign returns 200 but the composer opens with the flow's default/empty template → your override used wrong field names and Gong silently dropped them. Use exactly `overrides.steps[].number/subject/body`, then restage.
-- `sep_read` rejects `POST v2/flows/prospects` or `POST v2/flows/steps` → expected; route those read-shaped POSTs through `sep_write`.
+- `sales_engagement_read` rejects `POST v2/flows/prospects` or `POST v2/flows/steps` → expected; route those read-shaped POSTs through `sales_engagement_write`.
 - User says the email looks stale/wrong right after a restage → they're looking at a composer window opened before the restage; have them close and re-open the to-do.
 
 ## What this skill does NOT do

@@ -29,8 +29,8 @@ The single-prospect and many-prospect cases run the same steps; the batch case j
 | Purpose | Tool |
 |---|---|
 | Get tenant config + integration ids + **ICP** | `get_tenant_settings()` |
-| **Read** Outreach | `sep_read(relative_url, http_method="GET", params=…)` — **no** `integration_id` |
-| **Write** to Outreach (create/enroll/draft/send) | `sep_write(http_method, relative_url, json_body=…)` — **no** `integration_id` |
+| **Read** Outreach | `sales_engagement_read(relative_url, http_method="GET", params=…)` — **no** `integration_id` |
+| **Write** to Outreach (create/enroll/draft/send) | `sales_engagement_write(http_method, relative_url, json_body=…)` — **no** `integration_id` |
 | Resolve a person → LinkedIn + title/company | `match_person` |
 | Resolve a company → LinkedIn + firmographics | `match_company` |
 | Score the prospect + get talking points | `ai_prospecting` |
@@ -51,7 +51,7 @@ Most failures in this flow are **not** code errors — they're configuration gat
 
 1. **Confirm the provider, every session.** Call `get_tenant_settings()` and read `sep.type` — it must be `"outreach"` for this skill. If it's `salesloft`, `gong`, or `replyio`, this skill's endpoints do not apply: use **`sep-cadence-enrollment`** instead (and `gong-create-and-push-to-flow` for Gong).
 
-   `sep_read`/`sep_write` take **no `integration_id`** — the engine resolves the tenant's Outreach integration internally, so there is no id to fetch, rotate, or go stale. (Only `crm_read` still takes one, from `crm.integration_id`.)
+   `sales_engagement_read`/`sales_engagement_write` take **no `integration_id`** — the engine resolves the tenant's Outreach integration internally, so there is no id to fetch, rotate, or go stale. (Only `crm_read` still takes one, from `crm.integration_id`.)
 
 2. **OAuth scopes.** The flow needs: `prospects.read/write`, `sequences.read/write`, `sequenceSteps.read/write`, `sequenceStates.read/write`, `sequenceTemplates.all` (or `.read`), `templates.all` (or `.read`), `mailboxes.read`, `mailings.read/write`, `tasks.read/write`, `emailAddresses.read/write`. A missing scope returns `403 unauthorizedOauthScope` naming the exact scope. `schedules.read` is commonly **absent** — expect not to be able to read the delivery schedule via API, and diagnose schedule issues from the UI instead.
 
@@ -149,7 +149,7 @@ Same flow, looped, with a few additions:
 ## Hard rules (the things that bite)
 
 - **Confirm `sep.type == "outreach"` every session.** Another provider means another skill (`sep-cadence-enrollment`).
-- **`sep_read`/`sep_write` take no `integration_id`** — don't invent the argument.
+- **`sales_engagement_read`/`sales_engagement_write` take no `integration_id`** — don't invent the argument.
 - **Prefer CRM-first for creating people** when a CRM is connected (see STEP 2).
 - **Never prefix `api/v2/`** in `relative_url`.
 - **The email step must be a Manual Email step**, and the **draft must already exist** before you PATCH it.

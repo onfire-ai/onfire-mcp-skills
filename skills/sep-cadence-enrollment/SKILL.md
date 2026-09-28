@@ -28,14 +28,14 @@ Everything that touches the tenant's connected sales engagement platform starts 
 |---|---|
 | Discover the connected provider + CRM | `get_tenant_settings()` → `settings.sep.type`, `settings.crm.enabled` |
 | Create/update people in the CRM | `crm_write(entity_type, records)` → `crm_write_status(job_id)` → `crm_write_results(job_id)` |
-| Read the SEP (people, cadences, users, enrollment state) | `sep_read(relative_url, http_method="GET", params=…)` |
-| Write to the SEP (create the copy, then enroll) | `sep_write(http_method, relative_url, json_body=…)` |
+| Read the SEP (people, cadences, users, enrollment state) | `sales_engagement_read(relative_url, http_method="GET", params=…)` |
+| Write to the SEP (create the copy, then enroll) | `sales_engagement_write(http_method, relative_url, json_body=…)` |
 | Resolve identity before pushing | `match_person`, `match_company` |
 | Emails + phones | `contact_data_enrichment` |
 
-Neither `sep_read` nor `sep_write` takes an `integration_id` — the engine resolves the tenant's SEP internally. `crm_write` likewise resolves the CRM internally. Do not invent an id argument.
+Neither `sales_engagement_read` nor `sales_engagement_write` takes an `integration_id` — the engine resolves the tenant's SEP internally. `crm_write` likewise resolves the CRM internally. Do not invent an id argument.
 
-`sep_write` is **deny-by-default**: a tenant without the grant gets a refusal, not a silent no-op. If it's refused, say so plainly and stop — do not fall back to some other write path.
+`sales_engagement_write` is **deny-by-default**: a tenant without the grant gets a refusal, not a silent no-op. If it's refused, say so plainly and stop — do not fall back to some other write path.
 
 ---
 
@@ -43,11 +43,11 @@ Neither `sep_read` nor `sep_write` takes an `integration_id` — the engine reso
 
 **When a CRM is connected, a person reaches the SEP only after a `crm_write` for that person has been confirmed successful.** You do not wait for the tenant's CRM→SEP sync to mirror them. You create the SEP copy yourself, immediately after validation.
 
-This is not a convention you have to remember — **the engine enforces it**. `sep_write` refuses a prospect-create unless a *CRM proof row* exists for that person.
+This is not a convention you have to remember — **the engine enforces it**. `sales_engagement_write` refuses a prospect-create unless a *CRM proof row* exists for that person.
 
 ### How the proof gate works
 
-`crm_write_results(job_id)` mints one proof row in `mcp_control.sep_prospect_crm_proof` for every prospect record that came back `succeeded` on a `completed` job. A `sep_write` prospect-create then atomically **consumes** one matching row. No matching row → the call is refused with:
+`crm_write_results(job_id)` mints one proof row in `mcp_control.sep_prospect_crm_proof` for every prospect record that came back `succeeded` on a `completed` job. A `sales_engagement_write` prospect-create then atomically **consumes** one matching row. No matching row → the call is refused with:
 
 ```json
 {"status": "error", "error_code": "CRM_UPLOAD_REQUIRED", "error": "..."}
@@ -71,9 +71,9 @@ The gate exists because writing to the SEP first breaks three things:
 Resolve provider + CRM               (STEP 1 — get_tenant_settings)
    → Push the person into the CRM     (STEP 2 — crm_write)
    → Validate the push landed         (STEP 3 — crm_write_status → crm_write_results)   ← mints the proof
-   → Create the SEP copy              (STEP 4 — sep_write, if not already there)        ← consumes the proof
-   → Pick the cadence                 (STEP 5 — sep_read)
-   → Enroll                           (STEP 6 — sep_write)
+   → Create the SEP copy              (STEP 4 — sales_engagement_write, if not already there)        ← consumes the proof
+   → Pick the cadence                 (STEP 5 — sales_engagement_read)
+   → Enroll                           (STEP 6 — sales_engagement_write)
    → Verify + report                  (STEP 7)
 ```
 
@@ -161,7 +161,7 @@ crm_write_results(job_id)    → per-record outcome + the queryable dataset
 
 `crm_write_status` takes roughly 3s for one record, 5–7s for a handful, longer for large batches.
 
-**You must call `crm_write_results`.** This is the single most important behavioral rule in this skill. Polling `crm_write_status` to `completed` is *not* enough — the proof rows are minted inside `crm_write_results`. Skip it and every downstream `sep_write` prospect-create fails with `CRM_UPLOAD_REQUIRED`, with nothing in the CRM to explain why.
+**You must call `crm_write_results`.** This is the single most important behavioral rule in this skill. Polling `crm_write_status` to `completed` is *not* enough — the proof rows are minted inside `crm_write_results`. Skip it and every downstream `sales_engagement_write` prospect-create fails with `CRM_UPLOAD_REQUIRED`, with nothing in the CRM to explain why.
 
 Validation means, per record, all of:
 
@@ -188,11 +188,11 @@ Capture `crm_id` per row here as well: it's the Gong enrollment key in STEP 6, a
 The user may be pointing at someone who already exists in the SEP, and the tenant's hydration sync may have brought them in on a previous cycle. Look them up by email before creating anything:
 
 ```
-outreach   → sep_read("prospects", params={"filter[emails]": "john.doe@acme.com"})
-salesloft  → sep_read("people",    params={"email_addresses": "john.doe@acme.com"})
-gong       → sep_read("v2/data-privacy/data-for-email-address",
+outreach   → sales_engagement_read("prospects", params={"filter[emails]": "john.doe@acme.com"})
+salesloft  → sales_engagement_read("people",    params={"email_addresses": "john.doe@acme.com"})
+gong       → sales_engagement_read("v2/data-privacy/data-for-email-address",
                       params={"emailAddress": "john.doe@acme.com"})
-replyio    → sep_read("contacts",  params={"email": "john.doe@acme.com"})
+replyio    → sales_engagement_read("contacts",  params={"email": "john.doe@acme.com"})
 ```
 
 **Found → skip the create entirely** and go to STEP 5 with the id you just read. Creating on top of an existing person is exactly the duplicate this skill exists to prevent. (The unconsumed proof row simply stays unconsumed; it is harmless and carries no expiry.)
@@ -204,7 +204,7 @@ Capture the id from the response: Outreach `data[0].id` (prospect id), Salesloft
 ### Outreach
 
 ```
-sep_write(
+sales_engagement_write(
   http_method  = "POST",
   relative_url = "prospects",
   json_body = {"data": {"type": "prospect", "attributes": {
@@ -223,7 +223,7 @@ The gate reads `data.attributes.linkedinUrl` (it also accepts `linkedin_url`).
 ### Salesloft
 
 ```
-sep_write(
+sales_engagement_write(
   http_method  = "POST",
   relative_url = "people",
   json_body = {
@@ -242,7 +242,7 @@ The gate reads `linkedin_url` (it also accepts `linkedinUrl`).
 ### Reply.io
 
 ```
-sep_write(
+sales_engagement_write(
   http_method  = "POST",
   relative_url = "contacts",
   json_body = {
@@ -277,7 +277,7 @@ Do **not** work around a refusal by dropping to a different write path or by re-
 
 If the create passes the gate but the SEP itself rejects it:
 
-- **4xx** → the proof is **refunded automatically** (returned to unconsumed). Fix the body and retry the same `sep_write`. No new CRM upload needed.
+- **4xx** → the proof is **refunded automatically** (returned to unconsumed). Fix the body and retry the same `sales_engagement_write`. No new CRM upload needed.
 - **5xx or transport error** → the proof stays **consumed**. A retry will hit `CRM_UPLOAD_REQUIRED`. Before re-uploading to the CRM, **read the SEP to check whether the create actually landed** — a 5xx often means it did. Only re-run `crm_write` + `crm_write_results` if it genuinely isn't there.
 
 ---
@@ -285,10 +285,10 @@ If the create passes the gate but the SEP itself rejects it:
 ## STEP 5 — Pick the cadence
 
 ```
-outreach   → sep_read("sequences", params={"sort": "-updatedAt"})
-salesloft  → sep_read("cadences",  params={"per_page": "100"})
-gong       → sep_read("v2/flows",  params={"flowOwnerEmail": "<rep@company.com>"})
-replyio    → sep_read("sequences")
+outreach   → sales_engagement_read("sequences", params={"sort": "-updatedAt"})
+salesloft  → sales_engagement_read("cadences",  params={"per_page": "100"})
+gong       → sales_engagement_read("v2/flows",  params={"flowOwnerEmail": "<rep@company.com>"})
+replyio    → sales_engagement_read("sequences")
 ```
 
 Show the candidates with their names and enabled/active state, and let the user pick unless they already named one. **Re-read the list at enrollment time rather than trusting a cadence id from earlier in the conversation** — cadences get renamed, archived, and disabled, and a stale id enrolls into nothing or into the wrong thing. If the user named a cadence by name, confirm the id you resolved it to before writing.
@@ -306,7 +306,7 @@ One enrollment write per person. These bodies are the ones the platform actually
 ### Salesloft
 
 ```
-sep_write(
+sales_engagement_write(
   http_method  = "POST",
   relative_url = "cadence_memberships",
   json_body = {
@@ -320,7 +320,7 @@ sep_write(
 `user_id` is the rep the cadence is attributed to. Resolve it from their email first:
 
 ```
-sep_read("users", params={"search": "rep@company.com"})
+sales_engagement_read("users", params={"search": "rep@company.com"})
 ```
 
 Salesloft's `/users` endpoint **ignores an `email[]` filter and returns the whole workspace** — `search` is the only filter that narrows server-side, and it free-text matches name *and* email. So filter the results client-side for an exact case-insensitive email match before using the id. If no user matches, omit `user_id` entirely; Salesloft then attributes the enrollment to the integration's token holder. Say which rep it landed under either way.
@@ -328,7 +328,7 @@ Salesloft's `/users` endpoint **ignores an `email[]` filter and returns the whol
 ### Outreach
 
 ```
-sep_write(
+sales_engagement_write(
   http_method  = "POST",
   relative_url = "sequenceStates",
   json_body = {"data": {"type": "sequenceState", "relationships": {
@@ -342,8 +342,8 @@ sep_write(
 Outreach ids here are **integers**, not strings, and the mailbox is **required**. Resolve it:
 
 ```
-sep_read("users", params={"filter[email]": "rep@company.com"})   → user id
-sep_read("mailboxes", params={"filter[user][id]": "<user id>"})  → pick the mailbox
+sales_engagement_read("users", params={"filter[email]": "rep@company.com"})   → user id
+sales_engagement_read("mailboxes", params={"filter[user][id]": "<user id>"})  → pick the mailbox
 ```
 
 Pick a mailbox with `sendState == "ENABLED"` and `sendDisabled == false`. Sending and syncing are independent toggles — the *send* toggle is the one that gates outbound; a disabled *sync* toggle only affects reply tracking.
@@ -355,7 +355,7 @@ A `201` returns the sequenceState with `state: "pending"` — that is **normal a
 Gong enrollment is an **assign against the CRM record id**, not a SEP-side person id — and it is the call the proof gate checks on Gong:
 
 ```
-sep_write(
+sales_engagement_write(
   http_method  = "POST",
   relative_url = "v2/flows/prospects/assign",
   json_body = {
@@ -373,14 +373,14 @@ For **per-prospect subject/body overrides, hand off to `gong-create-and-push-to-
 ### Reply.io
 
 ```
-sep_write(
+sales_engagement_write(
   http_method  = "POST",
   relative_url = "sequences/<sequence id>/contact-links/bulk",
   json_body = {"contactIds": [<contact id, int>]}
 )
 ```
 
-Reply.io rejects an already-enrolled contact with a generic error indistinguishable from a blocked sequence, so **check first**: `sep_read("contacts/<contact id>/sequences")` and skip the write if the target sequence is already there.
+Reply.io rejects an already-enrolled contact with a generic error indistinguishable from a blocked sequence, so **check first**: `sales_engagement_read("contacts/<contact id>/sequences")` and skip the write if the target sequence is already there.
 
 ---
 
@@ -389,13 +389,13 @@ Reply.io rejects an already-enrolled contact with a generic error indistinguisha
 Confirm the enrollment landed, then report in business terms.
 
 ```
-outreach   → sep_read("sequenceStates/<id>")                  → state, activeAt
-salesloft  → sep_read("cadence_memberships", params={"person_id": "<id>"})
-gong       → sep_write("POST", "v2/flows/prospects", json_body={"crmProspectsIds": ["<id>"]})
-replyio    → sep_read("contacts/<contact id>/sequences")
+outreach   → sales_engagement_read("sequenceStates/<id>")                  → state, activeAt
+salesloft  → sales_engagement_read("cadence_memberships", params={"person_id": "<id>"})
+gong       → sales_engagement_write("POST", "v2/flows/prospects", json_body={"crmProspectsIds": ["<id>"]})
+replyio    → sales_engagement_read("contacts/<contact id>/sequences")
 ```
 
-(Gong models two of its reads as POSTs; `sep_read` rejects those as not read-shaped, so they route through `sep_write`. They're still reads, and they are not prospect-creates, so the proof gate doesn't touch them.)
+(Gong models two of its reads as POSTs; `sales_engagement_read` rejects those as not read-shaped, so they route through `sales_engagement_write`. They're still reads, and they are not prospect-creates, so the proof gate doesn't touch them.)
 
 Report per person: **created/matched in the CRM → created in <provider> (or already there) → enrolled in <cadence name> under <rep>**. Name anyone who didn't make it and why (CRM write failed, no LinkedIn URL so no proof, no email, already enrolled, Gong hasn't ingested the CRM record yet).
 
@@ -432,7 +432,7 @@ For read-only asks ("what cadences do we have", "is she already in a sequence", 
 | Their enrollments | `sequenceStates` + `filter[prospect][id]` | `cadence_memberships` + `person_id` |
 | Find a rep | `users` + `filter[email]` | `users` + `search` (then match client-side) |
 
-`sep_read` is read-only by construction — write-shaped requests sent to it are redirected, not executed. It never touches the proof gate.
+`sales_engagement_read` is read-only by construction — write-shaped requests sent to it are redirected, not executed. It never touches the proof gate.
 
 ---
 
@@ -459,7 +459,7 @@ Present every operation as the Onfire engine working with their sales engagement
 - **Never work around `CRM_UPLOAD_REQUIRED`.** Fix the cause or report it. There is no alternate write path.
 - **Discover the provider before writing any URL.** Never infer it from the user's vocabulary.
 - **Never repeat the API root** in `relative_url` — except Gong, which keeps its `v2/`.
-- **Confirm live writes with the user** before calling `crm_write` or `sep_write`, and name the exact people and the exact cadence.
+- **Confirm live writes with the user** before calling `crm_write` or `sales_engagement_write`, and name the exact people and the exact cadence.
 - **Re-resolve the cadence id at enrollment time.** Don't trust one from earlier in the conversation.
 - **Set attribution explicitly at enrollment.** Don't rely on an inherited owner.
 - **Never mix prospects and accounts** in one `crm_write` job when SEP creates will follow.
@@ -484,4 +484,4 @@ Present every operation as the Onfire engine working with their sales engagement
 | Outreach `422` on enroll | Missing mailbox relationship, or ids passed as strings instead of integers. |
 | Gong `404 Flow not found` | `flowId` was sent as a number and rounded. Send it as a string. |
 | Gong `prospectsNotAssigned` non-empty | Gong hasn't ingested that CRM record yet. This is a Gong-side sync, not something the proof gate covers. Report it and offer a re-check. |
-| `sep_write` refused outright (not `CRM_UPLOAD_REQUIRED`) | The tenant doesn't have the write grant. Report it; there is no fallback path. |
+| `sales_engagement_write` refused outright (not `CRM_UPLOAD_REQUIRED`) | The tenant doesn't have the write grant. Report it; there is no fallback path. |
