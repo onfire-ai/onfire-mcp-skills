@@ -3,6 +3,13 @@
 Versions match `.claude-plugin/plugin.json`, which is what the marketplace serves.
 This file starts at 0.5.1; earlier versions predate it.
 
+## 0.6.1 — 2026-09-28
+
+### Added
+
+- **Privacy policy link.** `privacyPolicyUrl` in `plugin.json`, required for a plugin
+  that connects to a remote MCP server.
+
 ## 0.6.0 — 2026-09-27
 
 Plugin directory readiness.
