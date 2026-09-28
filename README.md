@@ -28,7 +28,7 @@ account. An Onfire workspace is required.
 
 ## What's here
 
-24 skills:
+25 skills:
 
 | Group | Skills |
 |---|---|
@@ -38,7 +38,7 @@ account. An Onfire workspace is required.
 | Signal layers | `airgap-opportunity`, `hiring-signals`, `event-attendance-signals`, `github-repo-signals`, `employee-footprint`, `company-growth-trends`, `title-movement`, `office-segmentation` |
 | Community | `community-message-search`, `community-messages-sentiment`, `community-join-signals` |
 | Reports | `account-research`, `competitor-report` |
-| Sequences & CRM writes | `sep-cadence-enrollment`, `outreach-sequence-email-composer`, `gong-create-and-push-to-flow` |
+| Sequences & CRM writes | `sep-cadence-enrollment`, `sales-engagement-platforms-utils`, `outreach-sequence-email-composer`, `gong-create-and-push-to-flow` |
 | Recurring | `weekly-territory-plan` (the 5x5) |
 
 Each skill is a directory under `skills/` with a `SKILL.md`, plus `references/` for

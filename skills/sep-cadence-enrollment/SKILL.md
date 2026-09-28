@@ -21,6 +21,7 @@ Everything that touches the tenant's connected sales engagement platform starts 
 | Decide **who** to enroll | `ai-prospecting` / `onfire-prospecting` first, then come back |
 | Emails/phones before pushing to the CRM | `contact-data-enrichment` first |
 | Just read the SEP (list cadences, check enrollment, look up a person) | STEP 1 + the [read recipes](#read-recipes-by-provider); skip the write path |
+| A provider's filter, pagination or sparse-fieldset syntax; what a resource is called on the connected SEP | `sales-engagement-platforms-utils` |
 
 ## Tools
 
