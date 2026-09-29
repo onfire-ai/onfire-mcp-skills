@@ -2,11 +2,11 @@
 
 All calls go through the Onfire Integrations tools, which resolve credentials and route to Outreach. **The engine already applies the `api/v2/` root** — `relative_url` must be the bare path (`prospects`, not `api/v2/prospects`).
 
-- **Reads:** `sep_read(relative_url, http_method="GET", params?)`
-- **Writes:** `sep_write(http_method, relative_url, json_body?, params?)`
+- **Reads:** `sales_engagement_read(relative_url, http_method="GET", params?)`
+- **Writes:** `sales_engagement_write(http_method, relative_url, json_body?, params?)`
 - **Neither takes an `integration_id`** — the engine resolves the tenant's Outreach integration internally. There is no id to fetch or keep fresh.
 - Bodies are **JSON:API**: `{"data": {"type": "...", "id": ..., "attributes": {...}, "relationships": {...}}}`.
-- `sep_read` is read-only by construction: a write-shaped request sent to it is redirected, not executed. `sep_write` is deny-by-default — if the tenant lacks the grant you get a refusal, not a silent no-op.
+- `sales_engagement_read` is read-only by construction: a write-shaped request sent to it is redirected, not executed. `sales_engagement_write` is deny-by-default — if the tenant lacks the grant you get a refusal, not a silent no-op.
 
 ## Confirm the provider + get the ICP
 

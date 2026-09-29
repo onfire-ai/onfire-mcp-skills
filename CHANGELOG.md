@@ -3,6 +3,24 @@
 Versions match `.claude-plugin/plugin.json`, which is what the marketplace serves.
 This file starts at 0.5.1; earlier versions predate it.
 
+## 0.7.0 — 2026-09-28
+
+The sales engagement tools were renamed, and the reference they need is now published.
+
+### Added
+
+- **`sales-engagement-platforms-utils`.** Per-provider reference for reading a connected
+  sales engagement platform — path form, query and pagination grammar, resource-name
+  translation and failure triage for Outreach, Salesloft, Gong Engage and Reply.io. The
+  MCP's own guide carries only what it needs to dispatch a call; a vendor's payload
+  format lives here.
+
+### Fixed
+
+- **Renamed tools.** `sep_read` / `sep_write` became `sales_engagement_read` /
+  `sales_engagement_write` in the MCP. Four skills still handed an agent the old names,
+  which stop resolving at that deploy.
+
 ## 0.6.1 — 2026-09-28
 
 ### Added
