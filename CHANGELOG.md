@@ -3,6 +3,28 @@
 Versions match `.claude-plugin/plugin.json`, which is what the marketplace serves.
 This file starts at 0.5.1; earlier versions predate it.
 
+## 0.8.0 — 2026-09-30
+
+Five skills now route to the champion-move and website-visitor tools, and several
+skills stop handing an agent fields and arguments the MCP rejects.
+
+### Added
+
+- **First-party signal tools.** `weekly-territory-plan`, `outreach-sequence-email-composer`,
+  `account-research`, `airgap-opportunity` and `community-message-search` list
+  `detect_ex_champion_moves` and `detect_website_visitors`, since `query_intent_signals`
+  returns neither champion moves nor website visits.
+
+### Fixed
+
+- **Field names.** Company-entity queries select `company_name`, not `name`, and contact
+  queries select `location_name`, not `location`.
+- **`insight_filter` OR.** A list value in one `insight_filter` ORs. Five places said it
+  didn't.
+- **Tool arguments.** Dropped `query_intent_signals(tenant_id=)`,
+  `query_datasets(dataset_id=)` and `query_datasets(persist_as_dataset=)`, none of which
+  the tools take.
+
 ## 0.7.0 — 2026-09-28
 
 The sales engagement tools were renamed, and the reference they need is now published.
