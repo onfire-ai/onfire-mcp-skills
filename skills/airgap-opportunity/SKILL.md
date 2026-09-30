@@ -145,7 +145,7 @@ Confirm with `resolve_insights(["air-gapped environment","cross domain solution"
 {
   "entity": "company",
   "insight_filters": [{"kind": "technology", "value": ["Air-Gapped Environment", "Cross Domain / Data Diode"]}],
-  "select": ["name", "website", "industry", "size_band", "location_country"],
+  "select": ["company_name", "website", "industry", "size_band", "location_country"],
   "limit": 50
 }
 ```

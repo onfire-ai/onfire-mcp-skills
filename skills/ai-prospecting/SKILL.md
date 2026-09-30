@@ -5,7 +5,7 @@ description: Run AI prospecting against a target company to rank the likely buye
 
 # ai_prospecting (atomic)
 
-Phoenix is the prospecting engine. This tool answers ONE question — "who are the best prospects (likely buyers / champions) to approach at this ACCOUNT?" — and lets Phoenix's model decide who. It ranks prospects for a company via the single action `action="run"`. It is **not** a people search and has no single-person scoring path.
+This tool answers ONE question — "who are the best prospects (likely buyers / champions) to approach at this ACCOUNT?" — and lets the prospecting model decide who. It ranks prospects for a company via the single action `action="run"`. It is **not** a people search and has no single-person scoring path.
 
 ## When to use this
 
@@ -19,7 +19,7 @@ Don't use this for identity resolution alone (use `match-company` / `match-perso
 
 `ai_prospecting` is account-level ranking only. It is the wrong tool when the user has already decided *which* people they want, or names one specific person:
 
-- **The user specifies WHICH people by deterministic criteria** — a title, seniority, persona, location, or technology (e.g. "get me the top-level CISOs at Microsoft", "VPs of Security at US banks", "data engineers at Stripe"). That is a filter query → route to the **`ask_onfire`** tool over the contact entity, NOT `ai_prospecting`. Phoenix doesn't take title/seniority/persona filters; if you feed it one you'll get its own ranked picks, not the filtered set the user asked for.
+- **The user specifies WHICH people by deterministic criteria** — a title, seniority, persona, location, or technology (e.g. "get me the top-level CISOs at Microsoft", "VPs of Security at US banks", "data engineers at Stripe"). That is a filter query → route to the **`ask_onfire`** tool over the contact entity, NOT `ai_prospecting`. The engine doesn't take title/seniority/persona filters; if you feed it one you'll get its own ranked picks, not the filtered set the user asked for.
 - **The user names ONE specific person and asks if they're worth pursuing** ("is Jane Doe worth a meeting?"). `ai_prospecting` has no path for this — there is no single-person scoring. Do not use it.
 - **Identity / LinkedIn URL resolution** → `match_company` / `match_person`.
 - **Emails / phones** → `contact_data_enrichment`.
@@ -52,21 +52,21 @@ ai_prospecting(action="run", linkedin_urls=[
 `linkedin_urls` (list) takes precedence over `company_linkedin_url` (single) when both are passed.
 
 **Optional flags:**
-- `use_cache=True` — let Phoenix return cached results from a recent identical run instead of recomputing. Use only when it's clearly a re-run of something already executed in this conversation. Default `False`.
-- `activate_shadow_run=True` — run against the caller's shadow schema instead of the live team schema. Use when the user is iterating on schema config via `manage-ai-prospecting`. Default `False`. **404 from this means there is no shadow yet — call `create_shadow` first via `manage-ai-prospecting`.**
+- `use_cache=True` — return cached results from a recent identical run instead of recomputing. Use only when it's clearly a re-run of something already executed in this conversation. Default `False`.
+- `activate_shadow_run=True` — run against the caller's shadow schema instead of the live team schema. Use when the user is iterating on schema config via the `manage_ai_prospecting` tool. Default `False`. **404 from this means there is no shadow yet — call `create_shadow` first via `manage_ai_prospecting`.**
 
 ## The polling pattern (don't skip this)
 
-Phoenix runs can take a few minutes. The MCP server polls Phoenix internally and may return:
+Prospecting runs can take a few minutes. The MCP server polls the run internally and may return:
 
 ```json
-{"status": "still_running", "message": "...", "companies": ["..."], "run_ids": [24685]}
+{"status": "still_running", "message": "...", "companies": ["..."], "run_ids": [12345]}
 ```
 
 When you see this, **call the tool again**. Two equivalent options:
 
-1. **Preferred — send `run_ids` back**: `ai_prospecting(action="run", run_ids=[24685])`. Skips the redundant POST to Phoenix and polls the existing run directly via `GET /v1/prospecting/runs/{run_id}`. Use this whenever the previous response surfaced `run_ids`.
-2. **Identical arguments**: `ai_prospecting(action="run", company_linkedin_url="...")` (same as the first call). Phoenix's server-side dedup picks up the in-flight run row and returns the same `run_id`. Slightly more network, same outcome.
+1. **Preferred — send `run_ids` back**: `ai_prospecting(action="run", run_ids=[12345])`. Skips starting a redundant run and polls the existing one directly. Use this whenever the previous response surfaced `run_ids`.
+2. **Identical arguments**: `ai_prospecting(action="run", company_linkedin_url="...")` (same as the first call). Server-side dedup picks up the in-flight run row and returns the same `run_id`. Slightly more network, same outcome.
 
 Either path is safe — **the server never creates a duplicate `public.runs` row**. Keep calling until you get a `status="completed"` payload back. If you change `company_linkedin_url` or `linkedin_urls` between polls, that's a new request for a different company, not a retry.
 
@@ -126,7 +126,7 @@ The content is byte-stable within a server version, so re-fetching mid-conversat
     "expires_at": "...",
     "facets": { "WORKED_IN_CLIENT_COMPANY_IN_PAST": {"true": 5, "false": 37}, "CURRENT_PERSONAS": {...}, ... }
   },
-  "top_picks": [ /* "start here" top 5 in Phoenix's native best-first order, each row carrying the full broad column set */ ],
+  "top_picks": [ /* "start here" top 5 in native best-first order, each row carrying the full broad column set */ ],
   "priority_summary": {
     "existing_customer_alumni": 5,
     "with_named_connector": 39
@@ -142,7 +142,7 @@ The content is byte-stable within a server version, so re-fetching mid-conversat
 
 ### top_picks (preview shape only — the "start here" subset)
 
-Top-N projection in Phoenix's **native best-first order** — Phoenix already returns rows ranked by its model (warm-intro path, persona fit, momentum and the rest weighed internally); the scores themselves are not exposed. **Each top-pick row carries the full broad column set** — identity, `CURRENT_PERSONAS`, `prospect_tags`, the full warm-intro path, career-momentum signals (`MONTHS_SINCE_LAST_PROMOTION`, `BUDGET_MANAGEMENT_EXPERIENCE`), `PAST_COMPANIES_USED_CLIENT_TECH`, signals / events / `product_talking_points`, and `ai_reasoning` (cleaned, markdown-bolded).
+Top-N projection in **native best-first order** — rows already arrive ranked by the prospecting model (warm-intro path, persona fit, momentum and the rest weighed internally); the scores themselves are not exposed. **Each top-pick row carries the full broad column set** — identity, `CURRENT_PERSONAS`, `prospect_tags`, the full warm-intro path, career-momentum signals (`MONTHS_SINCE_LAST_PROMOTION`, `BUDGET_MANAGEMENT_EXPERIENCE`), `PAST_COMPANIES_USED_CLIENT_TECH`, signals / events / `product_talking_points`, and `ai_reasoning` (cleaned, markdown-bolded).
 
 Render every row in top_picks as a complete prospect card using the canonical template above — not a one-line paraphrase. Top_picks is the "start here" set; if filtered_prospects > 5 (or whatever the configured `_TOP_PICKS_COUNT` is), `preview_rows` carries the next rows in returned order and the dataset has the rest.
 
@@ -165,7 +165,7 @@ Present when `filtered_prospects ≤ _SMALL_RUN_INLINE_THRESHOLD` or when the se
 
 ### Full projected field set
 
-Each prospect row in the dataset (and in `preview_rows`) carries the broad field set Phoenix exposes — identity, persona classification, warm-intro path, signals + ready-made talking points, career momentum, and narrative reasoning. Rows arrive in Phoenix's native best-first order; the model's internal scores are **not** exposed. Notable named fields:
+Each prospect row in the dataset (and in `preview_rows`) carries the broad field set the engine exposes — identity, persona classification, warm-intro path, signals + ready-made talking points, career momentum, and narrative reasoning. Rows arrive in native best-first order; the model's internal scores are **not** exposed. Notable named fields:
 
 | Group | Fields |
 |---|---|
@@ -176,20 +176,20 @@ Each prospect row in the dataset (and in `preview_rows`) carries the broad field
 | Career momentum | `MONTHS_SINCE_LAST_PROMOTION`, `BUDGET_MANAGEMENT_EXPERIENCE` |
 | Narrative | `ai_reasoning` |
 
-**No score fields are returned** — there is no `rank_position`, no `MASTER_SCORE_*`, no `COMPOSITE_SCORE` or sub-scores, no `relevancy_reasoning` or `should_filter_reason`. Take rows in the order Phoenix returns them.
+**No score fields are returned** — there is no `rank_position`, no `MASTER_SCORE_*`, no `COMPOSITE_SCORE` or sub-scores, no `relevancy_reasoning` or `should_filter_reason`. Take rows in the order they are returned.
 
 **Don't promise fields outside this set** — no emails, no phones, no full tenure history. If the user asks for emails/phones, that's `contact-data-enrichment`.
 
-If Phoenix returns zero prospects the response is the same shape with `dataset: null`, `top_picks: []`, `priority_summary: {}`, and `preview_rows: []`.
+If a run returns zero prospects the response is the same shape with `dataset: null`, `top_picks: []`, `priority_summary: {}`, and `preview_rows: []`.
 
-`failed_companies` (always present on `action="run"`) is a list of any company URLs that failed during the batch fan-out — each entry has `linkedin_url`, `error`, and `status_code` (when the failure came back as an HTTP error from Phoenix). On a fully-successful run it's `[]`. If the user passed N URLs and some are listed here, mention them — those companies were *not* prospected. If every URL failed, the tool returns `status="error"` with the same `failed_companies` list and no dataset.
+`failed_companies` (always present on `action="run"`) is a list of any company URLs that failed during the batch fan-out — each entry has `linkedin_url`, `error`, and `status_code` (when the failure came back as an HTTP error from the engine). On a fully-successful run it's `[]`. If the user passed N URLs and some are listed here, mention them — those companies were *not* prospected. If every URL failed, the tool returns `status="error"` with the same `failed_companies` list and no dataset.
 
 ## Working with the dataset
 
 The full ranked list lives in the dataset, not in `preview_rows`. Use the dataset companion tools to inspect or slice it without paying its context cost:
 
 - **`describe_dataset(dataset_id)`** — schema + a head sample. Good first call before writing SQL.
-- **`query_datasets({alias: dataset_id}, sql, row_limit=N)`** — read-only DuckDB SQL against the dataset. Filter, count, slice, or pull a specific page.
+- **`query_datasets({alias: dataset_id}, sql, row_limit=N)`** — read-only SQL against the dataset. Filter, count, slice, or pull a specific page.
 - **`download_dataset(dataset_id)`** — mint a short-lived URL the user can click to download the dataset as CSV. Use whenever the user asks for the file ("send me the CSV", "download the results", "export this", "give me the spreadsheet"). Surface the returned `download_url` directly in the chat — that link IS the deliverable.
 - **`list_datasets()`** — surface earlier datasets from this conversation (e.g. to compare a live run vs a shadow run).
 
@@ -228,7 +228,7 @@ query_datasets(
 )
 ```
 
-`facets` on the response are pre-computed distribution counts over the prioritization-driving dimensions: `WORKED_IN_CLIENT_COMPANY_IN_PAST` (alumni count), `prospect_tags` (which product/category tags appear), `CURRENT_PERSONAS` (persona match distribution), and `COMPANY_LINKEDIN_URL` (per-company breakdown for batch runs). Use these for quick "what's the shape of this run?" answers without a `query_datasets` round-trip. There are no score-based facets — Phoenix's internal scores aren't exposed. **Location facets were intentionally removed** — `LOCATION_COUNTRY`/`LOCATION_REGION` are still per-row fields in the dataset but aren't what a BDR prioritizes on; if a user really wants a geographic breakdown, run `query_datasets` with `GROUP BY LOCATION_COUNTRY`.
+`facets` on the response are pre-computed distribution counts over the prioritization-driving dimensions: `WORKED_IN_CLIENT_COMPANY_IN_PAST` (alumni count), `prospect_tags` (which product/category tags appear), `CURRENT_PERSONAS` (persona match distribution), and `COMPANY_LINKEDIN_URL` (per-company breakdown for batch runs). Use these for quick "what's the shape of this run?" answers without a `query_datasets` round-trip. There are no score-based facets — the model's internal scores aren't exposed. **Location facets were intentionally removed** — `LOCATION_COUNTRY`/`LOCATION_REGION` are still per-row fields in the dataset but aren't what a BDR prioritizes on; if a user really wants a geographic breakdown, run `query_datasets` with `GROUP BY LOCATION_COUNTRY`.
 
 ## ai_reasoning is already display-ready
 
@@ -294,7 +294,7 @@ These fields are sales-actionable. If they are present on the row, they appear i
 5. `MONTHS_SINCE_LAST_PROMOTION` and `BUDGET_MANAGEMENT_EXPERIENCE` (the "why now" signals)
 6. `PAST_COMPANIES_USED_CLIENT_TECH` (prior-exposure signal — high credibility hook)
 7. `ai_reasoning` verbatim (it is structured + bolded + evidence-quoted already)
-8. `product_talking_points` first entry (Phoenix wrote the opener — don't invent your own)
+8. `product_talking_points` first entry (the engine wrote the opener — don't invent your own)
 
 ### Step 3 — Tail block (counts + dataset_id)
 
@@ -310,7 +310,7 @@ The same four-step flow applies, but the lede should mention per-company spread 
 
 ### Long lists / pagination
 
-On preview shape, after rendering top_picks + preview_rows, pull the remaining rows via `query_datasets({"p": dataset_id}, "SELECT * FROM p LIMIT N OFFSET K")` — the dataset is already stored in Phoenix's native best-first order, so plain `LIMIT`/`OFFSET` paginates in that order (there is no `rank_position` or score column to sort on). Use `SELECT *` so you don't silently drop high-leverage fields. Render those rows with the same prospect-card template. If the user wants the file rather than a paged view, call `download_dataset(dataset_id)` and surface the returned `download_url` — that's the canonical CSV. For a download of just a slice (e.g. "the first 50"), run the slice through `query_datasets(..., persist_as_dataset=True)` first to get a new `dataset_id`, then `download_dataset` on that.
+On preview shape, after rendering top_picks + preview_rows, pull the remaining rows via `query_datasets({"p": dataset_id}, "SELECT * FROM p LIMIT N OFFSET K")` — the dataset is already stored in native best-first order, so plain `LIMIT`/`OFFSET` paginates in that order (there is no `rank_position` or score column to sort on). Use `SELECT *` so you don't silently drop high-leverage fields. Render those rows with the same prospect-card template. If the user wants the file rather than a paged view, call `download_dataset(dataset_id)` and surface the returned `download_url` — that's the canonical CSV. `download_dataset` always exports the whole dataset, and `query_datasets` results are not saved, so a slice (e.g. "the first 50") is shown inline rather than offered as its own file.
 
 ### Worked example — what a rendered prospect card actually looks like
 
@@ -363,11 +363,11 @@ If the user already asked for a file (any phrasing — "send", "export", "downlo
 - **Never send `target_tenant_id`.** Tenant comes from OAuth. The override is super-tenant only and will error for everyone else.
 - **Polling is mandatory** — `{"status": "still_running"}` means call again, preferably with `run_ids` from the response (or identical args if no `run_ids` are present yet).
 - **Don't invent fields outside the projected set.** The dataset carries the field set documented in the table above — no emails, no phones, no full tenure history, and no score fields (`rank_position`, `MASTER_SCORE_*`, `COMPOSITE_SCORE` and the like are not returned). If the user asks for emails/phones, route to `contact-data-enrichment`.
-- **Take rows in returned order.** Phoenix returns prospects already in best-first order; there is no score or `rank_position` column to sort or paginate on. Don't tell the agent to sort by a score.
+- **Take rows in returned order.** Prospects already arrive in best-first order; there is no score or `rank_position` column to sort or paginate on. Don't tell the agent to sort by a score.
 - **Render every available row as a full prospect card.** On inline shape, render every prospect. On preview shape, render every row in `top_picks` and `preview_rows`. Drop a card-line only when its underlying field is null/empty — never silently skip a no-drop field on row 4 that you showed on row 1. Consistency across rows is the contract.
 - **Render `ai_reasoning` verbatim.** Server already converts the `$$-onfire-bold-$$` sentinels to markdown bold and strips JSON-leak artifacts. Don't paraphrase the bullets into a one-liner — that's where the evidence quotes live.
 - **Use the named warm-intro connector.** If `CONNECTING_EMPLOYEE_NAME` is populated, name them; that's the introduction path.
-- **Don't try to re-fetch the full prospect list by re-running.** Use the returned `dataset_id` with `query_datasets` / `describe_dataset` instead — it's free, fast, and doesn't trigger a Phoenix run.
+- **Don't try to re-fetch the full prospect list by re-running.** Use the returned `dataset_id` with `query_datasets` / `describe_dataset` instead — it's free, fast, and doesn't trigger a new run.
 - **Don't set `use_cache=True`** unless it's plausibly a re-run of something already executed this session.
 - **`activate_shadow_run=True`** only when the user is iterating on schema (and a shadow exists).
 
@@ -376,7 +376,7 @@ If the user already asked for a file (any phrasing — "send", "export", "downlo
 - **Rendering only the top 3-5 and stopping.** The biggest failure mode and the one that triggered this skill's last rewrite. If the run returned 9 filtered prospects, you render 9 cards — not 3 with a "I can pull more anytime" footer. On inline shape every row is in your context; on preview shape `top_picks` already has the ranked subset plus `preview_rows` for the next slice. The user asked for a prospect list, give them the prospect list.
 - **Rendering some fields for the top prospects and dropping them for the rest.** If row 1 has score breakdown + persona match + career-momentum + past tech employers, then rows 2–N have the same lines (where the underlying data is present). Inconsistency across rows reads as sloppiness and signals the model gave up partway through.
 - **Paraphrasing `ai_reasoning` into a one-liner.** The five-bullet structure with quoted evidence is the differentiator — that's what makes Onfire's output a briefing rather than a contact dump. Render verbatim, don't summarise.
-- **Inventing opener prose when `product_talking_points` exists.** Phoenix already wrote product-specific openers per prospect. Use them. Don't paraphrase `ai_reasoning` into an opener and pretend you did the work.
+- **Inventing opener prose when `product_talking_points` exists.** The engine already wrote product-specific openers per prospect. Use them. Don't paraphrase `ai_reasoning` into an opener and pretend you did the work.
 - **Ignoring the warm-intro path.** If `CONNECTING_EMPLOYEE_NAME` is populated, name them in the output. That's the warm-intro contact the user can ping; burying it inside `ai_reasoning` is wasteful.
 - **Missing the alumni callout.** `WORKED_IN_CLIENT_COMPANY_IN_PAST=TRUE` is the highest-value expansion signal in the response. If any row has it, prepend the warm-intro line with the alumni callout.
 - **Treating `still_running` as an error.** It's the documented async signal. Just call again — send back the `run_ids` if present.
@@ -468,16 +468,16 @@ User: "get me the top-level CISOs at Microsoft"
 
 **Iterating on schema config.**
 ```
-1. manage-ai-prospecting create_shadow / update_shadow per user edits.
+1. manage_ai_prospecting create_shadow / update_shadow per user edits.
 2. ai_prospecting(action="run", activate_shadow_run=True, company_linkedin_url=...) → dataset_id_shadow
 3. ai_prospecting(action="run", company_linkedin_url=...) (live) → dataset_id_live
 4. Compare with query_datasets({"shadow": ds_shadow, "live": ds_live}, "SELECT ...") if useful.
-5. Promote with manage-ai-prospecting ship_shadow when satisfied.
+5. Promote with manage_ai_prospecting ship_shadow when satisfied.
 ```
 
 ## What this skill does NOT do
 
 - It doesn't resolve LinkedIn URLs — that's `match-company` / `match-person`.
 - It doesn't return contact info — that's `contact-data-enrichment`.
-- It doesn't edit schema config — that's `manage-ai-prospecting`.
+- It doesn't edit schema config — that's the `manage_ai_prospecting` tool.
 - It doesn't analyse the dataset for you — that's `query_datasets` / `describe_dataset` (companion tools to the dataset handle).

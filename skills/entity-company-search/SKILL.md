@@ -1,11 +1,11 @@
 ---
 name: entity-company-search
-description: Search for companies directly from Onfire's LinkedIn company entity (the `company` entity, table ONFIRE.COMPANIES) using the `ask_onfire` tool. Use when the user wants company firmographics, technology adoption, funding data, or social URLs — phrases like "find fintech companies in Israel with 50-200 employees", "look up Northwind's company data", "which companies in our list are publicly traded", "get the GitHub URL for Artifex", or any company lookup that can be answered with structured filters on LinkedIn company data.
+description: Search for companies directly from Onfire's LinkedIn company entity (the `company` entity) using the `ask_onfire` tool. Use when the user wants company firmographics, technology adoption, funding data, or social URLs — phrases like "find fintech companies in Israel with 50-200 employees", "look up Northwind's company data", "which companies in our list are publicly traded", "get the GitHub URL for Artifex", or any company lookup that can be answered with structured filters on LinkedIn company data.
 ---
 
 # entity-company-search
 
-Direct lookup of the `company` entity (table `ONFIRE.COMPANIES`) via `ask_onfire`.
+Direct lookup of the `company` entity via `ask_onfire`.
 The canonical LinkedIn company entity — firmographics, technologies,
 funding, social channels, and enriched metadata in one place.
 
@@ -47,6 +47,7 @@ Author the QueryIR with these logical names. Call
 |-------|-------|
 | `linkedin_url` | Primary identity. `eq` to target ONE company. Any URL format is normalized server-side. |
 | `domain` | Bare website domain ("northwind.com"). Prefer for exact matching. |
+| `company_name` | Company name, free text, stored lowercase. To target ONE company, resolve it with `match_company` and filter `linkedin_url` instead. |
 | `industry` | LinkedIn industry, free text, stored lowercase — use `contains` or a lowercase `eq`. |
 | `size_band` | LinkedIn bucket: "1-10","11-50","51-200","201-500","501-1000","1001-5000","5001-10000","10001+". Use `in` for a set. |
 | `employee_count` | Numeric — use `gte` / `lte`. |
@@ -61,8 +62,8 @@ Author the QueryIR with these logical names. Call
 | `technologies` | Self-declared tech **array** — cannot be scalar-filtered (see "Technology adoption" below). |
 
 **Returnable attributes** (use in `select`, not filterable as dimensions):
-`name`, `website`, `domain`, `description`, `enriched_summary`, `followers`,
-`github_url`, `company_ticker`, `stock_exchange`, `funding_last_round_type`,
+`website`, `description`, `enriched_summary`, `followers`, `github_url`,
+`company_ticker`, `stock_exchange`, `funding_last_round_type`,
 `funding_last_round_date`.
 
 **Measure:** `company_count` (= `COUNT(DISTINCT linkedin_url)`) — select alone for a count.
@@ -77,7 +78,7 @@ author it.
 ```
 ask_onfire(query={
   entity: "company",
-  select: ["linkedin_url", "name", "website", "size_band", "industry",
+  select: ["linkedin_url", "company_name", "website", "size_band", "industry",
            "employee_count", "location_country", "company_type",
            "funding_last_round_type", "funding_last_round_date"],
   filters: [{dimension: "domain", op: "eq", value: "northwind.com"}],
@@ -90,7 +91,7 @@ Swap the filter for `{dimension: "linkedin_url", op: "eq", value: "<url>"}` to l
 ```
 ask_onfire(query={
   entity: "company",
-  select: ["linkedin_url", "name", "website", "size_band", "employee_count",
+  select: ["linkedin_url", "company_name", "website", "size_band", "employee_count",
            "location_country", "is_b2b"],
   filters: [
     {dimension: "industry", op: "contains", value: "cybersecurity"},
@@ -113,7 +114,7 @@ server-side, with `min_count` = minimum active contacts carrying the technology:
 ```
 ask_onfire(query={
   entity: "company",
-  select: ["linkedin_url", "name", "website", "size_band", "industry",
+  select: ["linkedin_url", "company_name", "website", "size_band", "industry",
            "location_country"],
   insight_filters: [{kind: "technology", value: "Kubernetes", min_count: 1}],
   filters: [{dimension: "is_b2b", op: "eq", value: true}],
@@ -122,14 +123,14 @@ ask_onfire(query={
 ```
 Technology/persona values are concepts, not literals — give the human term and
 the server canonicalises it, or confirm the exact value with `resolve_insights`
-(carry `kind`) first. Multiple `insight_filters` AND together — run one query per
-concept and merge if you need an OR.
+(carry `kind`) first. Multiple `insight_filters` AND together; for an OR, give one filter a list
+of same-kind concepts.
 
 ### Publicly traded companies in a sector
 ```
 ask_onfire(query={
   entity: "company",
-  select: ["linkedin_url", "name", "website", "size_band",
+  select: ["linkedin_url", "company_name", "website", "size_band",
            "company_ticker", "stock_exchange", "location_country"],
   filters: [
     {dimension: "company_type", op: "eq", value: "Public"},
@@ -149,7 +150,7 @@ the downloaded dataset) — flag this to the user rather than dropping it silent
 ```
 ask_onfire(query={
   entity: "company",
-  select: ["linkedin_url", "name", "domain", "size_band", "industry",
+  select: ["linkedin_url", "company_name", "domain", "size_band", "industry",
            "employee_count", "is_b2b", "company_type"],
   filters: [{dimension: "domain", op: "in",
              value: ["northwind.com", "sendline.com", "pathwatch.com", "frostbyte.com"]}],
@@ -161,7 +162,7 @@ ask_onfire(query={
 ```
 ask_onfire(query={
   entity: "company",
-  select: ["name", "linkedin_url", "github_url", "website"],
+  select: ["company_name", "linkedin_url", "github_url", "website"],
   filters: [{dimension: "domain", op: "eq", value: "artifex.com"}],
   limit: 1
 })

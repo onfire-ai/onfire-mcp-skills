@@ -1,6 +1,6 @@
 # Persona → Use Case Mapping
 
-Maps Phoenix prospect titles and AI reasoning signals to BDR use cases,
+Maps `ai_prospecting` prospect titles and AI reasoning signals to BDR use cases,
 and defines buying committee priority tiers.
 
 ---
@@ -59,7 +59,7 @@ Map from `config.account_research.buying_committee_queries` persona labels:
 
 ## AI reasoning signal → use case
 
-Scan `ai_reasoning` field from Phoenix for these keyword patterns:
+Scan the prospects' `ai_reasoning` field for these keyword patterns:
 
 | Keywords in reasoning | Use case |
 |----------------------|----------|
@@ -100,7 +100,7 @@ A prospect may map to multiple use cases. Show them in the section for their
 
 ---
 
-## Receptivity signals from Phoenix reasoning
+## Receptivity signals from prospect reasoning
 
 The following patterns in `ai_reasoning` indicate higher outreach receptivity:
 
@@ -119,15 +119,15 @@ Surface the top 2–3 receptivity signals per prospect in their card.
 
 ## Signal holder → prospect matching
 
-When a Metabase signal has an `intent_holder_linkedin_url`, attempt to match it
-against Phoenix prospect `LINKEDIN_URL` values:
+When an intent signal has an `intent_holder_linkedin_url`, attempt to match it
+against the prospects' `LINKEDIN_URL` values:
 
 ```
 normalize(url) = url.lower().strip('/').replace('https://','').replace('www.','')
 match = any(normalize(signal_url) in normalize(prospect_url) or vice versa)
 ```
 
-If matched: merge the signal data and Phoenix prospect data into a single enriched
+If matched: merge the signal data and the prospect data into a single enriched
 card, showing both the intent signal (source, date, summary) and the AI reasoning.
 
 If not matched: show the signal holder as a standalone entry in the signals table

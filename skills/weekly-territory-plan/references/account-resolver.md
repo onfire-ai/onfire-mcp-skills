@@ -149,7 +149,6 @@ what keeps each pull small and on-topic.
 
 ```
 query_intent_signals(
-  tenant_id=<omit on a normal session>,
   account_website="<domain>",
   keyword_match=[<the rep's ICP terms, resolved>],
   signal_types=["High Intent"]
@@ -234,9 +233,10 @@ ask_onfire(query={
 })
 ```
 
-**`insight_filters` AND together — they never OR.** One query per concept, merged
-client-side. Expecting an OR here silently returns the intersection, which reads as
-"no footprint" when the truth is "no single person carries all three".
+**Separate `insight_filters` AND together; a list inside one filter ORs.** Put
+alternative technologies in one filter's list. Splitting them into separate filters
+silently returns the intersection, which reads as "no footprint" when the truth is
+"no single person carries all three".
 
 ### Developer-community activity
 

@@ -62,10 +62,9 @@ Entity mapping (table → ask_onfire entity): `ONFIRE.PEOPLE` = `contact`;
 `people_experiences`; `ONFIRE.EVENTS_CONTACTS` = `event_contact`;
 `ONFIRE.GROWTH_INSIGHT_MONTHLY` = `growth_insight_monthly`;
 `ONFIRE.INSIGHTS_2_EVIDENCES` = `insight_evidence`; `ONFIRE.EVIDENCES`
-= `evidence`; `ONFIRE.GITHUB_MEMBERS` = `github_member`;
-`SILVER.JOB_POST.STG_JOB_POSTS` = `job_post`. The full employment-
-history pool (`ONFIRE.EXPERIENCES_FULL`) = `experiences_pool` and the
-full people pool (`ONFIRE.PEOPLE_FULL`) = `people_pool` — **both GATED**:
+= `evidence`; `ONFIRE.GITHUB_MEMBERS` = `github_member`. The full
+employment-history pool (`ONFIRE.EXPERIENCES_FULL`) = `experiences_pool`
+and the full people pool (`ONFIRE.PEOPLE_FULL`) = `people_pool` — **both GATED**:
 author a QueryIR against them only with `allow_extended_pool: true` and
 no insight search. (These supersede the old `PEOPLE_GRAND` /
 `PEOPLE_GRAND_EXPERIENCES` "tool-managed, no entity" tables;
@@ -323,9 +322,9 @@ Used in:
 
 ## Query 04 — Open job postings
 
-Source entity: `job_post` (`SILVER.JOB_POST.STG_JOB_POSTS` — posting-
-level, one row per LinkedIn job post). It has no `DELETED_AT`; the live
-cut is `application_active = 1` (the `open` named filter). There is no
+Source entity: `job_post` (posting-level, one row per LinkedIn job
+post). It has no `DELETED_AT`; the live cut is `application_active = 1`
+(the `open` named filter). There is no
 hiring-manager fan-out — if the brief needs an outreach target, pair
 this slice with `hiring_manager_signal` (joined from `contact`) or
 `entity-people-search` on the account's recruiters or team leads.
@@ -387,7 +386,7 @@ ask_onfire(query={
   `select` empty) — both return the single scalar.
 - **Geographic / functional shape of the active set (aggregate mode).**
   The country and `job_function` × `seniority` distributions of the
-  active postings — which the DuckDB patterns below compute client-side
+  active postings — which the join patterns below compute client-side
   — are a plain GROUP BY + COUNT, so you can get them server-side
   instead:
 
@@ -443,7 +442,7 @@ the active set (countries, `JOB_FUNCTION`, `SENIORITY_JOB`), plus a callout
 on whether any active postings explicitly reference a major product /
 release effort (search `JOB_TEXT` for the product name where relevant).
 
-### DuckDB join patterns
+### Client-side join patterns
 
 The two distribution cuts below can be done server-side in aggregate
 mode (see the geographic / functional shape block above); the
@@ -666,7 +665,7 @@ server-side, so no `LOWER()`):
 ```
 ask_onfire(query={
   entity: "company",
-  select: ["name", "industry", "size_band", "employee_count",
+  select: ["company_name", "industry", "size_band", "employee_count",
            "location_country", "location_locality"],
   filters: [{dimension: "linkedin_url", op: "in", value: [
     // distinct company_linkedin_url values from ds_acquisition
@@ -944,9 +943,9 @@ Used in: Page 4 Departed-no-backfill detail table.
 
 ---
 
-## DuckDB join patterns (post-Snowflake)
+## Client-side join patterns
 
-Once everything is persisted, use `query_datasets` to join. DuckDB
+Once everything is persisted, use `query_datasets` to join. It
 rejects `UNION` and `CTE-named-as-dataset-alias`; keep joins as flat
 LEFT JOINs against named dataset aliases.
 

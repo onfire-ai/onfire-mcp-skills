@@ -39,12 +39,11 @@ Skip this for:
 ## `get_company_headcount` — total headcount + employee roster
 
 > **Flag — now reachable via a gated pool entity (updated):** `get_company_headcount`
-> is backed by `ONFIRE.PEOPLE_GRAND_EXPERIENCES` (tenure/stint rows) +
-> `ONFIRE.PEOPLE_GRAND` (profile enrichment). These rows **are no longer
+> is backed by the full employment-history pool (tenure/stint rows) plus the
+> full people pool (profile enrichment). These rows **are no longer
 > unreachable from `ask_onfire`** — they now exist as the **gated** semantic
-> entities `experiences_pool` (the full employment-history pool, mirrors
-> `PEOPLE_GRAND_EXPERIENCES`) and `people_pool` (the full people pool, mirrors
-> `PEOPLE_GRAND`). To query them you must set `allow_extended_pool=true` **and**
+> entities `experiences_pool` (the full employment-history pool) and
+> `people_pool` (the full people pool). To query them you must set `allow_extended_pool=true` **and**
 > name the entity explicitly; they carry **no insight search** (route any
 > persona/technology query to `growth_insight_monthly` / `contact` / `company`).
 > Keep `get_company_headcount` as the convenient point lookup — it returns the
@@ -53,7 +52,7 @@ Skip this for:
 > you need a custom cut the tool doesn't give you (e.g. a roster **distribution**
 > by title or location via aggregate mode — see below).
 
-Headcount is **derived from tenure rows** in `ONFIRE.PEOPLE_GRAND_EXPERIENCES`:
+Headcount is **derived from tenure rows** in the employment-history pool:
 for each month M in the window, the tool counts distinct people whose tenure
 covers M (`START_DATE <= last-day-of-M` AND `END_DATE IS NULL OR END_DATE >=
 first-day-of-M`). MoM growth % is computed from those counts.
@@ -66,9 +65,9 @@ flag). One row per (person × stint) where any of these hold:
 - `end_date` falls in the lookback window → **leaver** (covers long-tenured
   departures whose start is outside the window)
 
-Each row is joined to `ONFIRE.PEOPLE_GRAND` for profile fields (name,
+Each row is joined to the people pool for profile fields (name,
 country, region, current title) and self-joined to
-`ONFIRE.PEOPLE_GRAND_EXPERIENCES` for the person's immediately-prior AND
+the employment-history pool for the person's immediately-prior AND
 immediately-next company. `next_*` is only populated for stints that
 ended (`end_date IS NOT NULL`). The tool wires these self-joins up for you in
 one call — that's why it stays the convenient path. The underlying rows are
@@ -119,18 +118,18 @@ The **first row per company** is the current month's count.
 
 | Column | Source | Notes |
 |---|---|---|
-| `company_linkedin_url` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Target company |
-| `person_linkedin_url`, `person_linkedin_id` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | The employee |
-| `is_primary` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | LinkedIn's "current primary role" flag |
-| `start_date`, `end_date` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | `YYYY-MM` strings (NULL end = still there) |
-| `title_name`, `title_role`, `title_sub_role`, `title_levels` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Title classification at the company |
-| `full_name`, `headline` | `ONFIRE.PEOPLE_GRAND` | Latest snapshot |
-| `location_country`, `location_region`, `location_continent`, `location_name` | `ONFIRE.PEOPLE_GRAND` | Person's location |
-| `current_job_title`, `current_company_name`, `current_company_linkedin_url` | `ONFIRE.PEOPLE_GRAND` | What they're doing *now* (may differ from the target stint if `end_date IS NOT NULL`) |
-| `prior_company_name`, `prior_company_linkedin_url`, `prior_title` | self-join on `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Where they came from before the target stint |
-| `prior_start_date`, `prior_end_date` | self-join on `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Prior stint's window |
-| `next_company_name`, `next_company_linkedin_url`, `next_title` | self-join on `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Where they went after the target stint. **NULL when `end_date IS NULL`** (still active) |
-| `next_start_date`, `next_end_date` | self-join on `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | Next stint's window |
+| `company_linkedin_url` | stint | Target company |
+| `person_linkedin_url`, `person_linkedin_id` | stint | The employee |
+| `is_primary` | stint | LinkedIn's "current primary role" flag |
+| `start_date`, `end_date` | stint | `YYYY-MM` strings (NULL end = still there) |
+| `title_name`, `title_role`, `title_sub_role`, `title_levels` | stint | Title classification at the company |
+| `full_name`, `headline` | profile | Latest snapshot |
+| `location_country`, `location_region`, `location_continent`, `location_name` | profile | Person's location |
+| `current_job_title`, `current_company_name`, `current_company_linkedin_url` | profile | What they're doing *now* (may differ from the target stint if `end_date IS NOT NULL`) |
+| `prior_company_name`, `prior_company_linkedin_url`, `prior_title` | prior / next stint | Where they came from before the target stint |
+| `prior_start_date`, `prior_end_date` | prior / next stint | Prior stint's window |
+| `next_company_name`, `next_company_linkedin_url`, `next_title` | prior / next stint | Where they went after the target stint. **NULL when `end_date IS NULL`** (still active) |
+| `next_start_date`, `next_end_date` | prior / next stint | Next stint's window |
 
 ### Deriving joiners / leavers from the roster
 
@@ -167,10 +166,10 @@ get_company_headcount(
 The roster rows behind `get_company_headcount` are now **queryable** through
 `ask_onfire`, via two **gated** entities:
 
-| Entity | Mirrors | Grain | Use it for |
-|---|---|---|---|
-| `experiences_pool` | `ONFIRE.PEOPLE_GRAND_EXPERIENCES` | one row per person-stint | roster / org-movement cuts; `is_primary = true` is the current role |
-| `people_pool` | `ONFIRE.PEOPLE_GRAND` | one row per person | whole-pool identity / profile lookups |
+| Entity | Grain | Use it for |
+|---|---|---|
+| `experiences_pool` | one row per person-stint | roster / org-movement cuts; `is_primary = true` is the current role |
+| `people_pool` | one row per person | whole-pool identity / profile lookups |
 
 > **Gated — opt in explicitly.** Both are withheld from the routing catalog.
 > To query either you MUST (1) name the entity in the QueryIR `entity` field and

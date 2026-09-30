@@ -5,7 +5,7 @@ description: Resolve a person (from name, email, and/or company context) to a ve
 
 # match_person (atomic)
 
-Resolves people via Onfire's Matchbox2 engine. Vector search + AI matching, so it handles "Lana P. at Frostbyte" or just an email alias.
+Resolves people via Onfire's matching engine. Vector search + AI matching, so it handles "Lana P. at Frostbyte" or just an email alias.
 
 ## When to use this
 

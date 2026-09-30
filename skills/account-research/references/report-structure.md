@@ -726,8 +726,8 @@ reads as a self-contained heading without a separate title/subtitle pair.
       <!-- Brand-side talking points, drawn from
            tenant_config.derived_use_cases[].evidence. The label is
            rendered uppercase by the .lbl class; spell the tenant name
-           the way it appears in tenant_config (e.g. "Artifex solution
-           alignment" -> "ARTIFEX SOLUTION ALIGNMENT"). -->
+           the way it appears in tenant_config (e.g. "Acme Security solution
+           alignment" -> "ACME SECURITY SOLUTION ALIGNMENT"). -->
     </div>
   </div>
   <span class="lbl">Talking points</span>
@@ -820,11 +820,8 @@ No sources line. Logo (if available) + company name + label + date.
 | Never write | Write instead |
 |---|---|
 | `—` (em dash) | `-` (hyphen) |
-| "Metabase signals" | "Intent signals" |
 | "Slack signal" | "Professional community" |
 | "Discord signal" | "Community engagement" |
-| "Phoenix prospects" | "Key contacts" |
-| "Snowflake 10-K" | "Annual filing" |
 | "Tenant config match" | "Solution alignment" |
 | "Account Brief" | "Account Research" |
 | Bare headcount number | Headcount with parenthetical breakdown when relevant |
@@ -849,11 +846,7 @@ abstractions:
 
 | Internal name | Customer-facing label |
 |---|---|
-| Phoenix | "Identified prospects" / "verified key contacts" |
-| Phoenix prospect data | "LinkedIn profile evidence" (when source is profile data) OR "buyer signals data" |
 | AI prospecting | "Buyer signals" |
-| Metabase | "Intent signals" |
-| Snowflake (as source) | "Annual filing" / "10-K" (cite the doc) |
 | MCP, Onfire, OnFire | (never appears in report text) |
 
 Acceptable abstractions in customer-facing prose:
@@ -866,15 +859,14 @@ Acceptable abstractions in customer-facing prose:
 - "[Conference Name] [Year]" (real events, e.g. "SecureCon 2026")
 - "[Community channel] community Slack / Discord"
 
-Snowflake CAN appear as a CUSTOMER product (e.g. "Snowflake Cortex AI is
-in production at the account"). It cannot appear as the SOURCE of the
-report data. Same rule for any vendor: if they sell it and the account
-uses it, mention freely. If we use it to research, never mention.
+A vendor CAN appear as a CUSTOMER product (e.g. "Databricks is in
+production at the account"): if they sell it and the account uses it,
+mention it freely. Never name how the report data was gathered.
 
 Final grep before delivery:
 
 ```
-grep -iE 'phoenix|metabase|mcp|onfire' report.html
+grep -iE 'mcp|onfire' report.html
 ```
 
 Zero matches required.

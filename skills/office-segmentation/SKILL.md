@@ -1,7 +1,7 @@
 ---
 name: office-segmentation
 description: >-
-  Build a geographic office segmentation for any company — where are the offices and how many employees work near each one. Orchestrates four tools in sequence: search_offices (discover office locations from Onfire's market intelligence), match_company (resolve LinkedIn URL), get_company_headcount (current employee count), and ask_onfire (per-office employee counts from the contact entity / ONFIRE.PEOPLE). Use when the user asks anything like "how are employees distributed across offices?", "how many people work in the London office?", "what's the geographic footprint of Northwind?", "which office is the biggest?", "map employees to office locations", or "where does the bulk of the workforce sit?".
+  Build a geographic office segmentation for any company — where are the offices and how many employees work near each one. Orchestrates four tools in sequence: search_offices (discover office locations from Onfire's market intelligence), match_company (resolve LinkedIn URL), get_company_headcount (current employee count), and ask_onfire (per-office employee counts from the contact entity). Use when the user asks anything like "how are employees distributed across offices?", "how many people work in the London office?", "what's the geographic footprint of Northwind?", "which office is the biggest?", "map employees to office locations", or "where does the bulk of the workforce sit?".
 ---
 
 # Office Segmentation
@@ -11,9 +11,9 @@ description: >-
 Given a company name (and optionally a website), this skill:
 
 1. Discovers all worldwide office locations from Onfire's market intelligence.
-2. Resolves the company's LinkedIn URL via Matchbox.
+2. Resolves the company's LinkedIn URL via `match_company`.
 3. Gets the current employee headcount snapshot.
-4. Counts employees near each office from `ONFIRE.PEOPLE` (one `ask_onfire` count per office).
+4. Counts employees near each office from the `contact` entity (one `ask_onfire` count per office).
 5. Assembles a ranked table: offices sorted by employee count, regional totals, and % of workforce per office.
 
 ---
@@ -90,7 +90,7 @@ Use `months=1` — you only need the current snapshot, not historical trends.
 
 ## Step 4 — Get the per-office employee counts
 
-`ONFIRE.PEOPLE` is the `contact` entity in `ask_onfire`. You query it with a
+People live on the `contact` entity in `ask_onfire`. You query it with a
 structured **QueryIR** (NOT SQL) — `ask_onfire(query={entity, select, filters, ...})`.
 
 > **No GROUP BY.** `ask_onfire` cannot return a grouped location distribution
