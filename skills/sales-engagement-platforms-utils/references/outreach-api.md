@@ -5,7 +5,7 @@ the most structured of the four and the least like the others.
 
 > **Request bodies live elsewhere.** For resource creation, sequence and step schemas, the
 > `stepType` enum, mailbox selection and the OAuth scope list, read
-> **`../../outreach-sequence-email-composer/references/outreach-api-cheatsheet.md`**. This
+> the `outreach-sequence-email-composer` skill's **`references/outreach-api-cheatsheet.md`**. This
 > file covers the query-parameter grammar only.
 
 **Docs:** <https://developers.outreach.io/api/making-requests> ·

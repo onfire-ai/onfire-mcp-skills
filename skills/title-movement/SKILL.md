@@ -1,7 +1,7 @@
 ---
 name: title-movement
 description: >
-  Detect month-by-month title movement (new hires and departures by job title) at any target company using `ONFIRE.EXPERIENCES_FULL` via `ask_onfire`.
+  Detect month-by-month title movement (new hires and departures by job title) at any target company using the `experiences_pool` entity via `ask_onfire`.
 
   Use this skill whenever the user asks about:
   - "title movement" or "role movement" at a company
@@ -20,7 +20,7 @@ compatibility:
 
 # Title Movement Skill
 
-Detect which job titles are newly entering or permanently leaving a company, month by month. Data source: the **extended employment-history pool** — entity `experiences_pool` (alias `ONFIRE.EXPERIENCES_FULL`) via `ask_onfire`. This is the broad superset (~5x) of the curated `people_experiences`, one row per person-stint, and is the right source for *whole-pool* org movement because it covers people regardless of whether they carry curated insights.
+Detect which job titles are newly entering or permanently leaving a company, month by month. Data source: the **extended employment-history pool** — entity `experiences_pool` via `ask_onfire`. This is the broad superset (~5x) of the curated `people_experiences`, one row per person-stint, and is the right source for *whole-pool* org movement because it covers people regardless of whether they carry curated insights.
 
 > **`experiences_pool` is GATED.** It is withheld from the routing catalog and has **no insight search**. You must name the entity explicitly *and* set `allow_extended_pool: true` in every QueryIR below, or the query will not run. The narrower curated alternative is `people_experiences` — it covers only insight-connected people (a fraction of the pool), so prefer `experiences_pool` here for complete movement coverage; fall back to `people_experiences` only if a caller explicitly wants the curated subset.
 

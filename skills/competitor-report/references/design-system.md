@@ -749,7 +749,7 @@ on top, full-width bar below.
 ## Forbidden patterns
 
 - **No em dashes** (`—`) outside verbatim quotes. Always `-`.
-- **No internal tool names** (Snowflake, Phoenix, MCP, ask_onfire,
+- **No internal tool names** (MCP, ask_onfire,
   QueryIR, entity names, Onfire dataset IDs) in customer-facing copy. Use
   "market intelligence", "intent signals", "CRM records".
 - **No specific channel names** (LinkedIn, Twitter, individual Slack

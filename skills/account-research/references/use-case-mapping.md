@@ -101,15 +101,15 @@ For each use case that passes the inclusion test:
 
 ```
 fit_score = (
-  (signal_count * 2)           # Metabase signals mapped to this use case
-  + (prospect_count * 1.5)     # Phoenix prospects mapped to this use case
+  (signal_count * 2)           # intent signals mapped to this use case
+  + (prospect_count * 1.5)     # prospects mapped to this use case
   + (keyword_density * 3)      # 10-K keyword matches for this use case (capped at 3)
   + (competitor_present * 2)   # Known competitor in-seat at account
 )
 ```
 
 Normalise to 1–10 range. If no 10-K data: weight keyword_density as 0.
-If no Phoenix data: weight prospect_count as 0.
+If no prospect data: weight prospect_count as 0.
 Always show fit_score with one decimal place.
 
 ---

@@ -26,12 +26,12 @@ Titles come from two places, combined:
 Neither is hardcoded in this skill. A committee baked into a skill file is a committee
 that is wrong for every tenant but one.
 
-One query per persona, because `insight_filters` AND together:
+One query per persona, so each person maps to the committee seat they fill:
 
 ```
 ask_onfire(query={
   entity: "contact",
-  select: ["full_name", "job_title", "linkedin_url", "location"],
+  select: ["full_name", "job_title", "linkedin_url", "location_name"],
   filters: [{dimension: "current_company_url", op: "eq", value: "<account linkedin url>"}],
   insight_filters: [{kind: "persona", value: "<resolved committee persona>"}],
   limit: 5

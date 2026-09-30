@@ -6,7 +6,7 @@ description: >-
 
 # community_messages_sentiment
 
-Semantic vector retrieval (the same ranker behind `community-message-search`) + Vertex (Gemini) per-message aspect scoring over the Onfire community-messages corpus. **Pure top-k**: `target_messages` is the number of most-relevant messages we retrieve, the number we LLM-score, and the cap on what we return and bill. Company enrichment against Onfire's people and company records resolves each sender's employer so you get a by-company breakdown in addition to the by-community one.
+Semantic vector retrieval (the same ranker behind `community-message-search`) + LLM per-message aspect scoring over the Onfire community-messages corpus. **Pure top-k**: `target_messages` is the number of most-relevant messages we retrieve, the number we LLM-score, and the cap on what we return and bill. Company enrichment against Onfire's people and company records resolves each sender's employer so you get a by-company breakdown in addition to the by-community one.
 
 ## Routing gate — answer this BEFORE using this skill
 

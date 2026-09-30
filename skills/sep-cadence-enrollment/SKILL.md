@@ -18,7 +18,7 @@ Everything that touches the tenant's connected sales engagement platform starts 
 | Enroll someone in a cadence / sequence / flow | **this skill**, all the way through |
 | Enroll **and** have the agent write the per-prospect email (Outreach manual-email steps) | this skill for STEPS 1–5, then `outreach-sequence-email-composer` |
 | Enroll into a **Gong Engage flow** with per-prospect subject/body overrides | this skill for STEPS 1–4, then `gong-create-and-push-to-flow` |
-| Decide **who** to enroll | `ai-prospecting` / `onfire-prospecting` first, then come back |
+| Decide **who** to enroll | `ai-prospecting` first, then come back |
 | Emails/phones before pushing to the CRM | `contact-data-enrichment` first |
 | Just read the SEP (list cadences, check enrollment, look up a person) | STEP 1 + the [read recipes](#read-recipes-by-provider); skip the write path |
 | A provider's filter, pagination or sparse-fieldset syntax; what a resource is called on the connected SEP | `sales-engagement-platforms-utils` |
@@ -48,7 +48,7 @@ This is not a convention you have to remember — **the engine enforces it**. `s
 
 ### How the proof gate works
 
-`crm_write_results(job_id)` mints one proof row in `mcp_control.sep_prospect_crm_proof` for every prospect record that came back `succeeded` on a `completed` job. A `sales_engagement_write` prospect-create then atomically **consumes** one matching row. No matching row → the call is refused with:
+`crm_write_results(job_id)` mints one proof row for every prospect record that came back `succeeded` on a `completed` job. A `sales_engagement_write` prospect-create then atomically **consumes** one matching row. No matching row → the call is refused with:
 
 ```json
 {"status": "error", "error_code": "CRM_UPLOAD_REQUIRED", "error": "..."}

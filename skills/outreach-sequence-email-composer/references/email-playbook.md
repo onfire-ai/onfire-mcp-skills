@@ -12,12 +12,12 @@ Pull from four sources and let them shape distinct parts of the email:
 
 | Source | Tools | Feeds |
 |---|---|---|
-| **The prospect** | prospect record, `ai_prospecting` talking points, `ask_onfire`/`query_intent_signals` | The hook, the persona-appropriate framing, the "why you" |
+| **The prospect** | prospect record, `ai_prospecting` talking points, `ask_onfire`/`query_intent_signals`, `detect_ex_champion_moves`/`detect_website_visitors` | The hook, the persona-appropriate framing, the "why you" |
 | **Their company** | `account_research` (10-K, footprint, intent, use cases), `ask_onfire` (hiring, growth, events) | The trigger/timeline, the "why now", credible specifics |
 | **The tenant's ICP** | `get_tenant_settings.account_research` (`golden_persona`, `competitors`, `technologies`, `organization`, `buying_committee_queries`, derived use cases) | The value prop, the competitive angle, what to actually pitch |
 | **User + conversation** | the chat | Product/angle, tone, constraints, prior context |
 
-The best emails anchor the hook to a **real business signal** (leadership change, hiring momentum, a 10-K priority, an intent/footprint signal, event attendance) and connect it to the tenant's ICP value prop.
+The best emails anchor the hook to a **real business signal** (leadership change, hiring momentum, a 10-K priority, an intent/footprint signal, event attendance, a former champion) and connect it to the tenant's ICP value prop. A website visit decides when to write; never mention it in the email.
 
 ## Structure (target ~50–120 words)
 

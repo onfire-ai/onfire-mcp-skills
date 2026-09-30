@@ -166,7 +166,7 @@ Each warehouse pull runs through **`ask_onfire`** — a structured
 order_by, distinct_by, limit, confirmed}`), **not** raw SQL. (The
 removed `query_onfire` raw-SQL tool no longer exists.) Each pull persists
 its result as a dataset; track the dataset IDs - the analysis phase joins
-them with `query_datasets`. See `references/snowflake-queries.md` for the
+them with `query_datasets`. See `references/ask-onfire-queries.md` for the
 per-slice QueryIR recipes and the table→entity map, and
 `account-research/references/ask-onfire-signals.md` for the worked
 patterns.
@@ -179,7 +179,7 @@ with the user and resubmit with `confirmed: true`. Several brief slices
 are full-cohort pulls feeding a downstream `query_datasets` analysis —
 expect to hit and deliberately clear the confirmation gate.
 
-Two capabilities the brief now uses (read snowflake-queries.md for the
+Two capabilities the brief now uses (read ask-onfire-queries.md for the
 per-slice recipes):
 
 - **Aggregate mode in a QueryIR** — `group_by`, `aggregations`
@@ -207,12 +207,12 @@ net-new / now-gone + paired-swap classification, acquisition first-ever
 cohort, departed-no-backfill free-text scan, leaver destinations) pull
 the constrained rows with a QueryIR (aggregate-or-row,
 `allow_extended_pool: true` where the pool is needed), persist, and do
-the window / cohort / self-join logic client-side (see snowflake-
+the window / cohort / self-join logic client-side (see ask-onfire-
 queries.md for which is which).
 
 ### 1.1 Headcount trend + employee roster (single call — primary source for org-growth changes)
 
-See `references/snowflake-queries.md` → query 01.
+See `references/ask-onfire-queries.md` → query 01.
 
 A single `get_company_headcount` call is the **primary source for all
 org-growth changes** in the brief — monthly headcount trend, joiners,
@@ -268,7 +268,7 @@ the canonical pattern; do not re-derive these slices from
 
 ### 1.2 Title movement (window-bound)
 
-See `references/snowflake-queries.md` → query 02.
+See `references/ask-onfire-queries.md` → query 02.
 
 Sourced from the gated `experiences_pool` entity (the whole-pool
 employment history; `allow_extended_pool: true`). Two complementary
@@ -333,25 +333,25 @@ for every row — feed this into the Phase 2 strategic-thread synthesis
 
 ### 1.4 Open job postings
 
-See `references/snowflake-queries.md` → query 04.
+See `references/ask-onfire-queries.md` → query 04.
 
-`SILVER.JOB_POST.STG_JOB_POSTS` rows for the target quarter and currently-active
+`job_post` rows for the target quarter and currently-active
 postings. Persists as `ds_open_jobs_quarter` (in-quarter) and `ds_open_jobs_active`
 (currently open snapshot).
 
-Pitfall: `SILVER.JOB_POST.STG_JOB_POSTS` does not have a `DELETED_AT`
+Pitfall: `job_post` does not have a `DELETED_AT`
 column. Use `APPLICATION_ACTIVE = 1` to scope to currently open roles.
 
 ### 1.5 Persona / department trends
 
-See `references/snowflake-queries.md` → query 05.
+See `references/ask-onfire-queries.md` → query 05.
 
 `GROWTH_INSIGHT_MONTHLY` for 12 months of persona-level adoption (e.g.
 `growth-Data Engineering`, `growth-Product`). Persists as `ds_persona`.
 
 ### 1.6 GitHub footprint
 
-See `references/snowflake-queries.md` → query 06.
+See `references/ask-onfire-queries.md` → query 06.
 
 `EVIDENCES` rows where `EVIDENCE_TYPE_ID = 6` and the
 `PAYLOAD:REPO_OWNER` matches the competitor (or its open-source repo
@@ -365,7 +365,7 @@ the assembled report.
 
 ### 1.7 Customer acquisition motion (last 12 months)
 
-See `references/snowflake-queries.md` → query 07.
+See `references/ask-onfire-queries.md` → query 07.
 
 **Methodology — first-ever, not any-mention.** The cohort is companies
 whose **first-ever** Packmint mention in the insights pipeline (across
@@ -386,7 +386,7 @@ guard. That is multi-stage GROUP-BY + `COUNT(DISTINCT)` keyed by
 company + a `NOT ILIKE` exclusion, none of which a QueryIR can express.
 So **pull the constrained `insight_evidence` rows with a bounded
 `ask_onfire` QueryIR, persist them, then run all of the cohort logic
-client-side in `query_datasets` (DuckDB).** `insight_value` is bound
+client-side in `query_datasets`.** `insight_value` is bound
 and resolved server-side (`resolve_insights` shares the
 persona/technology vocabulary), so the old `ILIKE` casing workaround
 is gone — send the competitor name and the resolver canonicalises it.
@@ -414,10 +414,10 @@ exclude companies that had pre-window mentions. Get that either with a
 second per-candidate-company pull (`insight_value` + `company_url` eq,
 selecting the `first_seen` measure = `MIN(start_date)`), or pull a
 wider date range and compute `MIN` client-side. Persist the rows, then
-in `query_datasets` (DuckDB) build the cohort:
+in `query_datasets` build the cohort:
 
 ```sql
--- runs in query_datasets over the persisted insight_evidence rows, NOT in Snowflake
+-- runs in query_datasets over the persisted insight_evidence rows
 WITH external_mentions AS (
   SELECT company_url, person_url, start_date
   FROM ds_evidence_rows
@@ -456,7 +456,7 @@ in window" count. Run this client-side over the same persisted rows
 (the in-window pull alone is enough — no all-time `MIN` needed):
 
 ```sql
--- naive (over-counts; informational only) — query_datasets, not Snowflake
+-- naive (over-counts; informational only) — runs in query_datasets
 SELECT COUNT(DISTINCT company_url)
 FROM ds_evidence_rows
 WHERE start_date BETWEEN '{window_start}' AND '{window_end}'
@@ -468,7 +468,7 @@ If `naive_count > first_ever_count`, the gap is companies with prior
 mentions that the brief MUST NOT count. Surface the gap in the brief
 as a footnote so the reader trusts the methodology.
 
-Legacy template (any-mention in window, raw Snowflake — **DO NOT USE
+Legacy template (any-mention in window, raw SQL — **DO NOT USE
 for the brief**; the `query_onfire` raw-SQL tool that ran it no longer
 exists; kept here only as a reference for what the brief is *not*
 doing):
@@ -511,7 +511,7 @@ Persists as `ds_acquisition`.
 
 ### 1.8 Customer firmographics
 
-See `references/snowflake-queries.md` → query 08.
+See `references/ask-onfire-queries.md` → query 08.
 
 Join the distinct `company_linkedin_url` values from `ds_acquisition`
 to `ONFIRE.COMPANIES` for `INDUSTRY`, `SIZE`, `LOCATION_COUNTRY`,
@@ -547,7 +547,7 @@ per-message LLM scorer drops off-topic messages (`discarded_off_topic`);
 
 ### 1.10 Resolve sentiment authors
 
-See `references/snowflake-queries.md` → query 09.
+See `references/ask-onfire-queries.md` → query 09.
 
 For every opinionated (positive + negative) external author in
 `ds_sentiment`, look up their LinkedIn URL in `ONFIRE.PEOPLE` to get
@@ -566,7 +566,7 @@ evidence wall.
 
 ### 1.11 Geo fallback for unresolved companies
 
-See `references/snowflake-queries.md` → query 10.
+See `references/ask-onfire-queries.md` → query 10.
 
 For any company in `ds_acq_firmo` with NULL `LOCATION_COUNTRY`, get the
 per-(company, country) employee distribution via an **aggregate-mode**
@@ -634,7 +634,7 @@ synthesis ("where are senior people going?").
 
 ### 1.13 Departed-no-backfill recoverability (only if Phase 2 detects any)
 
-See `references/snowflake-queries.md` → query 13.
+See `references/ask-onfire-queries.md` → query 13.
 
 For each title classified as `departed-no-backfill` in Phase 2.1, run
 two checks:
@@ -644,7 +644,7 @@ two checks:
    attributes, not filterable dimensions). Use the insight-native
    substitute instead: map the departed function to a curated persona
    (via `resolve_insights`) and scan current `contact` employees of the
-   target with that `insight_filter` (see snowflake-queries.md → query
+   target with that `insight_filter` (see ask-onfire-queries.md → query
    13a). If the function does not resolve to any curated persona, the
    free-text "doing the work under a different title" scan has **no
    ask_onfire expression** — flag it and lean on check 2 alone.
@@ -1806,7 +1806,7 @@ shaken out by a real brief that exposed a gap.
   capability note and Phase 1.2). Same source, different units (title
   strings vs person-stints) - they're complementary not reconcilable.
   Each page must state its unit in the action-sub.
-- **Open job postings: `SILVER.JOB_POST.STG_JOB_POSTS`** (Query 04).
+- **Open job postings: `job_post`** (Query 04).
   No `DELETED_AT` column - use `APPLICATION_ACTIVE = 1` for the active
   cut, but the brief currently disowns the active flag because the
   index only captures posting existence, not real-time open/closed

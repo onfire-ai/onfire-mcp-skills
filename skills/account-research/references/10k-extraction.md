@@ -55,8 +55,8 @@ What to look for inside this section:
 | Compliance frameworks | `NIST`, `ISO`, `SOC 2`, `FedRAMP`, `CIRCIA`, `OCC` |
 | M&A integration | `integration of [company]`, `acquired`, `Transaction` |
 
-Fortinet-relevant use case connections:
-- Response plan + CIRCIA → **Sec Ops** (FortiSOAR + CIRCIA compliance)
+tenant-relevant use case connections:
+- Response plan + CIRCIA → **Sec Ops** (SOAR tooling + CIRCIA compliance)
 - Third-party risk → **CNAPP** (DSPM, CASB for third-party SaaS)
 - CISO/CTRO background → **buying committee** enrichment
 - M&A integration → **CNAPP** + **Sec Ops** (expanded attack surface)
@@ -78,7 +78,7 @@ What to look for:
 | Regulatory AI risk | `OCC`, `SR 11-7`, `model risk`, `legal`, `regulatory` near `AI` |
 | AI in production | `generative AI`, `LLM`, `foundation model`, `Eno`, `Chat Concierge` |
 
-Fortinet-relevant use case connection: → **AI Sec** (FortiAI governance, API gateway protection)
+tenant-relevant use case connection: → **AI Sec** (AI governance, API gateway protection)
 
 ---
 
@@ -98,7 +98,7 @@ What to look for:
 | Cloud provider | `Amazon Web Services`, `Microsoft Azure`, `Google Cloud` |
 | Third-party SaaS | named SaaS vendors + `TSYS`, `FIS`, `Fidelity` |
 
-Fortinet-relevant use case connection: → **CNAPP** (CSPM/CWPP for confirmed cloud environment)
+tenant-relevant use case connection: → **CNAPP** (CSPM/CWPP for confirmed cloud environment)
 
 ---
 
@@ -117,7 +117,7 @@ What to look for:
 | New tech estate | `data centers`, `third-party vendors`, `network`, `payment` |
 | Risk from integration | `risks that may arise`, `integration risks`, `diversion` |
 
-Fortinet-relevant use case connections:
+tenant-relevant use case connections:
 - New data centers from acquisition → **CNAPP** (Prisma coverage gap for non-AWS estate)
 - Integration security risk → **Sec Ops** (expanded SOC scope)
 - New payment network → **Network Sec** (PCI DSS scope expansion)

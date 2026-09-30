@@ -22,7 +22,7 @@ You can either inline the contact dicts (best for small ad-hoc lists or a user-p
 | Pattern | Use when | What you send |
 |---|---|---|
 | Inline contacts | User picked a specific subset, or the rows came from a CSV/CRM dump that isn't already a dataset. | `contacts=[…dicts…]` + the three column-name params for the keys you used. |
-| Dataset passthrough | Enrich the full result of an `ai_prospecting` run, or a dataset built via `query_datasets(persist_as_dataset=True)`. | `dataset_id="ds_…"` + the column-name params for the **dataset's** column names (e.g. `LINKEDIN_URL`, `COMPANY_LINKEDIN_URL`, `FULL_NAME`, `LOCATION_COUNTRY` for an `ai_prospecting` dataset). |
+| Dataset passthrough | Enrich the full result of an `ai_prospecting` run. | `dataset_id="ds_…"` + the column-name params for the **dataset's** column names (e.g. `LINKEDIN_URL`, `COMPANY_LINKEDIN_URL`, `FULL_NAME`, `LOCATION_COUNTRY` for an `ai_prospecting` dataset). |
 
 Dataset passthrough is the canonical path after an `ai_prospecting` run — the run already returns a `dataset_id`, and reusing it avoids rebuilding contact dicts and getting the column names wrong. Set `total_count` from the run's `filtered_prospects` (or `dataset.row_count`).
 

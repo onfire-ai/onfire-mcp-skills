@@ -5,7 +5,7 @@ description: Resolve a company (from name, website, or LinkedIn URL) to a verifi
 
 # match_company (atomic)
 
-Resolves companies via Onfire's Matchbox2 engine. Vector search + AI matching, so partial / fuzzy / messy names work.
+Resolves companies via Onfire's matching engine. Vector search + AI matching, so partial / fuzzy / messy names work.
 
 ## When to use this
 

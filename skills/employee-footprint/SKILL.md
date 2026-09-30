@@ -79,21 +79,20 @@ ask_onfire(query={
 ```
 Any LinkedIn URL format is normalized server-side, so a bare slug URL is fine.
 
-### Several products from a list — one query each, then merge
-`insight_filters` **AND** together (a person must carry every listed
-insight). To find anyone using *any* product from a list, run **one
-query per product** and union the results yourself — there is no OR.
+### Several products from a list — one query, a list value
+A single insight_filter may carry a **list of same-kind values, which
+means OR** (the person carries any of them). Separate insight_filters
+still AND together (a person must carry every filter). To find anyone
+using *any* product from a list, put the whole list in one filter:
 
 ```
-// query 1
 ask_onfire(query={
   entity: "contact",
   select: ["full_name", "job_title", "job_summary", "linkedin_url"],
   filters: [{dimension: "current_company_url", op: "eq", value: "https://www.linkedin.com/company/nornet"}],
-  insight_filters: [{kind: "technology", value: "Ironwall"}],
+  insight_filters: [{kind: "technology", value: ["Ironwall", "Ironwall SASE"]}],
   limit: 10
 })
-// query 2 — same shape, value: "Ironwall SASE"; merge the two result sets.
 ```
 
 ### Competitor footprint — which competitor has the strongest presence?

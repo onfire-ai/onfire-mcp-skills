@@ -112,8 +112,8 @@ sales_engagement_read(
 A synced person returns a `customerData[].objects[]` entry like:
 
 ```json
-{ "objectType": "Lead", "externalId": "00QQH00000LqzbV2AR",
-  "mirrorId": "{\"integrationId\":\"...\",\"crmObjectType\":\"LEAD\",\"crmId\":\"00QQH00000LqzbV2AR\"}" }
+{ "objectType": "Lead", "externalId": "00Q000000000001AAA",
+  "mirrorId": "{\"integrationId\":\"...\",\"crmObjectType\":\"LEAD\",\"crmId\":\"00Q000000000001AAA\"}" }
 ```
 
 `externalId` / `crmId` == the Salesforce Id from Step 1. If `customerData` is empty, they haven't synced yet — do not attempt the assign.
@@ -147,7 +147,7 @@ Endpoint: **`POST /v2/flows/steps`** (body: `flowIds`, up to 20 flow ids, as str
 sales_engagement_write(
   http_method    = "POST",
   relative_url   = "v2/flows/steps",
-  json_body = {"flowIds": ["1328474376461590521"]}
+  json_body = {"flowIds": ["2345678901234567890"]}
 )
 ```
 
@@ -155,11 +155,11 @@ Real response shape (captured live):
 
 ```json
 { "flows": [{
-    "id": "1328474376461590521", "name": "My Test Flow",
-    "folderId": "439380271411523934", "visibility": "Company",
+    "id": "2345678901234567890", "name": "My Test Flow",
+    "folderId": "345678901234567890", "visibility": "Company",
     "exclusive": true, "description": null,
     "steps": [{
-      "id": "1186724529325049978",
+      "id": "4567890123456789012",
       "stepOrder": 1,
       "action": "SEND_EMAIL",
       "subject": "Test",
@@ -204,9 +204,9 @@ sales_engagement_write(
   http_method    = "POST",
   relative_url   = "v2/flows/prospects/assign",
   json_body = {
-    "flowId": "6498280454937525788",              # STRING — see below
+    "flowId": "1234567890123456789",              # STRING — see below
     "flowInstanceOwnerEmail": "owner@yourcompany.com",
-    "crmProspectsIds": ["00QQH00000LqzbV2AR"]      # Salesforce record Id(s), up to 100
+    "crmProspectsIds": ["00Q000000000001AAA"]      # Salesforce record Id(s), up to 100
   }
 )
 ```
@@ -218,9 +218,9 @@ sales_engagement_write(
   http_method    = "POST",
   relative_url   = "v2/flows/prospects/assign",
   json_body = {
-    "flowId": "1328474376461590521",               # STRING
+    "flowId": "2345678901234567890",               # STRING
     "flowInstanceOwnerEmail": "owner@yourcompany.com",
-    "crmProspectsIds": ["00QQH00000Lm4Wr2AJ"],     # exactly one when personalizing
+    "crmProspectsIds": ["00Q000000000002AAA"],     # exactly one when personalizing
     "overrides": {
       "steps": [{
         "number": 1,                                # = stepOrder of the SEND_EMAIL step from STEP 5
@@ -248,15 +248,15 @@ The full `overrides` object (all optional, Beta Phase):
 Gong returns **HTTP 200 and assigns the prospect** even if your override block uses wrong field names — it just drops the unknown fields, and the composer opens with the flow's default template (empty/`Test`). There is **no error to catch**. Names that were tried and silently ignored: `flowInstanceContent`, `stepsContentOverride`, `stepNumber`, `bodyHtml`. The only accepted names are exactly: **`overrides` → `steps` → `number` / `subject` / `body`**. If the user reports the composer is empty after your assign, this is why — restage with the correct schema.
 
 ### ⚠️ Send `flowId` as a STRING
-Gong flow ids are 19-digit Longs (e.g. `6498280454937525788`) that exceed JavaScript's safe-integer range. If you send it as a JSON **number** it gets rounded (→ `...526000`) and Gong returns `404 "Flow not found"`. Always quote it as a string so the exact value is preserved. Same care applies to any Gong id you round-trip.
+Gong flow ids are 19-digit Longs (e.g. `1234567890123456789`) that exceed JavaScript's safe-integer range. If you send it as a JSON **number** it gets rounded (→ `...456800`) and Gong returns `404 "Flow not found"`. Always quote it as a string so the exact value is preserved. Same care applies to any Gong id you round-trip.
 
 Success looks like:
 
 ```json
 { "prospectsAssigned": [{
     "flowName": "High Touch Outbound Flow",
-    "crmProspectId": "00QQH00000LqzbV2AR",
-    "flowInstanceId": "4769935861624480845",
+    "crmProspectId": "00Q000000000001AAA",
+    "flowInstanceId": "5678901234567890123",
     "flowInstanceStatus": "Running" }],
   "prospectsNotAssigned": [] }
 ```
@@ -282,7 +282,7 @@ Overrides only apply at assignment. To change the email of someone already in th
    → each entry has flowId, flowInstanceId, flowInstanceStatus
 2. Unassign (batch OK, up to 100):
    POST v2/flows/prospects/unassign-flows-by-instance-id
-   body: {"flowInstanceIds": ["4860310507072265577", …]}    # strings!
+   body: {"flowInstanceIds": ["6789012345678901234", …]}    # strings!
    → response lists unassignedFlowInstanceIds
 3. Re-assign one prospect at a time with the overrides block (STEP 7).
    → each gets a NEW flowInstanceId, restarted at step 1

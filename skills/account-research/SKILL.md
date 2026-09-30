@@ -12,7 +12,7 @@ owns the two derivations the orchestrator does lossily: the tenant's use-case
 taxonomy and its vendor/persona resolution (Step 1a).
 
 Given a **company website** (e.g. `meridianbank.com`) and a **tenant ID**
-(e.g. `ironwall`), this skill:
+(e.g. `acme-security`), this skill:
 
 1. Calls `account_research` for the non-prospect data sources: tenant
    config + derived use cases, 10-K extracts, LinkedIn footprint, intent
@@ -38,10 +38,10 @@ Given a **company website** (e.g. `meridianbank.com`) and a **tenant ID**
    by calling `ask_onfire` / one of the narrow typed tools when the user asks
    for genuinely new data.
 
-The skill **never** writes raw SQL and never touches Snowflake or the
-signals database directly. All data plumbing lives inside the Onfire
-MCP. `ask_onfire` is part of that MCP surface: it takes a structured
-query (a `QueryIR` of entity + filters, never SQL), validates it against
+The skill **never** writes raw SQL and never touches a database
+directly. All data plumbing lives inside the Onfire MCP. `ask_onfire`
+is part of that MCP surface: it takes a structured query (a `QueryIR`
+of entity + filters, never SQL), validates it against
 the semantic model server-side, and never exposes schema, table names,
 or vendors — so authoring `ask_onfire` queries is consistent with that
 principle, not an exception to it.
@@ -53,7 +53,7 @@ principle, not an exception to it.
 | Input | Required | Example |
 |-------|----------|---------|
 | `company_website` | Yes | `meridianbank.com` |
-| `tenant_id` | Yes | `ironwall` |
+| `tenant_id` | Yes | `acme-security` |
 | `company_linkedin_url` | Optional | `https://www.linkedin.com/company/meridian-bank/` |
 
 ---
@@ -150,7 +150,7 @@ output, not a lesser copy of it.
 - `still_running`, `skipped`, or an `error` -> poll with
   `ai_prospecting(action="run", company_linkedin_url="<url>")`, re-calling with
   the returned `run_ids` (or identical arguments) until `status="completed"`.
-  Phoenix dedups server-side, so this joins the in-flight run instead of
+  Runs dedup server-side, so this joins the in-flight run instead of
   starting a second one.
 - Prospecting needs the company LinkedIn URL. Resolve it with the
   `match-company` skill first when the envelope has none.
@@ -426,7 +426,8 @@ component snippets.
    section here is normal. Do not compensate by promoting Step 1d
    enrichment into it and labelling it an intent signal - hiring activity
    is hiring activity. If the account may be filed under a sibling domain,
-   one extra `query_intent_signals` call with that domain is worthwhile.
+   one extra `query_intent_signals`, `detect_ex_champion_moves` and
+   `detect_website_visitors` call with that domain is worthwhile.
    Some rows are prior-relationship signals - a person the tenant sold to
    or worked with at a former customer, now at this account. Slice them
    with `WHERE signal_type IN ('Champion Moved','Contact Moved','Champion
@@ -451,7 +452,7 @@ component snippets.
    source - see `report-structure.md` "Talking-points source citation")
    + prospect rows that map to that use case. The right column is
    brand-named: render its label as "[Tenant Display Name] solution
-   alignment" (e.g. "Artifex solution alignment"). Tag colors come from
+   alignment" (e.g. "Acme Security solution alignment"). Tag colors come from
    `render_spec.use_case_palette` keyed by the use case `tag` - never
    invent a color.
 8. **Key contacts per use case** - `break-before: page`, color-coded
@@ -488,9 +489,9 @@ in Step 1c - never invent score semantics.
 
 - **No em dashes** anywhere outside verbatim evidence quotes. Use a
   regular hyphen `-`.
-- **No internal tool names** anywhere in the HTML. Never write Metabase,
-  Snowflake, Phoenix, Onfire, MCP. Use: "market intelligence", "intent
-  signals", "public filings", "industry research".
+- **No internal tool names** anywhere in the HTML. Never write Onfire
+  or MCP. Use: "market intelligence", "intent signals", "public
+  filings", "industry research".
 - **Signal messages quoted verbatim** - never paraphrase or reframe.
   Trim with leading/trailing ellipsis only.
 - **Company name is a LinkedIn link** - `<a href="[linkedin]">` with a
@@ -560,7 +561,7 @@ below. All must pass.
 
 2. **No internal tool names, no em dashes outside verbatim quotes**
    One grep does both:
-   `grep -niE 'phoenix|metabase|mcp|onfire|—' report.html`
+   `grep -niE 'mcp|onfire|—' report.html`
    Zero matches, except a U+2014 inside a `class="evidence"` /
    `class="quote"` block (those preserve `message_text` byte-for-byte).
 
@@ -643,10 +644,10 @@ attendees", "give me all the prospects, not just the top 10":
 
 ```
 query_datasets(
-  dataset_id="<envelope.datasets.intent_signals | envelope.datasets.filings_10k
-               | envelope.datasets.linkedin_footprint
-               | ai_prospecting_response.dataset.id>",
-  sql="SELECT ... FROM dataset WHERE ..."
+  datasets={"d": "<envelope.datasets.intent_signals | envelope.datasets.filings_10k
+                  | envelope.datasets.linkedin_footprint
+                  | ai_prospecting_response.dataset.id>"},
+  sql="SELECT ... FROM d WHERE ..."
 )
 ```
 
@@ -667,7 +668,9 @@ relevant narrow typed tool. **Never write raw SQL.**
 
 | User asks for | Call |
 |---------------|------|
-| Signals on a topic outside the tenant's keyword set (e.g. NIS2, DORA) | `query_intent_signals(tenant_id, account_website, keyword_match=[...])` |
+| Signals on a topic outside the tenant's keyword set (e.g. NIS2, DORA) | `query_intent_signals(account_website, keyword_match=[...])` |
+| Former champions or known contacts now at the account | `detect_ex_champion_moves(account_website)` |
+| Who from the account visited the website | `detect_website_visitors(account_website)` |
 | A 10-K section the report didn't surface (e.g. a specific exec name) | `query_company_filings(website, keywords=[...])` |
 | Employees carrying a different product / competitor | `ask_onfire` — `entity=contact`, filter `current_company_url eq <url>`, `insight_filters=[{kind:technology, value:[<product>, ...]}]` — a **list ORs in one call** (NOT a raw `JOB_SUMMARY` ILIKE) |
 | People in a given role / persona at the account | `ask_onfire` — `entity=contact`, filter `current_company_url eq <url>`, `insight_filters=[{kind:persona, value:<resolved persona>}]` |
@@ -705,7 +708,7 @@ further sliceable via `query_datasets`.
 | `intent_signals.total_count` is 0 | Omit the Intent signals section entirely (per Section 5). Common and expected - do not backfill it with Step 1d enrichment. |
 | Step 1d `ask_onfire` returns `needs_confirmation` (`stage: "row_budget"`) | No rows billed. Lower `limit` to what the section needs and resubmit; do not blindly set `confirmed: true`. |
 | Step 1d `ask_onfire` returns zero rows or an `error` | Skip that enrichment silently; render from the orchestrator blocks. Never fail the report. |
-| `ai_prospecting` returns `status="still_running"` | Re-call with the returned `run_ids` (or identical args). Phoenix dedups server-side. |
+| `ai_prospecting` returns `status="still_running"` | Re-call with the returned `run_ids` (or identical args). Runs dedup server-side. |
 | `ai_prospecting` returns zero prospects (`top_picks: []`) or `tenant_config.prospecting_enabled` is `false` | Drop the prospect columns in Section 7 cards, but keep Section 8 and fill it from the Step 1d hiring-manager and golden-persona pulls. Omit Section 8 only when all three sources are empty. |
 | Company has no LinkedIn URL even after `match-company` | Skip Steps 1b and 1d entirely; render from `company_website`-scoped blocks only. Step 1a still runs - the taxonomy is tenant-scoped, not account-scoped. |
 | `filings_10k.found` is false | Expected for non-US and private companies. Run Step 1e and source every company-card figure. |

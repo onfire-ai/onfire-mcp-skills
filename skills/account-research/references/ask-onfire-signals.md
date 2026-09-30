@@ -121,7 +121,7 @@ per row returned**.
 
 ## Rendering hard-rule reminder
 
-None of these entity names, `ask_onfire`, Snowflake, or any internal
+None of these entity names, `ask_onfire`, or any internal
 pipeline term may appear in the customer HTML (see
 `report-structure.md` "Forbidden internal tool names"). Map each to a
 neutral abstraction: open roles → "open roles / hiring activity",
@@ -407,7 +407,7 @@ than from unsourced prose.
 ```
 ask_onfire(query={
   entity: "company",
-  select: ["name", "industry", "location_country", "size_band", "company_type",
+  select: ["company_name", "industry", "location_country", "size_band", "company_type",
            "website", "linkedin_url"],
   filters: [{dimension: "linkedin_url", op: "eq", value: "<account linkedin url>"}],
   limit: 1

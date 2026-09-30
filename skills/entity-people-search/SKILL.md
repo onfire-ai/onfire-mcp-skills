@@ -1,15 +1,14 @@
 ---
 name: entity-people-search
-description: Search for people/prospects directly from Onfire's LinkedIn people entity (ONFIRE.PEOPLE = entity `contact`) using the `ask_onfire` tool. Use when the user wants to find prospects by job title, company, location, seniority, persona/role, technology footprint, or keywords in their profile — phrases like "find engineers at Northwind", "who are the VPs of Security at banks in the US", "show me people with 'Loglytics' in their job summary", "look up this LinkedIn URL", or any people search that doesn't require Forschung's cross-database scoring.
+description: Search for people/prospects directly from Onfire's LinkedIn people entity (the `contact` entity) using the `ask_onfire` tool. Use when the user wants to find prospects by job title, company, location, seniority, persona/role, technology footprint, or keywords in their profile — phrases like "find engineers at Northwind", "who are the VPs of Security at banks in the US", "show me people with 'Loglytics' in their job summary", "look up this LinkedIn URL", or any people search that doesn't require `ai_prospecting`'s scoring.
 ---
 
 # entity-people-search
 
 Direct lookup of the canonical LinkedIn people entity via `ask_onfire`.
-The people table `ONFIRE.PEOPLE` is the `contact` entity in the semantic
-model. `ask_onfire` does **not** take SQL — it takes a structured
-**QueryIR** (`query={...}`) that the server compiles for you. No external
-API hop.
+People live on the `contact` entity in the semantic model. `ask_onfire` does
+**not** take SQL — it takes a structured **QueryIR** (`query={...}`) that the
+server compiles for you. No external API hop.
 
 ## When to use this
 
@@ -21,7 +20,7 @@ API hop.
 - Any people lookup that can be expressed as filters on LinkedIn profile data
 
 Skip this for:
-- Prospecting with Forschung's persona/event/technology scoring → use `ai_prospecting`
+- Scored prospecting (persona / event / technology) → use `ai_prospecting`
 - Looking up a single person by name only (no company context) → use `match_person` first
 - People who joined specific communities → use the `community-join-signals` skill
 
@@ -147,8 +146,8 @@ ask_onfire(query={
   limit: 30
 })
 ```
-`insight_filters` AND together — to cover several technologies, run one
-query per technology and merge (there is no OR).
+To cover several technologies, give one insight_filter a list of them — a
+list means OR. Separate `insight_filters` AND together.
 
 ### By seniority (a persona, not a column)
 Seniority is **not** a dimension — filter it with a `persona` insight_filter

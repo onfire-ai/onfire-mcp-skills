@@ -46,7 +46,7 @@ Skip this for:
 
 ## Entity structure
 
-`job_post` (source `SILVER.JOB_POST.STG_JOB_POSTS`) - each row = one job
+`job_post` - each row = one job
 posting captured from LinkedIn Jobs. Company-level only — there is **no
 person / hiring-manager link** on a posting. Author the QueryIR with these
 **logical field names** (not the physical column names):
