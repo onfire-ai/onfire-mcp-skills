@@ -121,6 +121,8 @@ gap to apologise for.
 | Role movement and alumni | `people_experiences` | `trigger_freshness` |
 | Leadership change | `query_intent_signals` `["Company Change"]` | `trigger_freshness` |
 | Promotion | `query_intent_signals` `["Promotion"]` | `trigger_freshness` |
+| Former champions and known contacts now at the account | `detect_ex_champion_moves` | `trigger_freshness`, `committee_reachability` |
+| Website visits | `detect_website_visitors` | `signal_strength` |
 | **Contract renewals and open tenders** | `tender` | `trigger_freshness`, `use_case_relevance` |
 | **Extended workforce** | `extended_workforce` | `icp_fit` |
 | Annual-filing language | `query_company_filings` | `use_case_relevance` |
@@ -494,7 +496,7 @@ Tenant-agnostic. Weights come from `rep_profile.dimension_weights` and default t
 | `signal_strength` | count, recency, and on-ICP-ness of live signals | 0.25 |
 | `use_case_relevance` | evidence tied to **this tenant's** configured use cases and technologies | 0.20 |
 | `committee_reachability` | are the tenant's committee personas present, above the seniority floor, and warm-reachable | 0.15 |
-| `trigger_freshness` | discrete dated triggers: leadership change, promotion, open roles, event, filing, community join, developer activity | 0.15 |
+| `trigger_freshness` | discrete dated triggers: leadership change, promotion, a former champion arriving, open roles, event, filing, community join, developer activity | 0.15 |
 | `momentum` | direction of headcount, persona, or technology adoption | 0.05 |
 
 ### Custom dimensions

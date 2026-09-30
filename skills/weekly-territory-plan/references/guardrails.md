@@ -227,7 +227,7 @@ Run all eleven before presenting anything. All eleven must pass. If one fails, f
 and rerun the whole set — a partial rerun is how a regression slips through.
 
 1. **No internal tool or vendor names** in the customer-facing file.
-   `grep -icE 'onfire|cowork|\bmcp\b|ask_onfire|ai_prospecting|contact_data_enrichment|detect_warm_intros|query_intent_signals|search_community_messages|match_company|describe_onfire_schema|query_datasets'`
+   `grep -icE 'onfire|cowork|\bmcp\b|ask_onfire|ai_prospecting|contact_data_enrichment|detect_warm_intros|detect_website_visitors|detect_ex_champion_moves|query_intent_signals|search_community_messages|match_company|describe_onfire_schema|query_datasets'`
    → must return 0.
 2. **No warm-intro tier words.** `grep -oE '\b(PLATINUM|GOLD|SILVER|BRONZE)\b'`
    → must return 0.

@@ -30,6 +30,8 @@ Answer one question before picking a tool:
   `community-join-signals`.
 - They want **non-message** signals (job changes, promotions, events, job
   posts) → `query_intent_signals`.
+- They want **website visits** or **former champions who changed jobs** →
+  `detect_website_visitors` / `detect_ex_champion_moves`.
 
 Word cues that land HERE: "talking about", "mentioned", "discussing",
 "raising", "asking about", "relevant people/prospects", "chatter". Word cues

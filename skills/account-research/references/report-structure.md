@@ -639,6 +639,8 @@ Never frame a contractor as an "internal champion" or "in seat".
 | GitHub | "Developer community signal" |
 | Champion Moved, Champion Move | "Former champion - [Former Company]" |
 | Contact Moved, Ex-Customer Contact Move, Ex-Customer Hire | "Known contact - [Former Company]" |
+| Account Visitor | "Website visit - [Visiting Company]" |
+| Prospect Visitor | "Website visit - [Name]" |
 | Company Change | "Company change - [New Company]" |
 | Promotion | "Promotion - [New Title]" |
 | Event Attendee (generic) | "[Event Name] - attendee" |

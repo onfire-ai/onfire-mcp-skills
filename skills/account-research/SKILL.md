@@ -426,7 +426,8 @@ component snippets.
    section here is normal. Do not compensate by promoting Step 1d
    enrichment into it and labelling it an intent signal - hiring activity
    is hiring activity. If the account may be filed under a sibling domain,
-   one extra `query_intent_signals` call with that domain is worthwhile.
+   one extra `query_intent_signals`, `detect_ex_champion_moves` and
+   `detect_website_visitors` call with that domain is worthwhile.
    Some rows are prior-relationship signals - a person the tenant sold to
    or worked with at a former customer, now at this account. Slice them
    with `WHERE signal_type IN ('Champion Moved','Contact Moved','Champion
@@ -668,6 +669,8 @@ relevant narrow typed tool. **Never write raw SQL.**
 | User asks for | Call |
 |---------------|------|
 | Signals on a topic outside the tenant's keyword set (e.g. NIS2, DORA) | `query_intent_signals(account_website, keyword_match=[...])` |
+| Former champions or known contacts now at the account | `detect_ex_champion_moves(account_website)` |
+| Who from the account visited the website | `detect_website_visitors(account_website)` |
 | A 10-K section the report didn't surface (e.g. a specific exec name) | `query_company_filings(website, keywords=[...])` |
 | Employees carrying a different product / competitor | `ask_onfire` — `entity=contact`, filter `current_company_url eq <url>`, `insight_filters=[{kind:technology, value:[<product>, ...]}]` — a **list ORs in one call** (NOT a raw `JOB_SUMMARY` ILIKE) |
 | People in a given role / persona at the account | `ask_onfire` — `entity=contact`, filter `current_company_url eq <url>`, `insight_filters=[{kind:persona, value:<resolved persona>}]` |

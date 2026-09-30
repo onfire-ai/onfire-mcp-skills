@@ -36,6 +36,7 @@ The single-prospect and many-prospect cases run the same steps; the batch case j
 | Score the prospect + get talking points | `ai_prospecting` |
 | Company narrative (10-K, footprint, intent, use cases) | `account_research` |
 | Targeted signals (intent, footprint, hiring, events, growth) | `ask_onfire`, `query_intent_signals` |
+| Former champions at the company, website visits | `detect_ex_champion_moves`, `detect_website_visitors` |
 
 Outreach's API root (`api/v2/`) is **already applied** by the engine. In `relative_url` use bare paths: `prospects`, `sequences`, `sequenceSteps`, `sequenceStates`, `sequenceTemplates`, `templates`, `mailings`, `tasks`, `mailboxes`. Never prefix `api/v2/`.
 
@@ -111,7 +112,7 @@ Poll `GET sequenceStates/<id>` until `state` becomes `active` and `activeAt` is 
 
 Read **`references/email-playbook.md`** and compose from these four sources:
 
-1. **The prospect** — title, persona/seniority, tech footprint, recent activity/intent. From the prospect record + `ai_prospecting` talking points + `ask_onfire`/`query_intent_signals`.
+1. **The prospect** — title, persona/seniority, tech footprint, recent activity/intent. From the prospect record + `ai_prospecting` talking points + `ask_onfire`/`query_intent_signals` + `detect_ex_champion_moves`/`detect_website_visitors`.
 2. **Their company** — 10-K themes, hiring momentum, growth/adoption trends, events, competitor/tech footprint. From `account_research` + `ask_onfire`.
 3. **The tenant's ICP** — from `get_tenant_settings.account_research`: `golden_persona`, `competitors`, `technologies`, `organization` personas, `buying_committee_queries`, and derived use cases. Frame the value prop and competitive angle around *this tenant's* ICP, not generic copy.
 4. **User input + conversation context** — the angle/product to pitch, tone, constraints, anything established earlier in the chat.

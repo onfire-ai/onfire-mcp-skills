@@ -175,7 +175,7 @@ Assign each signal to the highest-priority play it qualifies for:
 3. **Cross-domain / diode** — Group A compound terms. Defence and critical infrastructure only, effectively no false positives.
 4. **Platform / deployment pain** — Group A + Group F. Highest volume, lowest individual intent; best for community presence rather than outbound.
 
-Boost within a play for: **2+ people at the same account**, **new in seat under 12 months**, **repeat threads from the same person**, **an incumbent named with dissatisfaction**, **a message under 90 days old**.
+Boost within a play for: **2+ people at the same account**, **new in seat under 12 months**, **repeat threads from the same person**, **an incumbent named with dissatisfaction**, **a message under 90 days old**, **a former champion now at the account** (`detect_ex_champion_moves`), **a recent website visit** (`detect_website_visitors`).
 
 ---
 
