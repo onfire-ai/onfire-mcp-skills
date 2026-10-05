@@ -208,7 +208,7 @@ Branded A4 HTML, optionally rendered to PDF. Structure that works: headline acco
 When rendering to PDF, remember JavaScript charts do not execute in most HTML-to-PDF engines — build charts as HTML/CSS bars or inline SVG.
 
 ### C · Renewals
-Use the tender / renewal-radar entity via `ask_onfire` for public-sector contracts with renewal dates and named incumbents. Filter to the tenant's product surface — zero trust, ZTNA, micro-segmentation, secure and privileged remote access, IAM/ICAM, cross-domain, classified network. **Exclude generic SCADA construction, plant maintenance and hardware refresh** — they carry the vocabulary but buy nothing in this category.
+Use the `renewal_signal` entity (`signal_source: tenders`) via `ask_onfire` for public-sector contracts with renewal dates and named incumbents. Filter to the tenant's product surface — zero trust, ZTNA, micro-segmentation, secure and privileged remote access, IAM/ICAM, cross-domain, classified network. **Exclude generic SCADA construction, plant maintenance and hardware refresh** — they carry the vocabulary but buy nothing in this category.
 
 ---
 

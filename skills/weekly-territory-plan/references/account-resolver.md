@@ -96,7 +96,7 @@ evidence reads as a thin product rather than a thin config.
 
 A layer that returns nothing is not a failure: its dimension scores `null` and the
 weight redistributes, exactly as in stage 6. Several layers legitimately return
-nothing for a given rep — `tender` is public-sector only, `github_member` is
+nothing for a given rep — `renewal_signal` tenders are public-sector only, `github_member` is
 meaningful mainly for engineering-led sales — and that is a correct outcome, not a
 gap to apologise for.
 
@@ -123,7 +123,7 @@ gap to apologise for.
 | Promotion | `query_intent_signals` `["Promotion"]` | `trigger_freshness` |
 | Former champions and known contacts now at the account | `detect_ex_champion_moves` | `trigger_freshness`, `committee_reachability` |
 | Website visits | `detect_website_visitors` | `signal_strength` |
-| **Contract renewals and open tenders** | `tender` | `trigger_freshness`, `use_case_relevance` |
+| **Contract renewals and open tenders** | `renewal_signal` | `trigger_freshness`, `use_case_relevance` |
 | **Extended workforce** | `extended_workforce` | `icp_fit` |
 | Annual-filing language | `query_company_filings` | `use_case_relevance` |
 | Office footprint | `search_offices` | `icp_fit` |
@@ -315,18 +315,19 @@ A dated contract renewal is the strongest trigger in this file: it is a buying w
 with a date on it, and it names the incumbent to displace.
 
 Scoped to one account it is a **per-finalist** layer (stage 5). Dropping the
-`buyer_linkedin_url` filter and filtering on `insight_name` plus a renewal window
+`company_linkedin_url` filter and filtering on `insight_name` plus a renewal window
 instead turns it into a **candidate generator** for stage 1 — every public-sector buyer
 with a relevant contract expiring in the next two quarters. Bound it like any other
 billed generator: free count first, then a small explicit limit.
 
 ```
 ask_onfire(query={
-  entity: "tender",
-  select: ["signal_type", "notice_title", "buyer_name", "winner_name",
+  entity: "renewal_signal",
+  select: ["signal_type", "notice_title", "company_name", "winner_name",
            "renewal_date", "renewal_date_confidence", "tender_deadline", "source_url"],
   filters: [
-    {dimension: "buyer_linkedin_url", op: "eq", value: "<account linkedin url>"},
+    {dimension: "signal_source", op: "eq", value: "tenders"},
+    {dimension: "company_linkedin_url", op: "eq", value: "<account linkedin url>"},
     {dimension: "renewal_date", op: "gte", value: "<today, YYYY-MM-DD>"}
   ],
   order_by: [{field: "renewal_date", direction: "asc"}],
@@ -337,7 +338,7 @@ ask_onfire(query={
 - **Public-sector scope only** (EU TED and US USAspending). For a rep who sells purely
   into private companies this layer returns nothing and scores `null` — correct, not a
   failure.
-- **The buyer is the account; the winner is the incumbent.** They are different
+- **The buyer (`company_name` / `company_linkedin_url`) is the account; the winner is the incumbent.** They are different
   companies. `winner_name` / `winner_linkedin_url` are set only on awarded contracts —
   that name is the displacement angle, and the account's own firmographics come from
   the `company` join, never from the winner.
@@ -474,7 +475,7 @@ the annual report; check what came back before quoting it.
 **Firmographics** — `match_company` to confirm identity and resolve the LinkedIn URL,
 `get_company_headcount(company_linkedin_urls=[...], months=1)` for current size.
 
-**Contract renewals** (`tender`) and **extended workforce** (`extended_workforce`) —
+**Contract renewals** (`renewal_signal`) and **extended workforce** (`extended_workforce`) —
 both recipes are in stage 3 alongside the layers they belong with conceptually, but
 both are per-account and so run here. `extended_workforce` refines `icp_fit` at the
 re-score; a renewal date lands in `trigger_freshness` and is usually the strongest

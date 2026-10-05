@@ -248,9 +248,10 @@ competes with and the persona it actually sells to.
 ### Optional pulls - only when a section is still thin
 
 `event_company` / `event_contact` (event presence), `insight_evidence` (dated
-"in production since" proof), `product_adoption` (incumbent adoption quarter and
-likely renewal quarter - **BETA, both dates are estimates**, so any figure from
-it must be labelled as an estimate), `github_member` (developer engagement),
+"in production since" proof), `renewal_signal` with `signal_type=product_adoption`
+(incumbent adoption quarter and likely renewal quarter - **BETA, both dates are
+estimates**, so any figure from it must be labelled as an estimate),
+`github_member` (developer engagement),
 `people_experiences` (alumni / warm-path context).
 
 ### Two mechanics that matter
@@ -674,7 +675,7 @@ relevant narrow typed tool. **Never write raw SQL.**
 | A 10-K section the report didn't surface (e.g. a specific exec name) | `query_company_filings(website, keywords=[...])` |
 | Employees carrying a different product / competitor | `ask_onfire` — `entity=contact`, filter `current_company_url eq <url>`, `insight_filters=[{kind:technology, value:[<product>, ...]}]` — a **list ORs in one call** (NOT a raw `JOB_SUMMARY` ILIKE) |
 | People in a given role / persona at the account | `ask_onfire` — `entity=contact`, filter `current_company_url eq <url>`, `insight_filters=[{kind:persona, value:<resolved persona>}]` |
-| When the incumbent was adopted / when they renew | `ask_onfire` — `entity=product_adoption`, filter `company_linkedin_url eq <url>` (BETA - estimates, label them) |
+| When the incumbent was adopted / when they renew | `ask_onfire` — `entity=renewal_signal`, filter `signal_type eq product_adoption` + `company_linkedin_url eq <url>` (BETA - estimates, label them) |
 | Firmographics for a company with no 10-K | `ask_onfire` — `entity=company`, filter `linkedin_url eq <url>`, plus `get_company_headcount` |
 | More employee-footprint rows than the report showed | `query_datasets` on `envelope.datasets.linkedin_footprint` — free, no row budget |
 | Open roles / what the company is hiring for | `ask_onfire` — `entity=job_post`, filter `company_url eq <url>` (+ `job_function`/`seniority`/`open`) |
