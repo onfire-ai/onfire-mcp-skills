@@ -375,7 +375,7 @@ Widen with the other resolved `organization` personas (as a list, per
 recipe 9) when the golden persona alone returns nothing. Label each contact
 with its `display_names_mapping` label, not the raw config key.
 
-### 11. Incumbent adoption + renewal timing — `product_adoption` (OPTIONAL, BETA)
+### 11. Incumbent adoption + renewal timing — `renewal_signal` (OPTIONAL, BETA)
 
 Gives an incumbent's adoption quarter and the quarter of the year the
 account tends to renew - the timing hook a displacement report otherwise
@@ -383,9 +383,12 @@ lacks.
 
 ```
 ask_onfire(query={
-  entity: "product_adoption",
-  select: ["product", "adoption_quarter", "renewal_quarter"],
-  filters: [{dimension: "company_linkedin_url", op: "eq", value: "<account linkedin url>"}],
+  entity: "renewal_signal",
+  select: ["insight_name", "adoption_quarter", "renewal_quarter", "is_estimated"],
+  filters: [
+    {dimension: "signal_type", op: "eq", value: "product_adoption"},
+    {dimension: "company_linkedin_url", op: "eq", value: "<account linkedin url>"}
+  ],
   limit: 25
 })
 ```
