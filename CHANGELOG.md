@@ -3,6 +3,16 @@
 Versions match `.claude-plugin/plugin.json`, which is what the marketplace serves.
 This file starts at 0.5.1; earlier versions predate it.
 
+## 0.8.1 — 2026-10-05
+
+### Fixed
+
+- **Renewal and adoption recipes.** `account-research`, `weekly-territory-plan` and
+  `airgap-opportunity` queried the `product_adoption` and `tender` entities, which the
+  MCP folded into `renewal_signal`. Adoption rows are now `signal_type=product_adoption`,
+  tender rows are `signal_source=tenders`, and the buyer is `company_name` /
+  `company_linkedin_url`.
+
 ## 0.8.0 — 2026-09-30
 
 Five skills now route to the champion-move and website-visitor tools, and several
