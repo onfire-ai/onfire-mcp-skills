@@ -3,6 +3,10 @@
 Versions match `.claude-plugin/plugin.json`, which is what the marketplace serves.
 This file starts at 0.5.1; earlier versions predate it.
 
+## 0.8.2 — 2026-10-15
+
+- Update skills for recent MCP changes.
+
 ## 0.8.1 — 2026-10-05
 
 ### Fixed
