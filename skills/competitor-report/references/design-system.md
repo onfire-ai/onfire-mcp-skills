@@ -560,19 +560,19 @@ The customer-acquisition motion page. Conventions learned from Nexagon:
 
 The sentiment split page. Conventions:
 
-- 3 hero stats: owned-channel positive share, external positive share,
+- 3 hero stats: insider positive share, external positive share,
   negative concentration (qualitative, e.g. "Java / Maven")
 - 2-column card: "By author's continent" + "By author's employer size"
   - Each row: label + percentage triple on top, **full-width tall bar**
     below (height 10-11pt active, 9pt muted)
   - Color legend in card header (Positive / Neutral / Negative swatches)
   - Unresolved row at bottom, muted via `opacity: 0.65`
-- 2-card "Where the volume sits, by community" infographic:
-  - Owned brand surfaces card (green) - "Skews overwhelmingly positive"
-  - External developer communities card (red) - "Skews sharply negative"
+- 2-card "Who is talking" infographic:
+  - Competitor's own staff card (green) - "Skews overwhelmingly positive"
+  - External voices card (red) - "Skews sharply negative"
   - Single horizontal positive-vs-negative bar each, NO numbers
 - Negative-concentration callout
-- Sowhat - owned-noisy vs external-loud-negative synthesis
+- Sowhat - insiders-upbeat vs external-loud-negative synthesis
 
 ### Page 9 - Complication 2C (`.act`)
 
@@ -593,7 +593,7 @@ GitHub footprint snapshot. Conventions:
 ### Page 10 - Complication 2D (`.act`) - Event attendance signals - CONDITIONAL
 
 Include this page only if **at least one captured attendance signal**
-appears for the competitor in `ONFIRE.EVENTS_CONTACTS`. Source: Phase
+appears for the competitor in `event_contact`. Source: Phase
 1.15.
 
 Layout:
@@ -753,8 +753,8 @@ on top, full-width bar below.
   QueryIR, entity names, Onfire dataset IDs) in customer-facing copy. Use
   "market intelligence", "intent signals", "CRM records".
 - **No specific channel names** (LinkedIn, Twitter, individual Slack
-  community names) - use "owned brand surfaces" and "external developer
-  communities".
+  communities) - use "the competitor's own staff" and "external
+  voices".
 - **No GitHub time-trend claims** - the data is snapshot-only.
 - **No revenue estimates or dollar amounts** anywhere in the brief.
 - **No GTM recommendations** - analytical only.

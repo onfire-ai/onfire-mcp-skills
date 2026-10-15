@@ -66,20 +66,23 @@ This becomes the 3-card "Strategic threads" row on Page 4.
 Input: `ds_sentiment` (every Q-message scored as
 positive / neutral / negative / off-topic).
 
-### 2.1 Owned vs External
+### 2.1 Insiders vs External
 
-Owned = `community_name = {competitor_name}` (case-insensitive).
-External = everything else.
+Insider = `company_linkedin_url = {company_linkedin_url}` (the author
+works at the competitor). External = everyone else, including authors
+with no resolved employer.
 
 Drop off-topic and neutral rows for the headline ratio. Compute:
 
 ```
-owned_positive_share    = owned_positive    / (owned_positive    + owned_negative)
+insider_positive_share  = insider_positive  / (insider_positive  + insider_negative)
 external_positive_share = external_positive / (external_positive + external_negative)
 ```
 
-Express both as percentages. The Nexagon brief headline was ~92%
-owned vs ~16% external - the contrast is the story.
+Express both as percentages. Staff talking up their own product skew
+positive and the wider market rarely does - the contrast is the story.
+If there are no opinionated insider rows, drop the insider card and
+report the external share alone.
 
 ### 2.2 By continent + employer size
 
@@ -95,10 +98,11 @@ muted (opacity 0.65, color `var(--ink-3)`).
 
 ### 2.3 Negative concentration
 
-Compute which 2-3 community names hold the majority of the external
-negative volume. In the customer-facing copy, refer to them by their
-ecosystem category, not by name (e.g. "Java / Maven build-tool
-ecosystem" instead of community names).
+Compute which 2-3 author industries (`company_industry`) hold the
+majority of the external negative volume, and read those messages for
+the recurring theme. In the customer-facing copy, name the industry or
+the ecosystem the theme points to (e.g. "Java / Maven build-tool
+ecosystem"), never a platform or community.
 
 ---
 
@@ -222,10 +226,11 @@ row at the bottom of each cross-tab.
 
 ### 5.2 Acquisition-cohort companies
 
-For each company in `ds_acq_firmo` with `LOCATION_COUNTRY IS NULL`:
+For each company in `ds_acq_firmo` with `location_country IS NULL`:
 
-1. Query `ONFIRE.PEOPLE` for all employees of that company.
-2. Group by `LOCATION_COUNTRY`, count employees, take the modal value.
+1. Count that company's employees per `location_country` in the
+   `contact` entity (aggregate mode - Query 10).
+2. Take the modal value.
 3. If a modal country exists, **fold the company into that region's
    bucket**.
 4. If no employees match (rare), keep the company in an Unresolved row.

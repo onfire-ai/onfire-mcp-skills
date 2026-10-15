@@ -113,7 +113,10 @@ ask_onfire(query={
 Rank the competitors by the `contact_count` each returns.
 
 ### Footprint across multiple target accounts
-Scope to several companies with `op: "in"`, then match the product:
+Scope to several companies with `op: "in"`, then match the product. When the
+accounts came back from an earlier tool (`match_company`, a prospect list), filter
+`{dimension: "current_company_url", from_dataset: "ds_...", column: "linkedin_url"}`
+instead of re-typing the URLs:
 
 ```
 ask_onfire(query={
@@ -160,8 +163,8 @@ catalog** — it cannot `ILIKE` an arbitrary free-text keyword in
 whose profile mentions a phrase that has no insight equivalent (a
 project codename, a marketing slogan, a generic word), say so plainly:
 the footprint is expressible only for terms that resolve to a technology
-(or persona) insight. Run `resolve_insights` to check whether the term
-maps to a catalog value before declaring it unsupported.
+(or persona) insight. Run `resolve_insights` with `kind="technology"` (or
+`"persona"`) to check whether the term maps to a catalog value before declaring it unsupported.
 
 ## Output handling
 

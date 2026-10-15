@@ -163,8 +163,8 @@ The subject framing is what makes this aspect-based: "I love Slack but Nexagon's
   },
   "unique_senders_with_linkedin": 128,
   "unique_companies_resolved": 64,
-  "by_community": [
-    { "community_type": "Slack", "community_name": "DevSecOps Community",
+  "by_platform": [
+    { "community_type": "Slack",
       "positive": 18, "negative": 29, "neutral": 9, "irrelevant": 0, "error": 0 },
     ...
   ],
@@ -177,7 +177,7 @@ The subject framing is what makes this aspect-based: "I love Slack but Nexagon's
   "top_positive": [
     { "linkedin_url": "...", "sender_name": "...", "sender_job_title": "Staff Engineer",
       "company_name": "Acme Corp", "company_industry": "Computer Software",
-      "community_type": "Slack", "community_name": "DevSecOps Community",
+      "community_type": "Slack",
       "message_text": "...", "confidence": 0.92, "reason": "..." },
     ...up to 5
   ],
@@ -195,7 +195,7 @@ The subject framing is what makes this aspect-based: "I love Slack but Nexagon's
 
 ### Dataset columns
 
-The persisted CSV includes: `linkedin_url`, `sender_name`, `sender_job_title`, `company_linkedin_url`, `company_name`, `company_industry`, `company_size`, `company_country`, `community_type`, `community_name`, `message_timestamp`, `message_text`, `sentiment_subject`, `sentiment_value`, `confidence`, `reason`, `relevance_score`, `message_id`.
+The persisted CSV includes: `linkedin_url`, `sender_name`, `sender_job_title`, `company_linkedin_url`, `company_name`, `company_industry`, `company_size`, `company_country`, `community_type`, `message_timestamp`, `message_text`, `sentiment_subject`, `sentiment_value`, `confidence`, `reason`, `relevance_score`, `message_id`.
 
 `relevance_score` is the semantic match score (0–1) of the message to the subject. Company fields are populated for senders whose LinkedIn URL matches a person record Onfire holds. Senders with no match have null company fields.
 
@@ -205,7 +205,7 @@ The persisted CSV includes: `linkedin_url`, `sender_name`, `sender_job_title`, `
 
 After every successful call, do these four things in order:
 
-1. **State the headline.** One sentence from `counts` + `by_community` + `by_company`, e.g. *"Sentiment toward Nexagon skewed negative — 71 negative vs 47 positive across 128 unique authors from 64 companies, heaviest in r/devops and the DevSecOps Slack; Acme Corp and Beta Inc employees are the most vocal critics."* If `total_returned` is less than `target_messages` (see `note`), **say so explicitly** ("only 142 relevant messages existed for this subject/window").
+1. **State the headline.** One sentence from `counts` + `by_platform` + `by_company`, e.g. *"Sentiment toward Nexagon skewed negative — 71 negative vs 47 positive across 128 unique authors from 64 companies, heaviest on Reddit and Slack; Acme Corp and Beta Inc employees are the most vocal critics."* If `total_returned` is less than `target_messages` (see `note`), **say so explicitly** ("only 142 relevant messages existed for this subject/window").
 
 2. **Quote 1-2 exemplars from `top_positive` and `top_negative`** with the author's LinkedIn URL, job title, and company. These are sorted by confidence — they're the most defensible quotes you have.
 
@@ -274,7 +274,7 @@ community_messages_sentiment(
 ```
 
 Then:
-1. *"Across the last 3 months, sentiment toward Nexagon skewed negative — 71 negative vs 47 positive across 128 unique authors from 64 companies (192 of the 200 most-relevant messages were on-topic). Negative discussion concentrated in r/devops and the DevSecOps Slack; employees at Acme Corp and Beta Inc are the most vocal critics."*
+1. *"Across the last 3 months, sentiment toward Nexagon skewed negative — 71 negative vs 47 positive across 128 unique authors from 64 companies (192 of the 200 most-relevant messages were on-topic). Negative discussion concentrated on Reddit and Slack; employees at Acme Corp and Beta Inc are the most vocal critics."*
 2. Quote 1 positive + 1 negative exemplar with LinkedIn URL, job title, and company.
 3. `download_dataset(dataset_id="...")` → surface link.
 4. *"The dataset (`ds_...`) is queryable for 7 days — ask me 'which industries complain most', 'show me only the Slack threads', or anything else."*

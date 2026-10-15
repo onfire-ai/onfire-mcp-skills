@@ -255,7 +255,7 @@ month-over-month change (positive = growing). Coverage is a trailing ~12 months.
 
 > **Resolve the concept first.** `insight` is a bound concept, not a literal.
 > Give the human term and the server resolves it (bouncing suggestions if it
-> can't), or confirm the canonical value with `resolve_insights`. The old
+> can't), or confirm the canonical value with `resolve_insights` (carry `kind`). The old
 > `growth-<slug>` stored prefix and `LOWER(insight_name) = ...` matching are
 > gone — never send a prefix yourself.
 

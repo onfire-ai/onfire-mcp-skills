@@ -139,7 +139,7 @@ Two curated insights encode Group A. Use these first — they are deduped and fa
 
 > **The insight satisfies Stage 1 only.** It encodes Group A and nothing else — it does *not* apply Stages 2 and 3 for you. A bare insight query will return accounts whose only air-gap connection is a stray profile mention: a law practice, a staffing agency, a recruiter. Always narrow afterwards, either with a firmographic join (`industry`, `size_band`, `location_country`) or by confirming a Group B–F term and no noise term in the underlying evidence. Verified in testing: the unfiltered company query returns visible false positives; the same query joined to regulated-vertical industries returns clean defence and government buyers.
 
-Confirm with `resolve_insights(["air-gapped environment","cross domain solution"])`, then query with `ask_onfire`:
+Confirm with `resolve_insights(["air-gapped environment","cross domain solution"], kind="technology")`, then query with `ask_onfire`:
 
 ```json
 {

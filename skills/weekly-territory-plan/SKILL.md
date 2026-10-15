@@ -79,8 +79,9 @@ All free. Run it every time, for every job.
 2. `get_tenant_settings()` - read the account-research configuration: buying-committee
    personas, configured competitors and technologies. **Omit `tenant_id`.**
 3. Derive `warm_intro_origin` (`references/config-and-setup.md`).
-4. `describe_onfire_schema(show_catalog=True)` - **once per session, before the first
-   `ask_onfire` call.** Assert every entity this skill uses exists.
+4. Before the first `ask_onfire` call, assert every entity this skill uses exists in the
+   entity catalog inlined in the server instructions. Call
+   `describe_onfire_schema(show_catalog=True)` only if that catalog is missing or cut off.
 5. `resolve_insights` for every persona, technology, competitor and event term that will
    appear in a filter, carrying `kind`.
 

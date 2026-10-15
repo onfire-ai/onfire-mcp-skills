@@ -119,8 +119,9 @@ an internal dial, not something a GTM user should have to reason about.
 ## Reading the results (internal)
 
 - Each row is a **sender**: `intent_holder_linkedin_url`, `name`,
-  `message_text`, `date`, plus internal-only `query_hits`, `score`, and
-  `community_name` / `community_type`.
+  `message_text`, `date`, `community_type` (the platform), plus internal-only
+  `query_hits` and `score`. The community a message came from is not returned —
+  describe it by platform only.
 - **`query_hits` is the strength signal** — rows hit by 2–3 of your phrasings
   are the strongest corroborated matches. Use it to **order** what you show
   (best first); do not show the number itself.

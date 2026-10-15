@@ -2,11 +2,9 @@
 
 Warehouse pulls run through **`ask_onfire`**, which takes a structured
 **QueryIR** (`query={entity, select, filters, insight_filters, joins,
-order_by, distinct_by, limit, confirmed}`) — **not** raw SQL. The
-removed `query_onfire` raw-SQL-over-`ONFIRE.*`-aliases tool no longer
-exists; every recipe below has been ported to a QueryIR shape or, where
-the analysis is beyond what ask_onfire can express, replaced with an
-explicit "pull rows, compute client-side" note.
+order_by, distinct_by, limit, confirmed}`) — **not** raw SQL. Where
+the analysis is beyond what ask_onfire can express, a recipe says so
+explicitly: pull rows, then compute client-side.
 
 Read `account-research/references/ask-onfire-signals.md` for the worked
 QueryIR recipe patterns this file mirrors.
@@ -37,9 +35,7 @@ reflexively.
    (hires/leavers per month by title, modal-country, location
    distribution, per-event/per-posting counts).
 2. **Extended-pool entities.** The full employment-history pool and full
-   people pool — what this brief used to flag as `PEOPLE_GRAND` /
-   `PEOPLE_GRAND_EXPERIENCES` ("no entity, tool-managed") — are now
-   queryable **gated** entities: `experiences_pool` (the ~5x superset of
+   people pool are queryable **gated** entities: `experiences_pool` (the ~5x superset of
    `people_experiences`, one row per stint — the source for hires /
    leavers / title movement / roster) and `people_pool` (the ~5x
    superset of `contact`, profile enrichment). Both are GATED and have
@@ -57,20 +53,12 @@ QueryIR (aggregate-or-row, `allow_extended_pool: true` where the pool is
 needed), persist them, then do the window / cohort / self-join logic
 client-side over the pulled dataset (`query_datasets`).
 
-Entity mapping (table → ask_onfire entity): `ONFIRE.PEOPLE` = `contact`;
-`ONFIRE.COMPANIES` = `company`; `ONFIRE.PEOPLE_EXPERIENCES` =
-`people_experiences`; `ONFIRE.EVENTS_CONTACTS` = `event_contact`;
-`ONFIRE.GROWTH_INSIGHT_MONTHLY` = `growth_insight_monthly`;
-`ONFIRE.INSIGHTS_2_EVIDENCES` = `insight_evidence`; `ONFIRE.EVIDENCES`
-= `evidence`; `ONFIRE.GITHUB_MEMBERS` = `github_member`. The full
-employment-history pool (`ONFIRE.EXPERIENCES_FULL`) = `experiences_pool`
-and the full people pool (`ONFIRE.PEOPLE_FULL`) = `people_pool` — **both GATED**:
-author a QueryIR against them only with `allow_extended_pool: true` and
-no insight search. (These supersede the old `PEOPLE_GRAND` /
-`PEOPLE_GRAND_EXPERIENCES` "tool-managed, no entity" tables;
-`get_company_headcount` (Query 01) still wraps the same movement math as
-a one-call convenience, but the underlying pool is now directly
-queryable when you need a cut the tool does not pre-compute.)
+The full employment-history pool (`experiences_pool`) and the full
+people pool (`people_pool`) are **GATED**: author a QueryIR against them
+only with `allow_extended_pool: true` and no insight search.
+`get_company_headcount` (Query 01) wraps the same movement math as a
+one-call convenience; query the pool directly when you need a cut the
+tool does not pre-compute.
 
 Persona / technology / event / evidence-type values are *concepts*, not
 literals — `ask_onfire` resolves them server-side (via `resolve_insights`
@@ -521,9 +509,8 @@ Complication 1B department-by-department callouts.
 ## Query 06 — GitHub footprint
 
 **Repo-name match is expressible via `github_member`; repo-OWNER match
-and `PAYLOAD:` JSON extraction are not.** The raw query reached into
-`ONFIRE.EVIDENCES.PAYLOAD` (a JSON blob, governance-denied and not
-selectable through ask_onfire) and ILIKE-matched both `REPO_OWNER` and
+and raw JSON extraction are not.** The old query read the evidence
+record's raw JSON (not selectable through ask_onfire) and ILIKE-matched both `REPO_OWNER` and
 `REPO_NAME` against the competitor. ask_onfire's `github_member` entity
 exposes only the bare `repo_name` (not the `owner/repo` form, no
 `repo_owner` column) and `activity` (`star` / `fork`), and carries no
@@ -657,20 +644,19 @@ directly and skip both warehouse paths.
 
 ## Query 08 — Customer firmographics
 
-After `ds_acquisition` is built, pull firmographics for the distinct
-companies. This is a clean `company` lookup — `linkedin_url` with
-`op: "in"` over the distinct URL list (any URL format is normalized
-server-side, so no `LOWER()`):
+After `ds_acquisition` is built, pull firmographics for its companies.
+This is a clean `company` lookup — `linkedin_url` filtered by the
+dataset's own column, so the URLs never go through your context (the
+server reads the distinct values and normalizes them):
 
 ```
 ask_onfire(query={
   entity: "company",
   select: ["company_name", "industry", "size_band", "employee_count",
            "location_country", "location_locality"],
-  filters: [{dimension: "linkedin_url", op: "in", value: [
-    // distinct company_linkedin_url values from ds_acquisition
-  ]}],
-  limit: <number of distinct companies in this batch>
+  filters: [{dimension: "linkedin_url", from_dataset: "<ds_acquisition id>",
+             column: "company_linkedin_url"}],
+  limit: <number of distinct companies in ds_acquisition>
 })
 ```
 
@@ -680,41 +666,41 @@ ask_onfire(query={
   `LOCATION_NAME` → `location_locality` (the closest company attribute;
   `company` has no `location_name`). `linkedin_url` is selectable, so the
   result still carries the join key back to `ds_acquisition`.
-- Each row returned is billed — `limit` should equal the batch size.
-  Batch the `in` list in groups of 30-50 URLs to keep each pull (and its
-  row budget) reasonable; merge the batches in `query_datasets`.
+- Each row returned is billed — `limit` should equal the distinct
+  company count. Above 50 the `needs_confirmation` gate fires; confirm
+  against its free COUNT. One call covers up to 5,000 companies, so do
+  not batch.
 
 ---
 
 ## Query 09 — Sentiment-author resolution
 
 After `community_messages_sentiment` returns `ds_sentiment`, pull the
-distinct opinionated external authors:
+distinct opinionated external authors, saved as their own dataset
+(`persist_as_dataset=true`):
 
 ```sql
--- via query_datasets
-SELECT DISTINCT linkedin_url, sender_name, community_name, sentiment_value
+-- via query_datasets, persist_as_dataset=true
+SELECT DISTINCT linkedin_url, sender_name, sentiment_value
 FROM s
 WHERE sentiment_value IN ('positive', 'negative')
-  AND community_name != '{competitor_name}'
+  AND COALESCE(company_linkedin_url, '') != '{company_linkedin_url}'
   AND message_timestamp >= '{q_start}'
   AND message_timestamp <  DATEADD(DAY, 1, '{q_end}')
   AND linkedin_url IS NOT NULL
 ```
 
-Then look them up in the `contact` entity via `ask_onfire` —
-`linkedin_url` with `op: "in"` over the author URL list (normalized
-server-side; select `current_company_url` too so the bias exclusion
-below can run):
+Then look them up in the `contact` entity via `ask_onfire`, taking
+`linkedin_url` from that saved dataset (select `current_company_url`
+too so the bias exclusion below can run):
 
 ```
 ask_onfire(query={
   entity: "contact",
   select: ["linkedin_url", "current_company_name", "current_company_url",
            "job_title", "location_country", "location_name"],
-  filters: [{dimension: "linkedin_url", op: "in", value: [
-    // opinionated-external author URLs
-  ]}],
+  filters: [{dimension: "linkedin_url", from_dataset: "<persisted_dataset id>",
+             column: "linkedin_url"}],
   limit: <number of distinct author URLs>
 })
 ```
@@ -764,15 +750,16 @@ the modal country from those counts. (The `OR` across two free-text key
 lists in the raw query is still not a single QueryIR filter — drop the
 name-based branch and key on the clean `current_company_url`.)
 
-For companies in `ds_acq_firmo` with NULL `location_country`, pull the
-per-company country distribution directly:
+For companies in `ds_acq_firmo` with NULL `location_country`, save
+them as their own dataset (`query_datasets`, `persist_as_dataset=true`,
+`SELECT linkedin_url FROM f WHERE location_country IS NULL`), then pull
+the per-company country distribution directly:
 
 ```
 ask_onfire(query={
   entity: "contact",
-  filters: [{dimension: "current_company_url", op: "in", value: [
-    // company URLs from ds_acq_firmo with NULL location_country
-  ]}],
+  filters: [{dimension: "current_company_url", from_dataset: "<persisted_dataset id>",
+             column: "linkedin_url"}],
   group_by: ["current_company_url", "location_country"],
   aggregations: [{name: "people", fn: "count_distinct", field: "linkedin_url"}],
   order_by: [{field: "people", direction: "desc"}],
@@ -845,9 +832,9 @@ Interns surface naturally as 4-6-month tenures with `intern` in
 `next_company_*` is NULL for some leavers — their next role hasn't
 landed in the data lake yet. Call the gap out explicitly ("6 of 18
 destinations captured"). For destination size / industry / country,
-batch-pair the distinct `next_company_linkedin_url` values to the
-`company` entity via a follow-up `ask_onfire` call (the Query 08 shape:
-`linkedin_url op=in`, groups of 30-50, `limit` = batch size).
+pull the `company` entity via a follow-up `ask_onfire` call (the Query
+08 shape: `linkedin_url` with `from_dataset` = this dataset and
+`column: "next_company_linkedin_url"`, `limit` = distinct destinations).
 
 Symmetric pattern for **joiner origins**: `ds_employees` already
 carries the `prior_company_*` block on every row — slice the same
