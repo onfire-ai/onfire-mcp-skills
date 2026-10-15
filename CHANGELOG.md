@@ -3,6 +3,33 @@
 Versions match `.claude-plugin/plugin.json`, which is what the marketplace serves.
 This file starts at 0.5.1; earlier versions predate it.
 
+## 0.9.0 - 2026-10-15
+
+Requires an Onfire MCP server that returns the `company_context` block and tool.
+
+### Added
+
+- **Company context in account research.** `account-research` reads the new
+  `company_context` block (live, cited public-web context: summary, ownership, stated
+  priorities, dated recent developments, leadership changes, qualification flags and
+  why-now hooks). Summary and ownership go in the company card for every company;
+  qualification flags open Why-Now as `hi` alerts; dated developments and hooks are
+  Why-Now sources cited as "company announcement" or "industry news"; priorities and
+  evergreen angles are use-case talking points, never Why-Now. SEC filers keep the 10-K
+  as the primary strategy source and get what happened after the latest filing.
+- **Opener triggers.** `outreach-sequence-email-composer` uses dated developments and
+  why-now hooks as preferred hooks, and stops for the user when a qualification flag
+  (acquired, rebranded, competitor, regulatory warning, shut down) is present.
+
+### Changed
+
+- **Polling.** While `company_context` is `still_running`, `account-research`
+  re-calls `account_research` with the same arguments (it resumes both async jobs);
+  it polls `ai_prospecting` directly only once company context is terminal.
+- **Checklist.** New checks require a date and source on every company-context item,
+  no evergreen angle in Why-Now, and flags first. The report never says how company
+  context was gathered.
+
 ## 0.8.2 — 2026-10-15
 
 - Update skills for recent MCP changes.

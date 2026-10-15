@@ -1,7 +1,9 @@
 # Steps 1a / 1d - concept resolution + `ask_onfire` warehouse signal recipes
 
 The `account_research` orchestrator pre-pulls four blocks (filings,
-footprint, intent signals, prospects). The Onfire warehouse holds more
+footprint, intent signals, prospects), plus live company context. Company
+news, stated priorities and leadership changes come from `company_context`
+(the envelope block, or the `company_context` tool), not from `ask_onfire`. The Onfire warehouse holds more
 signal surfaces that strengthen a report but are **not** in the
 envelope. This file is the worked-recipe reference for pulling them with
 `ask_onfire`.
