@@ -2,30 +2,31 @@
 #
 # With "Require review from Code Owners" enabled on main, every PR needs an
 # approving review from a code owner listed below. Approval authority is
-# intentionally limited to @NitzanOnFire and @GalOnFire — no other approval
-# (including from the wider developers team) can satisfy the requirement.
+# intentionally limited to @NitzanOnFire, @GalOnFire and @avsha-onfire — no
+# other approval (including from the wider developers team) can satisfy the
+# requirement.
 #
 # Extra emphasis is documented on the executable + instruction surface — the
 # parts an installer's agent will trust and run: SKILL.md instructions, the
 # plugin manifest, and any hooks, MCP servers, or bundled scripts.
 
-# Default: all changes require approval from Nitzan or Gal.
-*                       @NitzanOnFire @GalOnFire
+# Default: all changes require approval from Nitzan, Gal or Avshalom.
+*                       @NitzanOnFire @GalOnFire @avsha-onfire
 
 # Instruction surface (natural-language directives the agent follows).
-/skills/                @NitzanOnFire @GalOnFire
+/skills/                @NitzanOnFire @GalOnFire @avsha-onfire
 
 # Plugin manifest / marketplace (declares components, hooks, MCP, allowed-tools).
-/.claude-plugin/        @NitzanOnFire @GalOnFire
+/.claude-plugin/        @NitzanOnFire @GalOnFire @avsha-onfire
 
 # Auto-executing / code-execution surface — review with extra care.
-**/hooks.json           @NitzanOnFire @GalOnFire
-.mcp.json               @NitzanOnFire @GalOnFire
-**/*.mcp.json           @NitzanOnFire @GalOnFire
-**/scripts/             @NitzanOnFire @GalOnFire
-*.sh                    @NitzanOnFire @GalOnFire
-*.py                    @NitzanOnFire @GalOnFire
+**/hooks.json           @NitzanOnFire @GalOnFire @avsha-onfire
+.mcp.json               @NitzanOnFire @GalOnFire @avsha-onfire
+**/*.mcp.json           @NitzanOnFire @GalOnFire @avsha-onfire
+**/scripts/             @NitzanOnFire @GalOnFire @avsha-onfire
+*.sh                    @NitzanOnFire @GalOnFire @avsha-onfire
+*.py                    @NitzanOnFire @GalOnFire @avsha-onfire
 
 # Security tooling itself.
-/.gitleaks.toml         @NitzanOnFire @GalOnFire
-/.pre-commit-config.yaml @NitzanOnFire @GalOnFire
+/.gitleaks.toml         @NitzanOnFire @GalOnFire @avsha-onfire
+/.pre-commit-config.yaml @NitzanOnFire @GalOnFire @avsha-onfire
