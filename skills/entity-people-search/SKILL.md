@@ -130,6 +130,8 @@ ask_onfire(query={
   limit: 50
 })
 ```
+For a keyword family use a list — `value: ["security engineer", "appsec",
+"product security"]` matches any of them — in one query, not one per keyword.
 
 ### By technology footprint (replaces "keyword in job summary")
 A tool/vendor keyword (e.g. Sentinex) is a **technology insight**, not a

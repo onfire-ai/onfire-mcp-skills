@@ -107,6 +107,9 @@ ask_onfire(query={
   limit: 50
 })
 ```
+When the people came back from an earlier tool (`match_person`, a prospect
+list), filter `{dimension: "contact_url", from_dataset: "ds_...", column: "linkedin_url"}`
+instead of re-typing the URLs.
 
 ### Scope to a company's employees (who at <company> engaged with a repo)
 `github_member` has no company column, so scope via a `contact` join. Query the

@@ -111,8 +111,8 @@ itself.** Catch it here.
 - [ ] **No em dashes (`—`)** outside verbatim evidence quotes - always
       `-`
 - [ ] **No specific channel names** (LinkedIn, Twitter, individual
-      Slack community names) anywhere in customer-facing copy. Use
-      "owned brand surfaces" and "external developer communities".
+      Slack communities) anywhere in customer-facing copy. Use "the
+      competitor's own staff" and "external voices".
 - [ ] **No internal tool names** (MCP, ask_onfire,
       QueryIR, entity names, Onfire dataset IDs) in customer-facing copy.
       Use "market intelligence", "intent signals", "CRM records".
@@ -128,7 +128,7 @@ itself.** Catch it here.
 - [ ] **Percentages used in opinion / sentiment cuts**, not raw counts.
       The headline "92% positive share" reads cleaner than "134 of 145
       opinionated".
-- [ ] **Owned-vs-external sentiment infographic has NO numbers** -
+- [ ] **Insiders-vs-external sentiment infographic has NO numbers** -
       just visual balance and qualitative labels ("Skews
       overwhelmingly positive" / "Skews sharply negative")
 - [ ] **Raw counts allowed** in stat-card heroes (e.g. "63 net-new
@@ -156,11 +156,10 @@ itself.** Catch it here.
 - [ ] **Mid-month current column flagged with asterisk + footnote**
       in the monthly stacked bar (if the brief includes the current
       partial month)
-- [ ] **`INSIGHT_VALUE` casing checked.** If Query 07 returns zero
-      rows, verify the competitor's canonical capitalisation in
-      `ONFIRE.INSIGHTS_2_EVIDENCES` (e.g. `PackMint` not
+- [ ] **Competitor name checked.** If Query 07 returns zero rows,
+      check the competitor's canonical name with
+      `resolve_insights(kind="technology")` (e.g. `PackMint` not
       `Packmint`) before concluding "no acquisition motion data".
-      Use `ILIKE`, not exact-match equality.
 
 ---
 
@@ -235,7 +234,7 @@ itself.** Catch it here.
       analysis sections, not the back matter)
 - [ ] **Every term used in the brief has a definition entry** -
       reader should never wonder what "Net-new mentioner account" or
-      "Owned brand surface" means
+      "Insider voice" means
 
 ---
 

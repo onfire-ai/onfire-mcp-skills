@@ -140,6 +140,9 @@ ask_onfire(query={
   limit: 50
 })
 ```
+When the people came back from an earlier tool (`match_person`, a prospect
+list), filter `{dimension: "contact_url", from_dataset: "ds_...", column: "linkedin_url"}`
+instead of re-typing the URLs.
 
 ### How many people from a company attended an event (count)
 

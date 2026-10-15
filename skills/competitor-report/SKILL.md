@@ -196,8 +196,7 @@ per-slice recipes):
   source for hires / leavers / title movement / roster) and the full
   people pool (`people_pool`, ~5x `contact`). Both are **gated** and have
   **no insight search**: query them with `allow_extended_pool: true` and
-  the entity named explicitly. These supersede the old `PEOPLE_GRAND` /
-  `PEOPLE_GRAND_EXPERIENCES` "tool-managed, no entity" tables.
+  the entity named explicitly.
 
 ask_onfire **still cannot** express window functions, self-joins
 (prior / next employer), first-ever-across-all-time cohort logic, true
@@ -468,20 +467,6 @@ If `naive_count > first_ever_count`, the gap is companies with prior
 mentions that the brief MUST NOT count. Surface the gap in the brief
 as a footnote so the reader trusts the methodology.
 
-Legacy template (any-mention in window, raw SQL — **DO NOT USE
-for the brief**; the `query_onfire` raw-SQL tool that ran it no longer
-exists; kept here only as a reference for what the brief is *not*
-doing):
-
-```sql
--- WRONG / over-counting / removed-tool syntax — kept for diff reference only
-SELECT PERSON_LINKEDIN_URL, COMPANY_LINKEDIN_URL, MIN(START_DATE) AS first_seen
-FROM ONFIRE.INSIGHTS_2_EVIDENCES
-WHERE INSIGHT_VALUE = '{competitor_name}'
-  AND START_DATE BETWEEN DATEADD(MONTH, -12, '{q_end}') AND '{q_end}'
-GROUP BY PERSON_LINKEDIN_URL, COMPANY_LINKEDIN_URL
-```
-
 If `ask_onfire` rejects the `insight_evidence` entity (it is gated
 per-tenant), fall back to a `contact` static snapshot — current
 employees-of-other-companies who carry the competitor as a derived
@@ -513,9 +498,9 @@ Persists as `ds_acquisition`.
 
 See `references/ask-onfire-queries.md` → query 08.
 
-Join the distinct `company_linkedin_url` values from `ds_acquisition`
-to `ONFIRE.COMPANIES` for `INDUSTRY`, `SIZE`, `LOCATION_COUNTRY`,
-`EMPLOYEE_COUNT`. Persists as `ds_acq_firmo`.
+Look up the `company_linkedin_url` values from `ds_acquisition` in the
+`company` entity for `industry`, `size_band`, `location_country` and
+`employee_count`. Persists as `ds_acq_firmo`.
 
 ### 1.9 Sentiment scoring (target quarter, full window)
 
@@ -550,15 +535,15 @@ per-message LLM scorer drops off-topic messages (`discarded_off_topic`);
 See `references/ask-onfire-queries.md` → query 09.
 
 For every opinionated (positive + negative) external author in
-`ds_sentiment`, look up their LinkedIn URL in `ONFIRE.PEOPLE` to get
-their current employer + country. Persists as `ds_authors_resolved`.
+`ds_sentiment`, look up their LinkedIn URL in the `contact` entity to
+get their current employer + country. Persists as `ds_authors_resolved`.
 
-Authors that don't match a `PEOPLE` row, OR whose `PEOPLE` row has a
-null `JOB_COMPANY_NAME`, are the "Unresolved" bucket - shown muted in
+Authors with no `contact` row, OR whose row has a null
+`current_company_name`, are the "Unresolved" bucket - shown muted in
 the cross-tab, not hidden.
 
-**Bias exclusion.** After joining to `ONFIRE.PEOPLE`, discard any author
-whose `JOB_COMPANY_LINKEDIN_URL` matches either `{company_linkedin_url}`
+**Bias exclusion.** After the `contact` lookup, discard any author
+whose `current_company_url` matches either `{company_linkedin_url}`
 (the competitor being analysed) or `{tenant_linkedin_url}` (the origin
 tenant). These authors have a direct stake in the outcome and must not
 appear in `ds_authors_resolved`, the sentiment cross-tabs, or the
@@ -623,9 +608,10 @@ in the title — call those out separately from real departures.
 
 `ds_leavers` is a single dataset; destination columns live on the same
 row. If a destination size / industry / country breakdown is needed,
-pull the distinct `next_company_linkedin_url` values from the `company`
-entity via a follow-up `ask_onfire` call (the Query 08 shape:
-`linkedin_url op=in`, batch in groups of 30-50, `limit` = batch size).
+pull the destinations from the `company` entity via a follow-up
+`ask_onfire` call (the Query 08 shape: `linkedin_url` with
+`from_dataset` = `ds_leavers` and `column: "next_company_linkedin_url"`,
+`limit` = distinct destinations).
 Many leavers will not have a captured next role — call the gap out
 explicitly ("6 of 18 destinations captured").
 
@@ -643,7 +629,7 @@ two checks:
    `SUMMARY` / `HEADLINE` / `JOB_SUMMARY` columns (they are returnable
    attributes, not filterable dimensions). Use the insight-native
    substitute instead: map the departed function to a curated persona
-   (via `resolve_insights`) and scan current `contact` employees of the
+   (via `resolve_insights`, `kind: "persona"`) and scan current `contact` employees of the
    target with that `insight_filter` (see ask-onfire-queries.md → query
    13a). If the function does not resolve to any curated persona, the
    free-text "doing the work under a different title" scan has **no
@@ -744,13 +730,12 @@ Persist the rolled-up table as `ds_office_segmentation`:
 ### 1.15 Event attendance signals (conditional Complication 2D)
 
 Powers the **Event attendance** page (Complication 2D). Source entity:
-`event_contact` (`ONFIRE.EVENTS_CONTACTS`) — every captured signal of a
+`event_contact` — every captured signal of a
 competitor person attending a conference, summit, webinar or industry
 event.
 
-The brief wants the attendees **with names + titles**, which the raw
-query got by joining `EVENTS_CONTACTS` to `PEOPLE`. In ask_onfire that
-is the documented inverse: query the `contact` entity (so you can SELECT
+The brief wants the attendees **with names + titles**. In ask_onfire
+that is the documented inverse: query the `contact` entity (so you can SELECT
 profile fields) and apply `event_contact` as a **filter-only join**
 (`event_contact` exposes no profile fields to select):
 
@@ -823,17 +808,22 @@ Most departed-no-backfill titles are short-tenure dedicated seats where
 the function continues elsewhere - confirm via Phase 1.13 before
 characterising a function as "lost."
 
-### 2.2 Sentiment owned vs external
+### 2.2 Sentiment insiders vs external
 
-Split `ds_sentiment` opinionated rows by whether `community_name`
-matches the competitor name (owned brand surface) or not (external
-developer community). Compute the positive-share-of-opinionated for
-each pool:
+Split `ds_sentiment` opinionated rows by the author's employer:
+`company_linkedin_url = {company_linkedin_url}` is an insider (the
+competitor's own staff); everyone else, including authors with no
+resolved employer, is external. Compute the positive-share-of-opinionated
+for each pool:
 
 ```
-owned_pos_share    = owned_positive_count    / (owned_positive_count    + owned_negative_count)
+insider_pos_share  = insider_positive_count  / (insider_positive_count  + insider_negative_count)
 external_pos_share = external_positive_count / (external_positive_count + external_negative_count)
 ```
+
+Insiders appear only in this ratio. The Phase 1.10 bias exclusion still
+keeps them out of `ds_authors_resolved`, the cross-tabs and the
+evidence wall.
 
 Report as percentages. The brief uses percentages, not raw counts,
 everywhere in opinion sections.
@@ -1038,8 +1028,8 @@ These come from the canonical Nexagon brief. Violate at peril:
   the action title, then the supporting data.
 - **Percentages, not raw counts** in opinion / sentiment sections.
 - **No specific channel names.** Never name LinkedIn / Twitter / Slack
-  community names in the customer-facing copy. Use "owned brand
-  surfaces" vs "external developer communities".
+  communities in the customer-facing copy. Use "the competitor's own
+  staff" vs "external voices".
 - **No GTM recommendations.** This brief is analytical only.
 - **No revenue estimates / dollar amounts.** None. Anywhere.
 - **No em dashes.** Use a hyphen. Em dashes are forbidden except in
@@ -1078,7 +1068,7 @@ These come from the canonical Nexagon brief. Violate at peril:
 | Departmental change + promotions (Page 6) | `ds_employees` aggregated by `title_role` | Function bar chart (joiner vs leaver stints per department with %) + internal-promotions card grouped by destination department |
 | Open jobs (Page 7) | `ds_open_jobs_quarter` | Single table of captured-in-window postings (no active/closed column - we capture existence, not state) |
 | Acquisition | `ds_acquisition` ⨝ `ds_acq_firmo` ⨝ `ds_geo_fallback` | monthly stacked bar SVG + size + region cards |
-| Sentiment | `ds_sentiment` ⨝ `ds_authors_resolved` | three hero %, continent / size bars, owned-vs-external infographic |
+| Sentiment | `ds_sentiment` ⨝ `ds_authors_resolved` | three hero %, continent / size bars, insiders-vs-external infographic |
 | GitHub | `ds_github` | top countries bar + notable engagers table; country bars MUST sum to the headline engager-rows total (add `Unresolved` bucket if needed) |
 | Event attendance (conditional) | `ds_events_contacts` from Phase 1.15 | 3 hero cards (captured attendances / distinct events / region) + detail table; if sample is single-digit, frame as a floor |
 | Vendor-trust | Phase-2 detection | 3 trust-dimension cards |
@@ -1440,18 +1430,19 @@ After delivery, the user often asks:
 | `hide_unresolved` | `false` (Unresolved rows shown muted at the bottom of cross-tabs) | Set `true` to drop them entirely - cleaner-looking sentiment cards when the unresolved bucket is noisy |
 | `hide_n_labels` | `false` (sentiment cross-tabs show `n=X` per row) | Set `true` to drop the `n=X` annotations - cleaner cards, but the reader loses the row weight |
 | Vendor-trust threshold | 3 distinct dimensions | The user wants the page included regardless |
-| Customer acquisition source | `INSIGHTS_2_EVIDENCES` if allowed; PEOPLE snapshot otherwise; uploaded CSV if provided | The caller forces a path |
+| Customer acquisition source | `insight_evidence` if allowed; `contact` snapshot otherwise; uploaded CSV if provided | The caller forces a path |
 | Sentiment scope | `mode="date_range"` — every competitor-mentioning message in the quarter (capped at 10k/run; split by month if exceeded) | Don't switch to top_k for the brief — the full-window read is the point |
 | Industry buckets | 5 (Software / IT services / Public+Healthcare+Cyber+Financial / Media / Other) | Competitor has a heavy bias the bucketing doesn't expose |
 
 ## Casing notes on insight values
 
-`ONFIRE.INSIGHTS_2_EVIDENCES.INSIGHT_VALUE` stores the competitor brand
-in its **canonical capitalisation** which may not match the friendly
-`competitor_name` (e.g. `PackMint` not `Packmint`, `Artifex` not
-`artifex`). Use `ILIKE` or canonicalise both sides of the comparison.
-A naive `INSIGHT_VALUE = '{competitor_name}'` filter will return zero
-rows even when the data is there.
+`insight_value` holds the competitor brand in its **canonical
+capitalisation**, which may not match the friendly `competitor_name`
+(e.g. `PackMint` not `Packmint`, `Artifex` not `artifex`). The server
+resolves the name you send, so send it as the user wrote it. If Query 07
+still returns zero rows, check the name with
+`resolve_insights(kind="technology")` before concluding there is no
+data.
 
 ---
 
@@ -1464,14 +1455,13 @@ Report structure, prose, and methodology are unchanged — only how data
 is fetched / computed.
 
 - **Extended-pool entities.** The full employment-history pool and full
-  people pool — previously flagged as `PEOPLE_GRAND` /
-  `PEOPLE_GRAND_EXPERIENCES` ("tool-managed, no ask_onfire entity, never
-  author a QueryIR") — are now the gated `experiences_pool` (~5x
+  people pool — previously flagged as "tool-managed, no ask_onfire
+  entity, never author a QueryIR" — are now the gated `experiences_pool` (~5x
   `people_experiences`, one row per stint — hires / leavers / title
   movement / roster) and `people_pool` (~5x `contact`) entities. Both
   are GATED with NO insight search: query with `allow_extended_pool:
-  true` and the entity named. Every "PEOPLE_GRAND has no entity / never
-  query it" flag updated to point at these. `get_company_headcount`
+  true` and the entity named. Every "no entity / never query it" flag
+  updated to point at these. `get_company_headcount`
   stays the canonical path for Query 01 (it bundles the monthly counts,
   roster, AND the prior / next self-joins the QueryIR grammar can't
   express), but the underlying pool is now directly queryable when a cut
@@ -1601,7 +1591,7 @@ snapshot delta**
 
 **Page 11 NEW — Event attendance signals (Complication 2D)**
 - New full page between GitHub (Complication 2C) and Vendor-trust
-  events (Complication 3). Source: `ONFIRE.EVENTS_CONTACTS` filtered
+  events (Complication 3). Source: `event_contact` filtered
   by `company_linkedin_id`.
 - Three-card hero: Captured attendances / Distinct events / Region of
   attendees. Detail table: one row per attendance, columns Event,
@@ -1669,7 +1659,7 @@ All changes shaken out by an in-session edit round on the Packmint
 - New full-width card on the executive summary, between the three
   hero stats and the Five findings. Fed by `ds_office_segmentation`
   (Phase 1.14): one bucket per `search_offices` hit + distributed
-  clusters from `ONFIRE.PEOPLE` + a `Remote / location not disclosed`
+  clusters from `contact` + a `Remote / location not disclosed`
   bucket equal to `headcount_total − sum(matched_clusters)`.
 - HQ bucket gets a green bar + `HQ` pill; distributed hubs get a
   grey-blue bar + `distributed` pill; remote/unknown is muted grey.
@@ -1724,7 +1714,7 @@ All changes shaken out by an in-session edit round on the Packmint
 
 **Phase 1.14 — Office segmentation (new step)**
 - New Phase 1 step combining `search_offices`, the location-distribution
-  query on `ONFIRE.PEOPLE`, and the bucket-assignment rules from the
+  query on `contact`, and the bucket-assignment rules from the
   `office-segmentation` skill. Output: `ds_office_segmentation`,
   feeding the page 2 Geographic footprint card.
 - Use `JOB_COMPANY_LINKEDIN_ID = {company_linkedin_id}` in the location
@@ -1812,7 +1802,7 @@ shaken out by a real brief that exposed a gap.
   index only captures posting existence, not real-time open/closed
   state. Page 7 sums captured-in-window postings only, no active
   column.
-- **`INSIGHT_VALUE` casing pitfall** on `ONFIRE.INSIGHTS_2_EVIDENCES`.
+- **`insight_value` casing pitfall** on `insight_evidence`.
   The competitor brand may be stored in canonical capitalisation
   (`PackMint`, `Artifex`) that doesn't match `competitor_name`. Use
   `ILIKE`, never exact-match equality. (Casing notes section + Query

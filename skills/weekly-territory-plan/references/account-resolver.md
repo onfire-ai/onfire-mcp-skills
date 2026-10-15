@@ -28,10 +28,11 @@ worth engineering against.
    buying-committee personas, the configured competitors and technologies. **Omit
    `tenant_id`** unless this is a super-tenant session acting for another tenant.
 3. Derive `warm_intro_origin` per the ladder in `config-and-setup.md`.
-4. `describe_onfire_schema(show_catalog=True)` — **once per session, before the first
-   `ask_onfire` call.** Assert that every entity this file names actually exists in
-   the live catalog. Entities come and go; a layer built on a missing entity must be
-   skipped, not guessed at.
+4. Before the first `ask_onfire` call, assert that every entity this file names exists
+   in the entity catalog inlined in the server instructions. Call
+   `describe_onfire_schema(show_catalog=True)` only if that catalog is missing or cut
+   off. Entities come and go; a layer built on a missing entity must be skipped, not
+   guessed at.
 5. `resolve_insights` for every persona, technology, competitor, and event term that
    will appear in a filter, carrying `kind`. A concept is not a literal.
 6. `describe_onfire_schema([...])` for any entity whose field names you are not
@@ -130,7 +131,7 @@ gap to apologise for.
 | Firmographics | `match_company`, `get_company_headcount` | `icp_fit` |
 | Warm-intro path | `detect_warm_intros` | `committee_reachability` |
 
-**Catalog-gate every one of them.** `describe_onfire_schema(show_catalog=True)` is the
+**Catalog-gate every one of them.** The entity catalog (step 4 of the preflight) is the
 authority on what exists this session; entities come and go. A layer whose entity is
 absent is skipped, its dimension scored `null`, its weight redistributed — never
 guessed at and never silently dropped from the internal run notes.
@@ -285,7 +286,7 @@ the work still needs doing and nobody owns it.
 ```
 ask_onfire(query={
   entity: "evidence",
-  select: ["person_url", "community_name", "community_type", "community_joined_at"],
+  select: ["person_url", "community_type", "community_joined_at"],
   filters: [
     {dimension: "company_url", op: "eq", value: "<account linkedin url>"},
     {dimension: "evidence_type", op: "eq", value: "community_members"}
@@ -308,6 +309,10 @@ Four things this entity will punish you for:
   real date window, use `insight_evidence`, whose columns are actual DATEs.
 
 `community_type` is the platform — slack, discord, reddit, linkedin, github, twitter.
+The community's own name is not exposed; what it is about is `insight_value` on
+`insight_evidence`. To name the subject, run the same filters on `insight_evidence` with
+`group_by: ["insight_value"]`, and cite the join as "joined a community about
+{subject} on {platform}".
 
 ### Contract renewals and open tenders
 
@@ -533,7 +538,7 @@ metric Onfire does not already model. Contractor and contingent-workforce share 
 obvious trap: it looks like a textbook roster-share, and computing it that way would
 cost hundreds of credits per account — but `extended_workforce` already answers it at
 company grain for one row and one credit, with display-ready reasons. Reach for a
-custom dimension only after `describe_onfire_schema(show_catalog=True)` shows nothing
+custom dimension only after the entity catalog shows nothing
 that covers it.
 
 ### Four rules that make the blend honest

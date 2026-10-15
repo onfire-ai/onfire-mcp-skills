@@ -173,6 +173,8 @@ ask_onfire(query={
     ]},
     {dimension: "job_function", op: "contains", value: "security"}
   ],
+  // accounts from an earlier result (match_company, a prospect list): replace the
+  // value list with {dimension: "company_url", from_dataset: "ds_...", column: "linkedin_url"}
   order_by: [{field: "date_posted", direction: "desc"}],
   limit: 50
 })
@@ -275,7 +277,7 @@ the user the rest is out of scope for this tool:
 
 ## Common pitfalls
 
-- **No OR across columns** - filters AND together. The old "title ILIKE OR job_text ILIKE" keyword search is not expressible; use `job_function contains` or scope by account and read titles.
+- **No OR across columns** - filters AND together. The old "title ILIKE OR job_text ILIKE" keyword search is not expressible; use `job_function contains` or scope by account and read titles. Within one column a list is an OR: `{dimension: "job_function", op: "contains", value: ["security", "cyber"]}`.
 - **`job_function` is messy multi-value free text** - always match it with `op: "contains"`, never `eq` (e.g. `"engineering and information technology"` will never `eq` `"engineering"`).
 - **Title field is `job_post_title`, not `job_title`** - `job_title` only exists on the people/contact entity; using it here will bounce as an unknown field.
 - **`company_url`** accepts any URL format (normalized server-side); the slug form `linkedin.com/company/<slug>` is fine, no manual lower-casing needed.

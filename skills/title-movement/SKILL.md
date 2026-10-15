@@ -39,7 +39,7 @@ So the flow is: two aggregate `ask_onfire` calls for the monthly hire/departure 
 |---|---|---|
 | `company_linkedin_url` | **required** | e.g. `linkedin.com/company/taskboard`. Infer slug from company name if needed (e.g. "Cloudforce" → `linkedin.com/company/cloudforce`). State the inferred URL explicitly. Passed as a `company_url` filter value (any URL format is normalized server-side). |
 | `start_date` | 12 months ago | Convert natural language: "2 years" → 24 months ago, "since Jan 2024" → `2024-01`, "6 months" → 6 months ago. Format: `YYYY-MM`. Applied as a client-side cutoff on the returned month buckets — **not** as a query filter (`start_date` / `end_date` on the entity are TEXT `'YYYY-MM'`, not real dates, so range filtering them in the query is unreliable). |
-| `title_filter` | none | Translate "only engineering titles" or "titles with manager" to a dimension filter: `{dimension: "title_name", op: "contains", value: "engineer"}` (`title_name` is free text; `contains` is a case-insensitive substring match). **One keyword per query.** Multiple OR'd keywords are NOT expressible in a single QueryIR (dimension filters AND together, and there is no OR) — run one set of calls per keyword and merge the groups client-side. |
+| `title_filter` | none | Translate "only engineering titles" or "titles with manager" to a dimension filter: `{dimension: "title_name", op: "contains", value: "engineer"}` (`title_name` is free text; `contains` is a case-insensitive substring match). For several keywords use a list — `value: ["engineer", "developer"]` matches either — in one filter, not one set of calls per keyword. |
 | `group_grain` | `title_role` | The title axis to group hires/departures by. `title_role` is the closed, normalized role taxonomy (cleaner buckets, fewer spelling variants); `title_name` is the free-text raw title. Group by `title_role` by default; switch to (or add) `title_name` when the user wants the raw titles. |
 | `show_all` | false | Default: in the final table (Step 5), only keep months/titles where `title_new_to_company = TRUE` OR `title_gone_from_company = TRUE`. If user says "show everything" or "all movement", keep every month/title bucket. |
 
@@ -55,8 +55,8 @@ ask_onfire(query={
   allow_extended_pool: true,
   filters: [
     {dimension: "company_url", op: "eq", value: "<company_linkedin_url>"}
-    /* optional single-keyword title filter:
-       {dimension: "title_name", op: "contains", value: "<keyword>"} */
+    /* optional title filter (a list matches any keyword):
+       {dimension: "title_name", op: "contains", value: ["<keyword>", ...]} */
   ],
   buckets: [{name: "hire_month", field: "start_date", part: "month"}],
   group_by: ["hire_month", "title_role"],
@@ -78,7 +78,7 @@ ask_onfire(query={
   allow_extended_pool: true,
   filters: [
     {dimension: "company_url", op: "eq", value: "<company_linkedin_url>"}
-    /* same optional single-keyword title filter as Step 2 */
+    /* same optional title filter as Step 2 */
   ],
   buckets: [{name: "depart_month", field: "end_date", part: "month"}],
   group_by: ["depart_month", "title_role"],
