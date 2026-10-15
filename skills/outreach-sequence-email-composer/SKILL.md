@@ -35,6 +35,7 @@ The single-prospect and many-prospect cases run the same steps; the batch case j
 | Resolve a company → LinkedIn + firmographics | `match_company` |
 | Score the prospect + get talking points | `ai_prospecting` |
 | Company narrative (10-K, footprint, intent, use cases) | `account_research` |
+| What's new at the company: dated developments, stated priorities, leadership changes, qualification flags, why-now hooks | `company_context` (or `account_research`'s `company_context` block) |
 | Targeted signals (intent, footprint, hiring, events, growth) | `ask_onfire`, `query_intent_signals` |
 | Former champions at the company, website visits | `detect_ex_champion_moves`, `detect_website_visitors` |
 
@@ -113,7 +114,7 @@ Poll `GET sequenceStates/<id>` until `state` becomes `active` and `activeAt` is 
 Read **`references/email-playbook.md`** and compose from these four sources:
 
 1. **The prospect** — title, persona/seniority, tech footprint, recent activity/intent. From the prospect record + `ai_prospecting` talking points + `ask_onfire`/`query_intent_signals` + `detect_ex_champion_moves`/`detect_website_visitors`.
-2. **Their company** — 10-K themes, hiring momentum, growth/adoption trends, events, competitor/tech footprint. From `account_research` + `ask_onfire`.
+2. **Their company** — 10-K themes, hiring momentum, growth/adoption trends, events, competitor/tech footprint, and company context (dated recent developments, why-now hooks, stated priorities, leadership changes). From `account_research` + `company_context` + `ask_onfire`. A dated development or a `why_now_hooks` entry is the preferred opener trigger. If `company_context.qualification_flags` is non-empty (the company was acquired, rebranded, sells a competing product, got a regulatory warning or shut down), stop and tell the user before enrolling or drafting: the sequence may need to stop or be redirected.
 3. **The tenant's ICP** — from `get_tenant_settings.account_research`: `golden_persona`, `competitors`, `technologies`, `organization` personas, `buying_committee_queries`, and derived use cases. Frame the value prop and competitive angle around *this tenant's* ICP, not generic copy.
 4. **User input + conversation context** — the angle/product to pitch, tone, constraints, anything established earlier in the chat.
 

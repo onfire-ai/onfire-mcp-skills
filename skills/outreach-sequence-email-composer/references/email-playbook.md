@@ -13,11 +13,11 @@ Pull from four sources and let them shape distinct parts of the email:
 | Source | Tools | Feeds |
 |---|---|---|
 | **The prospect** | prospect record, `ai_prospecting` talking points, `ask_onfire`/`query_intent_signals`, `detect_ex_champion_moves`/`detect_website_visitors` | The hook, the persona-appropriate framing, the "why you" |
-| **Their company** | `account_research` (10-K, footprint, intent, use cases), `ask_onfire` (hiring, growth, events) | The trigger/timeline, the "why now", credible specifics |
+| **Their company** | `account_research` (10-K, footprint, intent, use cases), `company_context` (dated recent developments, why-now hooks, stated priorities, leadership changes, qualification flags), `ask_onfire` (hiring, growth, events) | The trigger/timeline, the "why now", credible specifics. Dated developments and `why_now_hooks` are the preferred opener triggers; a qualification flag (acquired, rebranded, competitor, regulatory warning, shut down) stops or redirects the sequence |
 | **The tenant's ICP** | `get_tenant_settings.account_research` (`golden_persona`, `competitors`, `technologies`, `organization`, `buying_committee_queries`, derived use cases) | The value prop, the competitive angle, what to actually pitch |
 | **User + conversation** | the chat | Product/angle, tone, constraints, prior context |
 
-The best emails anchor the hook to a **real business signal** (leadership change, hiring momentum, a 10-K priority, an intent/footprint signal, event attendance, a former champion) and connect it to the tenant's ICP value prop. A website visit decides when to write; never mention it in the email.
+The best emails anchor the hook to a **real business signal** (a dated company announcement or industry news item from `company_context`, leadership change, hiring momentum, a 10-K priority, an intent/footprint signal, event attendance, a former champion) and connect it to the tenant's ICP value prop. A website visit decides when to write; never mention it in the email. Never present an evergreen angle (undated website copy) as news, and never name where company context came from.
 
 ## Structure (target ~50–120 words)
 
