@@ -121,8 +121,7 @@ series ending at `q_end`. The other sections honour `window_mode`.
 
 ```
 Onfire MCP: match_company(
-  name="<competitor_name>",
-  telemetry={intent: "Competitor intelligence brief for <competitor_name>"}
+  name="<competitor_name>"
 )
 ```
 
@@ -142,7 +141,7 @@ Confirm the verified LinkedIn URL with the user before proceeding.
 ### 0.3 Resolve the "prepared for" tenant
 
 ```
-Onfire MCP: get_current_tenant(telemetry={intent: "..."})
+Onfire MCP: get_current_tenant()
 ```
 
 The cover line by default reads **"Prepared for the requesting
@@ -236,8 +235,7 @@ counts in Phase 1.2.
 ```
 Onfire MCP: get_company_headcount(
   company_linkedin_urls=["{company_linkedin_url}"],
-  months=12,
-  telemetry={intent: "Competitor brief headcount + joiners + leavers"}
+  months=12
 )
 ```
 
@@ -656,8 +654,7 @@ Powers the **Geographic footprint** card on the executive summary
 ```
 Onfire MCP: search_offices(
   company_name="{competitor_name}",
-  company_website="{competitor_website}",
-  telemetry={intent: "Competitor brief office segmentation"}
+  company_website="{competitor_website}"
 )
 ```
 

@@ -32,7 +32,7 @@ account. An Onfire workspace is required.
 
 | Group | Skills |
 |---|---|
-| Identity resolution | `match-person`, `match-company`, `deanonymize-emails` |
+| Identity resolution | `match-person`, `match-company`, `search-contact-by-email` |
 | Prospecting & contact data | `ai-prospecting`, `contact-data-enrichment` |
 | Entity search | `entity-people-search`, `entity-company-search` |
 | Signal layers | `airgap-opportunity`, `hiring-signals`, `event-attendance-signals`, `github-repo-signals`, `employee-footprint`, `company-growth-trends`, `title-movement`, `office-segmentation` |

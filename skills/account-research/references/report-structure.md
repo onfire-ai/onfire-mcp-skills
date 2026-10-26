@@ -47,16 +47,18 @@ time. Nothing in this file is hardcoded to a specific tenant.
 
 ## Reading the runtime contract
 
-Before rendering, pull these values from the envelope:
+This file is the rendering contract. The response carries data and
+follow-up routing only — it ships no section order, palette or rules, so
+there is nothing inline to prefer over what is written here.
 
-| Render value | Source | Fallback |
-|---|---|---|
-| Tenant display name | `tenant_config.brand.display_name` | `tenant_config.tenant_id`, title-cased |
-| Tenant logo (base64) | `tenant_config.brand.logo_data_uri` | omit logo, use text wordmark only |
-| Section order | `render_spec.section_order` | the order in this file |
-| Use case palette | `render_spec.use_case_palette` | required — never invent |
-| Page setup | `render_spec.page_setup` | the CSS block below |
-| Hard rules | `render_spec.hard_rules` | the list below |
+| Render value | Source |
+|---|---|
+| Tenant display name | `tenant_config.tenant_id`, title-cased — there is no display-name field |
+| Tenant logo | not in the envelope; always omit the logo and render a text wordmark |
+| Section order | the order in this file |
+| Use case palette | the seven entries in the CSS block below — never invent one |
+| Page setup | the CSS block below |
+| Hard rules | the list below |
 
 **The report is Onfire-branded, not tenant-branded.** The color palette,
 header-bar background, eyebrows, and score fills come from the fixed
@@ -75,21 +77,21 @@ longer drives anything.
 /* Reset */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Design tokens — Onfire palette (fixed) + cool neutrals + semantic intents.
+/* Design tokens - brand palette (fixed) + cool neutrals + semantic intents.
    Brand color does NOT vary per tenant; the report's visual identity is
-   Onfire's. */
+   the brand's. */
 :root {
-  /* Onfire brand — fixed. Do not inject tenant colors here. */
-  --brand:        #0A2540;        /* Onfire navy — header bar, primary text */
-  --brand-dark:   #051628;        /* deepest navy — hover/active accents */
-  --brand-mid:    #6B8FA8;        /* mid slate — quote borders, subdued fills */
-  --brand-light:  #DCEFF5;        /* cyan-tint — soft section bands / hero fills */
-  --accent:       #7C5CFF;        /* Onfire purple — single-word highlights, key callouts */
-  --accent-light: #ECE7FF;        /* purple tint — accent fills, no-flood */
+  /* Brand tokens - fixed. Do not inject tenant colors here. */
+  --brand:        #0A2540;        /* brand navy - header bar, primary text */
+  --brand-dark:   #051628;        /* deepest navy - hover/active accents */
+  --brand-mid:    #6B8FA8;        /* mid slate - quote borders, subdued fills */
+  --brand-light:  #DCEFF5;        /* cyan-tint - soft section bands / hero fills */
+  --accent:       #7C5CFF;        /* brand purple - single-word highlights, key callouts */
+  --accent-light: #ECE7FF;        /* purple tint - accent fills, no-flood */
 
-  /* Cool neutrals — shifted from the warm Helvetica palette to a slightly
+  /* Cool neutrals - shifted from the warm Helvetica palette to a slightly
      cyan-leaning off-white. Keeps the report from looking like a print
-     mailer and matches the Onfire web aesthetic. */
+     mailer and matches the brand web aesthetic. */
   --bg:        #F4F8FA;
   --surface:   #FFFFFF;
   --border:    #E2E8EE;
@@ -98,24 +100,29 @@ longer drives anything.
   --muted:     #4A5B6D;
   --faint:     #94A3B8;
 
-  /* Semantic intents — used for Why-Now alerts, not for branding */
+  /* Semantic intents - used for Why-Now alerts, not for branding */
   --hi-bg:    #FBEAE9; --hi-text:    #8C1B15;  /* danger / red flag */
   --med-bg:   #FAEEDA; --med-text:   #7A4A0A;  /* warn / amber */
   --low-bg:   #EEF1F4; --low-text:   #4A5B6D;  /* neutral / context */
   --ok-bg:    #E2F2E7; --ok-text:    #1E5C32;  /* success / green */
-  --info-bg:  #ECE7FF; --info-text:  #3D2C99;  /* info / Onfire purple */
+  --info-bg:  #ECE7FF; --info-text:  #3D2C99;  /* info / brand purple */
 
-  /* Use case palette — injected dynamically from render_spec.use_case_palette
-     One block per use case tag the orchestrator returned. Do not invent. */
-  /* Example shape:
-     --uc-<tag>-bg, --uc-<tag>-text, --uc-<tag>-bar  */
+  /* Use case palette - the colour contract for use case tags.
+     Seven slots. Assign an existing entry per card; never invent a hex. */
+  --uc-netsec-bg:   #E6F1FB; --uc-netsec-text:   #185FA5; --uc-netsec-bar:   #378ADD;
+  --uc-aisec-bg:    #EEEDFE; --uc-aisec-text:    #534AB7; --uc-aisec-bar:    #7F77DD;
+  --uc-secops-bg:   #E1F5EE; --uc-secops-text:   #0F6E56; --uc-secops-bar:   #1D9E75;
+  --uc-cnapp-bg:    #EAF3DE; --uc-cnapp-text:    #3B6D11; --uc-cnapp-bar:    #639922;
+  --uc-appsec-bg:   #FAEEDA; --uc-appsec-text:   #854F0B; --uc-appsec-bar:   #EF9F27;
+  --uc-identity-bg: #FAECE7; --uc-identity-text: #993C1D; --uc-identity-bar: #D85A30;
+  --uc-endpoint-bg: #F1EFE8; --uc-endpoint-text: #5F5E5A; --uc-endpoint-bar: #888780;
 }
 
-/* Page — A4 */
+/* Page - A4 */
 @page { size: A4; margin: 16mm 18mm 18mm 18mm; }
 html  { font-size: 10pt; }
 body  {
-  /* SYSTEM FONTS ONLY — no Google Fonts CDN (file:// blocks it) */
+  /* SYSTEM FONTS ONLY - no Google Fonts CDN (file:// blocks it) */
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
                Helvetica, Arial, sans-serif;
   background: #fff; color: var(--text);
@@ -123,14 +130,14 @@ body  {
   font-feature-settings: "ss01", "cv11";  /* harmless on unsupported fonts */
 }
 
-/* Force background colors to print in PDF — REQUIRED */
+/* Force background colors to print in PDF - REQUIRED */
 @media print {
   * { -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       color-adjust: exact !important; }
 }
 
-/* Header bar — full-bleed across the page on PDF, contained on screen.
+/* Header bar - full-bleed across the page on PDF, contained on screen.
    Defined in the stylesheet (not inline) so screen-media overrides can
    actually reach it; inline-style specificity used to defeat the screen
    override, which made the bar clip off the visible viewport in
@@ -178,7 +185,7 @@ strong { font-weight: 600; color: var(--text); }
 a      { color: var(--brand); text-decoration: none; }
 em     { font-style: italic; }
 
-/* Section header — eyebrow + title + subtitle pattern */
+/* Section header - eyebrow + title + subtitle pattern */
 .section-head { margin: 14pt 0 8pt; break-after: avoid; }
 .section-eye  { font-size: 6.5pt; font-weight: 700; letter-spacing: .14em;
                 text-transform: uppercase; color: var(--brand);
@@ -212,7 +219,7 @@ hr.divider { border: none; border-top: .4pt solid var(--border-md);
 .sig   { font-size: 8.5pt; margin-bottom: 3pt; line-height: 1.5; }
 .tp    { font-size: 8.5pt; margin-bottom: 5pt; line-height: 1.6; }
 
-/* Alert block — used for Why-Now severity tinting */
+/* Alert block - used for Why-Now severity tinting */
 .alert { border-radius: 4pt; padding: 7pt 9pt; margin-bottom: 6pt;
          font-size: 8.5pt; line-height: 1.55; break-inside: avoid;
          display: flex; gap: 8pt; align-items: flex-start; }
@@ -226,8 +233,8 @@ hr.divider { border: none; border-top: .4pt solid var(--border-md);
 .alert.info{ background: var(--info-bg);color: var(--info-text);}
 .alert strong { color: inherit; font-weight: 700; }
 
-/* Quote block — for verbatim talking-point excerpts (10-K filings,
-   LinkedIn profiles, public talks, press releases — anything cited in
+/* Quote block - for verbatim talking-point excerpts (10-K filings,
+   LinkedIn profiles, public talks, press releases - anything cited in
    the solution-fit "Talking points" block) */
 .quote { background: var(--bg); border-left: 2.5pt solid var(--brand-mid);
          border-radius: 0 4pt 4pt 0; padding: 6pt 9pt; margin: 7pt 0;
@@ -238,7 +245,7 @@ hr.divider { border: none; border-top: .4pt solid var(--border-md);
               font-style: normal; font-weight: 600; letter-spacing: .04em;
               text-transform: uppercase; }
 
-/* Evidence block — verbatim message_text / LinkedIn profile excerpts */
+/* Evidence block - verbatim message_text / LinkedIn profile excerpts */
 .evidence { margin-top: 5pt; background: var(--bg);
             border-left: 1.5pt solid var(--border-md);
             border-radius: 0 3pt 3pt 0; padding: 4pt 8pt; break-inside: avoid; }
@@ -284,7 +291,7 @@ hr.divider { border: none; border-top: .4pt solid var(--border-md);
 .score-num   { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
                font-size: 8.5pt; font-weight: 600; }
 
-/* Why-Now numbered rows — alternate to .alert when an unstyled list reads better */
+/* Why-Now numbered rows - alternate to .alert when an unstyled list reads better */
 .why-row { display: flex; gap: 9pt; align-items: flex-start;
            margin-bottom: 8pt; break-inside: avoid; }
 .why-num { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -685,8 +692,8 @@ its own Key Contacts card on a new page.
 
 The set of use cases is **dynamic**. Do not assume a fixed list. If the
 orchestrator returns three use cases, render three. If it returns six,
-render six. Tag colors come from `render_spec.use_case_palette` keyed
-by the use case `tag` — never invent a color.
+render six. Tag colors come from the use case palette in the CSS block
+above, keyed by the use case `tag` — never invent a color.
 
 The section header collapses to a single eyebrow line that combines the
 fixed label with the active brand and target account, so the divider
@@ -836,7 +843,7 @@ No sources line. Logo (if available) + company name + label + date.
 | Background colors not printing | `@media print { * { print-color-adjust: exact !important } }` |
 | Hardcoded brand color literal | `var(--brand)` / `var(--accent)` from the fixed Onfire palette |
 | Tenant brand color in CSS | Tenant brand never colors the report; only the display name + logo appear as content |
-| Invented use case tag color | The exact entry from `render_spec.use_case_palette` |
+| Invented use case tag color | The exact entry from the use case palette in the CSS block |
 
 ---
 
