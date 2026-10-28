@@ -3,6 +3,39 @@
 Versions match `.claude-plugin/plugin.json`, which is what the marketplace serves.
 This file starts at 0.5.1; earlier versions predate it.
 
+## 0.9.0 — 2026-10-26
+
+The MCP stopped shipping a rendering contract in its responses and renamed the
+reverse-email tool, both to clear findings from Anthropic's MCP Directory
+review. These skills follow.
+
+### Changed
+
+- **`deanonymize-emails` is now `search-contact-by-email`.** The tool it drives
+  was renamed `search_contact_by_email` and restricted to business domains:
+  personal mailboxes are declined before the lookup, never resolved and never
+  charged for, and come back in a `skipped` block. The skill reports them as
+  out of scope rather than as unidentified people, counts only business
+  addresses toward the consent threshold, and sends up to 500 per call instead
+  of 25.
+- **`account-research` owns its rendering contract.** `account_research` no
+  longer returns `render_spec`, so the section order, hard rules, page setup
+  and pre-delivery checklist come from the skill, and the seven use-case
+  palette entries — which had no fallback anywhere — are now in
+  `references/report-structure.md`. The response still carries
+  `follow_up_tools`.
+
+### Fixed
+
+- **The pasteable report CSS failed the skill's own gate.** Its comments
+  carried the vendor name and em dashes, both of which Step 3 greps
+  `report.html` for and rejects.
+- **`telemetry={intent: …}` removed from nine tool-call examples** in
+  `account-research`, `competitor-report` and `office-segmentation`. The MCP
+  dropped the field from every tool but `ask_onfire`, where it is optional; the
+  `office-segmentation` example also nested it inside `query={…}`, which the
+  query validator rejects.
+
 ## 0.8.2 — 2026-10-15
 
 - Update skills for recent MCP changes.

@@ -49,7 +49,7 @@ extra work — the country usually comes for free with the rows you already have
 |---|---|
 | `ai_prospecting` dataset | `LOCATION_COUNTRY` (already in every run's dataset) |
 | `ask_onfire` over the `contact` entity | `location_country` — add it to your `select` |
-| `deanonymize_emails` results | `location_country` |
+| `search_contact_by_email` results | `location_country` |
 | `match_person` | *nothing* — it returns no country; those rows fall back |
 
 The tool auto-detects a country column from the rows, so a row that carries one

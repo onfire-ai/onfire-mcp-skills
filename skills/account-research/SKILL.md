@@ -15,9 +15,9 @@ Given a **company website** (e.g. `meridianbank.com`) and a **tenant ID**
 (e.g. `acme-security`), this skill:
 
 1. Calls `account_research` for the non-prospect data sources: tenant
-   config + derived use cases, 10-K extracts, LinkedIn footprint, intent
-   signals, and the inline `render_spec` that defines the rendering
-   contract.
+   config + derived use cases, 10-K extracts, LinkedIn footprint and
+   intent signals. The rendering contract is this skill's own, in
+   `references/report-structure.md`.
 2. **Re-derives the tenant's taxonomy** (Step 1a). The envelope's
    `derived_use_cases` and `footprint_keywords` are coarser than the tenant's
    own configuration and their resolution is not match-quality gated, so the
@@ -64,8 +64,7 @@ principle, not an exception to it.
 Onfire MCP: account_research(
   company_website="<company_website>",
   tenant_id="<tenant_id>",
-  company_linkedin_url="<url>",   # optional but enables footprint
-  telemetry={intent: "Account research report for tenant <tenant_id>"}
+  company_linkedin_url="<url>"   # optional but enables footprint
 )
 ```
 
@@ -127,9 +126,9 @@ evidence you actually found for this account in Step 1d.
 
 This deliberately overrides `tenant_config.derived_use_cases`. When you do:
 
-- Colors come **only** from `render_spec.use_case_palette`. Assign an existing
-  palette entry per card; never invent a hex, never emit a tag class that is not
-  a palette key.
+- Colors come **only** from the use case palette in
+  `references/report-structure.md`. Assign an existing palette entry per card;
+  never invent a hex, never emit a tag class that is not a palette key.
 - Never render a card whose only evidence is a single partial keyword match.
 - Every card must position the tenant on the product it actually sells. If a
   card has no honest tie to that product, drop the card - do not manufacture an
@@ -317,43 +316,39 @@ the card, or be left out. An empty stat is better than an uncited one.
   "intent_signals": { dataset, preview_rows, facets, total_count },
   "prospects": { /* the orchestrator's own ai_prospecting run - see Step 1b */ },
   "datasets": { filings_10k, linkedin_footprint, intent_signals, prospects },
-  "render_spec": {
-    "section_order": [...],
-    "hard_rules": [...],
-    "use_case_palette": {...},
-    "page_setup": {...},
-    "pre_delivery_checklist": [...],
-    "follow_up_tools": {...}
+  "follow_up_tools": {
+    // which tool answers a question this envelope does not:
+    // slice_existing_data, pull_new_intent_signals,
+    // pull_extra_filing_sections, pull_extra_footprint_keywords
   }
 }
 ```
 
-## Use the inline `render_spec` (and the fixed Onfire palette)
+## The rendering contract (and the fixed Onfire palette)
 
-The orchestrator ships the rendering contract inline. Do not invent your
-own section order, palette, or rules. Read each from `render_spec`:
+The contract is this skill's, not the response's. `references/report-structure.md`
+holds all of it, and nothing in the envelope overrides it:
 
-- `render_spec.section_order` - the canonical section order
-- `render_spec.hard_rules` - every constraint you must apply
-- `render_spec.use_case_palette` - the only colors allowed for use case tags
-- `render_spec.page_setup` - A4 dimensions, font stack, print-color-adjust CSS
-- `render_spec.pre_delivery_checklist` - the server's baseline checks; Step 3
-  runs those plus the skill's own (see Step 3)
+- **Section order** - the canonical order, below and in the reference file
+- **Hard rules** - every constraint you must apply (below)
+- **Use case palette** - the only colors allowed for use case tags, in the
+  reference file's CSS block
+- **Page setup** - A4 dimensions, font stack, print-color-adjust CSS
+- **Pre-delivery checklist** - Step 3
 
 **The report's color palette is Onfire's, not the tenant's.** The
 `--brand` (navy) / `--accent` (purple) tokens are hard-coded in the CSS
 block in `references/report-structure.md` and do not vary per tenant.
 Ignore `tenant_config.brand.primary` if present — it's legacy. The only
-tenant-driven content in the header bar is the display name and logo:
+tenant-driven content in the header bar is the display name:
 
 | Render value | Source | Fallback when absent |
 |---|---|---|
 | Tenant display name (header + footer) | `tenant_config.tenant_id`, title-cased | always apply — no display_name field exists |
 | Tenant logo (header + footer) | not available in tenant config | always omit logo; render text wordmark only |
 
-If `render_spec` is missing or empty (older orchestrator version), use
-the defaults documented in `references/report-structure.md` as a fallback,
-but always prefer the inline contract.
+Read `references/report-structure.md` before rendering. It is the only
+source for the palette, the CSS and the component snippets.
 
 ---
 
@@ -362,7 +357,7 @@ but always prefer the inline contract.
 Read `references/report-structure.md` for the full A4 HTML template and
 component snippets.
 
-### Section order (from `render_spec.section_order`)
+### Section order
 
 1. **Header bar** - brand-colored full-width bar with tenant logo
    (base64, when provided), brand display name, "Account Research -
@@ -454,10 +449,10 @@ component snippets.
    + prospect rows that map to that use case. The right column is
    brand-named: render its label as "[Tenant Display Name] solution
    alignment" (e.g. "Acme Security solution alignment"). Tag colors come from
-   `render_spec.use_case_palette` keyed by the use case `tag` - never
-   invent a color.
+   the use case palette in `references/report-structure.md`, keyed by the
+   use case `tag` - never invent a color.
 8. **Key contacts per use case** - `break-before: page`, color-coded
-   from `render_spec.use_case_palette` by the use case `tag`. Each
+   from the use case palette by the use case `tag`. Each
    contact card must render the fields the
    `ai_prospecting_field_glossary` `how_to_use` guidance calls out:
    warm-intro tier + connector name + shared company, composite score
@@ -486,7 +481,7 @@ When surfacing prospect rows in sections 7 and 8, interpret every
 field through the `ai_prospecting_field_glossary` contract loaded
 in Step 1c - never invent score semantics.
 
-### Hard rules (from `render_spec.hard_rules` - non-negotiable)
+### Hard rules (non-negotiable)
 
 - **No em dashes** anywhere outside verbatim evidence quotes. Use a
   regular hyphen `-`.
@@ -524,7 +519,7 @@ not fabricate or substitute another field.
 The same rule applies to every `evidence_sentence` - from `top_profiles`,
 from the sliced footprint dataset, or from a Step 1d pull.
 
-### Page setup (from `render_spec.page_setup`)
+### Page setup
 
 - `@page { size: A4; margin: 16mm 18mm 18mm 18mm }`
 - `body { width: 174mm }`
@@ -534,11 +529,12 @@ from the sliced footprint dataset, or from a Step 1d pull.
 - Every `.card` has `break-inside: avoid`
 - Key contacts sections have `break-before: page`
 
-### Use case palette (from `render_spec.use_case_palette`)
+### Use case palette
 
-Only use the tag classes that appear in the palette. The palette is the
+Only use the tag classes that appear in the palette (the seven
+`--uc-*` entries in `references/report-structure.md`). The palette is the
 **colour** contract; Step 1a owns the **card set**. So: render the Step 1a
-use cases, and assign each one an existing `use_case_palette` entry.
+use cases, and assign each one an existing palette entry.
 
 - Never invent a colour and never emit a tag class that is not a palette key.
 - Reuse a palette entry whose semantics are closest to the card, or simply
@@ -550,7 +546,7 @@ use cases, and assign each one an existing `use_case_palette` entry.
 
 ---
 
-## Step 3 - Pre-delivery checklist (from `render_spec.pre_delivery_checklist`)
+## Step 3 - Pre-delivery checklist
 
 Before saving the final HTML and calling `present_files`, run every check
 below. All must pass.
@@ -558,7 +554,7 @@ below. All must pass.
 1. **Use case tags constrained to the palette**
    `grep -oE 'class="tag" style="background:var\\(--[a-z]+-bg' report.html`
    Every tag class must be one of the palette keys in
-   `render_spec.use_case_palette`. No invented tags.
+   `references/report-structure.md`. No invented tags.
 
 2. **No internal tool names, no em dashes outside verbatim quotes**
    One grep does both:

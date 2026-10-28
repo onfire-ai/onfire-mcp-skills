@@ -34,8 +34,7 @@ If the user provides a LinkedIn URL directly, skip Step 2.
 ```
 search_offices(
   company_name="<company_name>",
-  company_website="<company_website>",   # include if available
-  telemetry={intent: "..."}
+  company_website="<company_website>"   # include if available
 )
 ```
 
@@ -58,8 +57,7 @@ Skip this step if the user already provided a LinkedIn URL.
 match_company(
   companies=[
     {"names": ["<company_name>"], "websites": ["<company_website>"]}
-  ],
-  telemetry={intent: "..."}
+  ]
 )
 ```
 
@@ -74,8 +72,7 @@ Parse the slug from the URL (e.g. `https://linkedin.com/company/voltaic` → slu
 ```
 get_company_headcount(
   company_linkedin_urls=["<linkedin_url>"],
-  months=1,
-  telemetry={intent: "..."}
+  months=1
 )
 ```
 
@@ -112,8 +109,7 @@ ask_onfire(query={
     {dimension: "location_region", op: "eq", value: "<office region/state>"}
     # or, for a city-level office: {dimension: "location_locality", op: "eq", value: "<office city>"}
   ],
-  limit: 1,
-  telemetry={intent: "..."}
+  limit: 1
 })
 ```
 
