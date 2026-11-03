@@ -19,6 +19,11 @@ Clears the automated-check warnings on the plugin directory submission
   (1,028) are trimmed to fit.
 - **`compatibility` was a mapping in `hiring-signals` and `title-movement`.**
   The spec wants a plain string; both now say they need the Onfire MCP.
+- **Contributor guidance told skills to name environment variables for
+  secrets.** `SECURITY.md` and the PR template now say the opposite, in line
+  with the directory's credential rule: no credential read from the user's
+  machine; a needed value comes through `userConfig`. Likely trigger for the
+  "Uses a credential from the user's machine" hold.
 
 ### Added
 
@@ -26,6 +31,10 @@ Clears the automated-check warnings on the plugin directory submission
   must parse as YAML, `name` must match the folder, `description` must be
   1,024 characters or fewer, and `compatibility` must be a string. CI installs
   PyYAML for it; locally the check is skipped when PyYAML is missing.
+- **The same script guards the bundled connector.** It fails when `.mcp.json`
+  goes missing, stops declaring `onfire` at `https://mcp.onfire.ai/v1/mcp`, or
+  gains `headers`, `env` or any other key that could forward a local
+  credential.
 
 ## 0.9.0 — 2026-10-26
 

@@ -53,8 +53,12 @@ every PR:
       shell).
 - [ ] **No `allowed-tools` escalation** — broadening a skill's declared tools
       (especially shell execution) must be justified in the PR description.
-- [ ] **Secrets by reference only** — skills name environment variables; they
-      never hardcode credential values.
+- [ ] **No credentials from the user's machine** — a skill never reads a token
+      from an environment variable or local file and never hardcodes one. The
+      plugin directory holds any plugin that does. A value the plugin needs
+      comes from a `userConfig` entry in `plugin.json` with `sensitive: true`,
+      referred to as `${user_config.KEY}`. The Onfire connector needs none: it
+      signs in with OAuth.
 
 ## For people installing these skills
 

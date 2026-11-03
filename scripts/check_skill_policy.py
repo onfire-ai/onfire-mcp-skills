@@ -14,7 +14,8 @@ it, with a reason. Documentation that deliberately shows the wrong way needs it.
 It also parses every SKILL.md frontmatter the way the plugin directory does. A
 skill whose frontmatter a strict YAML parser rejects drops out of the scan's
 inventory and holds the submission (INVENTORY_GAPS). That check needs PyYAML;
-without it the check is skipped locally and CI still runs it.
+without it the check is skipped locally and CI still runs it. Last, it confirms
+the Onfire connector is still bundled in .mcp.json, by URL only.
 
     python3 scripts/check_skill_policy.py
 
@@ -22,6 +23,7 @@ Exit status is 0 when clean, 1 when any rule fires.
 """
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -161,6 +163,36 @@ def check_frontmatter(path: Path, yaml) -> list[str]:
     return problems
 
 
+# The connector every skill calls. Installing the plugin adds it, but only while
+# .mcp.json sits at the plugin root and names it by URL: no headers, env or
+# command, so nothing from the installer's machine rides along (sign-in is OAuth).
+CONNECTOR_FILE = ".mcp.json"
+CONNECTOR_NAME = "onfire"
+CONNECTOR_URL = "https://mcp.onfire.ai/v1/mcp"
+
+
+def check_connector() -> list[str]:
+    """Return one problem string per way the bundled connector has drifted."""
+    path = ROOT / CONNECTOR_FILE
+    if not path.is_file():
+        return [f"{CONNECTOR_FILE} is missing, so installing the plugin no longer adds the connector"]
+    try:
+        servers = json.loads(path.read_text(encoding="utf-8")).get("mcpServers", {})
+    except (json.JSONDecodeError, AttributeError) as error:
+        return [f"{CONNECTOR_FILE} is not valid JSON ({error})"]
+    server = servers.get(CONNECTOR_NAME)
+    if not isinstance(server, dict):
+        return [f"{CONNECTOR_FILE} no longer declares the {CONNECTOR_NAME!r} server"]
+
+    problems = []
+    if server.get("type") != "http" or server.get("url") != CONNECTOR_URL:
+        problems.append(f"{CONNECTOR_NAME!r} must be type http at {CONNECTOR_URL}")
+    extra = sorted(set(server) - {"type", "url"})
+    if extra:
+        problems.append(f"{CONNECTOR_NAME!r} carries {extra}: the directory holds any local credential it could forward")
+    return problems
+
+
 def scan(glob: str):
     """Yield (path, lineno, line, prev_line) for every file the glob selects."""
     paths = sorted(ROOT.glob(glob)) if "*" in glob else [ROOT / glob]
@@ -197,7 +229,15 @@ def main() -> int:
         if not re.search(pattern, path.read_text(encoding="utf-8")):
             failures.append((rule_id, message, []))
 
-    checked = len(FORBIDDEN) + len(REQUIRED)
+    checked = len(FORBIDDEN) + len(REQUIRED) + 1
+    problems = check_connector()
+    if problems:
+        failures.append((
+            "bundled-connector",
+            f"The Onfire connector must ship in {CONNECTOR_FILE} at the plugin root, by URL only.",
+            [(ROOT / CONNECTOR_FILE, 1, problem) for problem in problems],
+        ))
+
     try:
         import yaml
     except ImportError:

@@ -17,4 +17,6 @@ code-owner review.
 - [ ] No new `hooks` / `.mcp.json` / scripts without explicit maintainer sign-off;
       no dynamic remote code execution.
 - [ ] No unjustified `allowed-tools` escalation (especially shell execution).
-- [ ] Secrets referenced by env-var name only — never hardcoded.
+- [ ] No credentials read from the environment or hardcoded. A value the plugin
+      needs comes from a `userConfig` entry (`sensitive: true`) as
+      `${user_config.KEY}`; the Onfire connector signs in with OAuth.
