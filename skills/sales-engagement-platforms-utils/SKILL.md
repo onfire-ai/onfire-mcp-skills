@@ -9,9 +9,7 @@ description: >-
   tasks/actions/calls/mailboxes/users, page through a large collection, filter by date range,
   or trim a response to the fields you need. Also use when a SEP call has just failed and you
   need the right next move — a 404 routeNotFound, an empty result, a 403 scope error, a 422
-  "already been taken", or CRM_UPLOAD_REQUIRED. Carries the correct path form for each
-  provider, the query-parameter and pagination syntax each one expects, a resource-name
-  translation table, and which failures to stop retrying. For ENROLLING a person into a
+  "already been taken", or CRM_UPLOAD_REQUIRED. For ENROLLING a person into a
   cadence/sequence/flow or any multi-step SEP write workflow use `sep-cadence-enrollment`;
   for composing Outreach sequence emails use `outreach-sequence-email-composer`; for Gong
   flow content overrides use `gong-create-and-push-to-flow`.

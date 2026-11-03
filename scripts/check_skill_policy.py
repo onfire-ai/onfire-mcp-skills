@@ -11,6 +11,11 @@ contributor needs to fix it.
 Escape hatch: put `policy-ok` on the offending line or the line directly above
 it, with a reason. Documentation that deliberately shows the wrong way needs it.
 
+It also parses every SKILL.md frontmatter the way the plugin directory does. A
+skill whose frontmatter a strict YAML parser rejects drops out of the scan's
+inventory and holds the submission (INVENTORY_GAPS). That check needs PyYAML;
+without it the check is skipped locally and CI still runs it.
+
     python3 scripts/check_skill_policy.py
 
 Exit status is 0 when clean, 1 when any rule fires.
@@ -113,6 +118,49 @@ REQUIRED = [
 ]
 
 
+# Agent Skills spec limits. The directory scan enforces them; Claude Code is laxer,
+# so a skill can load fine locally and still fail the submission.
+NAME_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+NAME_MAX = 64
+DESCRIPTION_MAX = 1024
+COMPATIBILITY_MAX = 500
+FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.S)
+
+
+def check_frontmatter(path: Path, yaml) -> list[str]:
+    """Return one problem string per spec violation in a SKILL.md frontmatter."""
+    match = FRONTMATTER.match(path.read_text(encoding="utf-8"))
+    if not match:
+        return ["no frontmatter block (--- ... ---) at the top of the file"]
+    try:
+        meta = yaml.safe_load(match.group(1))
+    except yaml.YAMLError as error:
+        first = str(error).splitlines()[0]
+        return [f"invalid YAML ({first}): quote the value or use `>-`"]
+    if not isinstance(meta, dict):
+        return ["frontmatter is not a key: value mapping"]
+
+    problems = []
+    name = meta.get("name")
+    if name != path.parent.name:
+        problems.append(f"name {name!r} must match the folder name {path.parent.name!r}")
+    elif len(name) > NAME_MAX or not NAME_PATTERN.match(name):
+        problems.append(f"name must be lowercase-hyphenated and at most {NAME_MAX} characters")
+
+    description = meta.get("description")
+    if not isinstance(description, str) or not description.strip():
+        problems.append("description must be a non-empty string")
+    elif len(description) > DESCRIPTION_MAX:
+        problems.append(f"description is {len(description)} characters, the limit is {DESCRIPTION_MAX}")
+
+    compatibility = meta.get("compatibility")
+    if compatibility is not None and not isinstance(compatibility, str):
+        problems.append("compatibility must be a plain string, not a list or mapping")
+    elif compatibility is not None and len(compatibility) > COMPATIBILITY_MAX:
+        problems.append(f"compatibility is over {COMPATIBILITY_MAX} characters")
+    return problems
+
+
 def scan(glob: str):
     """Yield (path, lineno, line, prev_line) for every file the glob selects."""
     paths = sorted(ROOT.glob(glob)) if "*" in glob else [ROOT / glob]
@@ -149,8 +197,27 @@ def main() -> int:
         if not re.search(pattern, path.read_text(encoding="utf-8")):
             failures.append((rule_id, message, []))
 
+    checked = len(FORBIDDEN) + len(REQUIRED)
+    try:
+        import yaml
+    except ImportError:
+        print("skill policy: PyYAML not installed, frontmatter check skipped (CI runs it)")
+    else:
+        checked += 1
+        hits = [
+            (path, 1, problem)
+            for path in sorted(ROOT.glob("skills/*/SKILL.md"))
+            for problem in check_frontmatter(path, yaml)
+        ]
+        if hits:
+            failures.append((
+                "skill-frontmatter",
+                "SKILL.md frontmatter the plugin directory cannot list. A skill it\n"
+                "     cannot parse drops out of the scan and holds the submission.",
+                hits,
+            ))
+
     if not failures:
-        checked = len(FORBIDDEN) + len(REQUIRED)
         print(f"skill policy: {checked} rules, all clean")
         return 0
 

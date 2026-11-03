@@ -13,9 +13,7 @@ description: >
   - any question combining a company name with tracking who joined or left by title
 
   Trigger even if the user just pastes a LinkedIn company URL and asks "what's happening there?" or "show me movement." Works for any company — just needs a `company_linkedin_url` slug.
-compatibility:
-  tools:
-    - ask_onfire
+compatibility: Requires the Onfire MCP server (the `ask_onfire` tool).
 ---
 
 # Title Movement Skill

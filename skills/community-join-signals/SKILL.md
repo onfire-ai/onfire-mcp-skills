@@ -1,6 +1,16 @@
 ---
 name: community-join-signals
-description: Find people and companies that joined an online community (a Slack workspace, Discord server, Reddit community, LinkedIn group, GitHub org, or X/Twitter) using the `ask_onfire` tool against the `evidence` and `insight_evidence` entities. Use when the user asks who joined communities about a product, vendor or technology, wants community-presence signals for an account or individual, or wants a breakdown by subject or platform — phrases like "who joined the Artifex community", "who's in Kubernetes Slack communities", "find everyone from Northwind who's in any Kubernetes community", "who joined a security Slack since January", "which communities are Acme's employees in", or any community-membership lookup. Queryable: what the community is about (its subject), the platform, and the join date. The community's own name and URL are NOT exposed.
+description: >-
+  Find people and companies that joined an online community (a Slack workspace, Discord
+  server, Reddit community, LinkedIn group, GitHub org, or X/Twitter) using the `ask_onfire`
+  tool against the `evidence` and `insight_evidence` entities. Use when the user asks who
+  joined communities about a product, vendor or technology, wants community-presence signals
+  for an account or individual, or wants a breakdown by subject or platform — phrases like
+  "who joined the Artifex community", "who's in Kubernetes Slack communities", "find everyone
+  from Northwind who's in any Kubernetes community", "who joined a security Slack since
+  January", "which communities are Acme's employees in", or any community-membership lookup.
+  Queryable: what the community is about (its subject), the platform, and the join date. The
+  community's own name and URL are NOT exposed.
 ---
 
 # community-join-signals
