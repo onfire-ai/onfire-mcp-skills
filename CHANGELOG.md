@@ -3,6 +3,30 @@
 Versions match `.claude-plugin/plugin.json`, which is what the marketplace serves.
 This file starts at 0.5.1; earlier versions predate it.
 
+## 0.9.1 — 2026-11-03
+
+Clears the automated-check warnings on the plugin directory submission
+(FDE-410).
+
+### Fixed
+
+- **`community-join-signals` frontmatter was not valid YAML.** The description
+  was an unquoted scalar containing `: `, so a strict parser rejected it and
+  the directory scan could not list the skill (`INVENTORY_GAPS`). It is now a
+  `>-` block.
+- **Two descriptions were over the 1,024 character spec limit.**
+  `sales-engagement-platforms-utils` (1,132) and `weekly-territory-plan`
+  (1,028) are trimmed to fit.
+- **`compatibility` was a mapping in `hiring-signals` and `title-movement`.**
+  The spec wants a plain string; both now say they need the Onfire MCP.
+
+### Added
+
+- **`scripts/check_skill_policy.py` checks every SKILL.md frontmatter**: it
+  must parse as YAML, `name` must match the folder, `description` must be
+  1,024 characters or fewer, and `compatibility` must be a string. CI installs
+  PyYAML for it; locally the check is skipped when PyYAML is missing.
+
 ## 0.9.0 — 2026-10-26
 
 The MCP stopped shipping a rendering contract in its responses and renamed the
