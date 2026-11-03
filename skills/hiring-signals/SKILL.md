@@ -1,9 +1,7 @@
 ---
 name: hiring-signals
 description: Find open job postings at target companies using the `ask_onfire` tool against the `job_post` entity. Use when the user wants to know what roles a company is actively hiring for, where they're hiring, what seniority they're posting, which companies are hiring for a technology or skill, what open positions signal budget or expansion - phrases like "what is Northwind hiring for?", "find VP-level roles at my target accounts", "which accounts are expanding their security team?", "find buyers at companies hiring AI engineers", "show open data engineer roles in EMEA", or any job posting / hiring signal lookup.
-compatibility:
-  tools:
-    - ask_onfire
+compatibility: Requires the Onfire MCP server (the `ask_onfire` tool).
 ---
 
 # hiring-signals

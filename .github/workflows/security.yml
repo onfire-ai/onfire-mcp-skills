@@ -79,6 +79,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # PyYAML backs the frontmatter check, which is skipped without it.
+      - name: Install pinned deps
+        run: python3 -m pip install --quiet "pyyaml==6.0.2"
       - name: Check the patterns the security audit asked us to remove
         run: python3 scripts/check_skill_policy.py
 
