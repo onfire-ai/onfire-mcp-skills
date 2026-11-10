@@ -406,6 +406,58 @@ in browser previews.
 </div>
 ```
 
+**Related companies (company context `related_entities`).** One line per
+company the account spun off, sold, merged with, or is parent or subsidiary
+of, with that company's own dated developments nested under its name. They
+are that company's news, never the account's:
+
+```html
+<div style="font-size:8.5pt;line-height:1.6;margin-top:6pt">
+  <strong>Related companies</strong>
+  <div>[Spun off / Sold / Merged with / Parent / Subsidiary]
+    <strong>[related.name]</strong> ([related.detail],
+    <a href="[related.source_url]">company announcement</a>, [Month Year])
+    <ul style="margin:2pt 0 0 14pt;padding:0;color:var(--muted)">
+      <li>[development.event] (<a href="[development.source_url]">industry news</a>, [Month Day, Year])</li>
+    </ul>
+  </div>
+</div>
+```
+
+**Recent corporate events (company context `deals`, `incidents`, `sites`).**
+A compact list, newest first, about 8 rows chosen for what matters to the
+tenant. One row per item, each with its date and linked source:
+
+```html
+<table style="width:100%;font-size:8.5pt;line-height:1.5;margin-top:6pt;border-collapse:collapse">
+  <tr><th style="text-align:left;width:16%">Date</th><th style="text-align:left;width:14%">Type</th><th style="text-align:left">Event</th></tr>
+  <!-- deal: type, role, counterparty, status, value -->
+  <tr><td>[status_date or announced_date]</td><td>Acquisition</td>
+    <td>[Acquired / Agreed to acquire] [counterparty] for [value] ([status],
+      <a href="[source_url]">company announcement</a>)</td></tr>
+  <!-- rumored deal: always labelled -->
+  <tr><td>[announced_date]</td><td>Deal (reported, unconfirmed)</td>
+    <td>[summary] (<a href="[source_url]">industry news</a>; not confirmed by the company)</td></tr>
+  <!-- incident: type, date, authority, location, penalty, status -->
+  <tr><td>[date]</td><td>Workplace safety</td>
+    <td>[authority] citation at [location]: [summary], [penalty], [status]
+      (<a href="[source_url]">public record</a>)</td></tr>
+  <!-- site: event, date, location, headcount, effective -->
+  <tr><td>[date]</td><td>Site closing</td>
+    <td>[site] in [location], [headcount] roles, effective [effective]
+      (<a href="[source_url]">company announcement</a>)</td></tr>
+</table>
+<p style="font-size:8pt;color:var(--muted);margin-top:4pt">
+  Not found in the sources checked ([sources_checked, comma-separated]): [topic].
+</p>
+```
+
+Render only the fields that are present; drop empty clauses. Use the deal's
+`status_date` when set, else `announced_date`. A `certification` incident is a
+credential the company earned (for example ISO 45001): label it
+"Certification", not as a violation. One `checks_not_found` line per topic,
+never rephrased as "no incidents" or "clean record".
+
 ---
 
 ## Section 3: Why this account - why now
@@ -506,6 +558,8 @@ Number the regular points from 01 after the flags.
 | LinkedIn post / digital signal | `(LinkedIn post, [Date])` |
 | Company announcement (company context, the company's own site or press release) | `(company announcement, April 22, 2026)` with the `source_url` linked |
 | Industry news (company context, any other cited source) | `(industry news, July 2026)` with the `source_url` linked |
+| Public record (company context deal, incident or site from a regulator, court or government record) | `(public record, March 2025)` with the `source_url` linked |
+| Rumored deal (company context `deals`, `status: "rumored"`) | `(industry news, reported, unconfirmed, May 2026)` with the `source_url` linked |
 
 For SEC filers, the 10-K stays `(10-K, [date])` and company context items stay
 `(company announcement / industry news, [date])`, so readers can tell what the
@@ -898,7 +952,7 @@ Acceptable abstractions in customer-facing prose:
 - "intent signals"
 - "industry research"
 - "market intelligence"
-- "company announcement" / "industry news" (company context items)
+- "company announcement" / "industry news" / "public record" (company context items)
 - "[Conference Name] [Year]" (real events, e.g. "SecureCon 2026")
 - "[Community channel] community Slack / Discord"
 

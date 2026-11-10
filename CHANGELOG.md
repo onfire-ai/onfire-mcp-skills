@@ -3,6 +3,34 @@
 Versions match `.claude-plugin/plugin.json`, which is what the marketplace serves.
 This file starts at 0.5.1; earlier versions predate it.
 
+## 0.10.0 — 2026-11-10
+
+Requires an Onfire MCP server whose company context takes sections
+(`company_context_sections` on `account_research`, `sections` on
+`online_company_context`).
+
+### Added
+
+- **Company context sections.** `account-research` picks only the sections the
+  report needs: `brief` and `deals` for a full report, `incidents` when the
+  tenant sells security, safety, compliance or risk products, `sites` when it
+  sells into physical operations. It keeps the same list on every re-call.
+- **Deals, incidents and sites.** The company card gets a compact Recent
+  corporate events list (deal type, role, counterparty, status, value and dates;
+  incident type, authority, location, penalty and status; site event, location,
+  headcount and effective date), each item dated and cited. Rumored deals always
+  read "reported, unconfirmed". Dated items that bear on the tenant's product
+  are Why-Now sources; regulator and court records cite as "public record".
+- **Related companies and empty checks.** `related_entities` render under their
+  own name in the company card, never as the account's news. `checks_not_found`
+  reads "not found in the sources checked", never as a clean record.
+- **Section coverage.** The chat message that delivers the report says which
+  sections came back, from `section_status` and `section_reasons`; the report
+  itself stays silent about gaps.
+- **Email openers.** `outreach-sequence-email-composer` asks for `brief` and
+  `deals` (plus `sites` or `incidents` when they fit the tenant), uses dated deal
+  and site events as triggers, and never opens on a rumored deal.
+
 ## 0.9.2 — 2026-11-10
 
 Requires an Onfire MCP server that returns the `company_context` block and the `online_company_context` tool.
