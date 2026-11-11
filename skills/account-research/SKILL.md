@@ -1,6 +1,6 @@
 ---
 name: account-research
-description: Generate a full account research report for any company. The Onfire MCP `account_research` tool fetches the core data sources - tenant config, 10-K extracts, employee technology footprint, intent signals, and AI-scored prospects - in one call and returns a rendering contract alongside the data. This skill enriches it with additional warehouse signals via `ask_onfire` (hiring momentum, event attendance, persona/technology growth trends, dated deployment proof, active hiring managers), enforces the rendering contract, and produces the final customer-facing A4 HTML file. Use whenever a user asks to "generate a report", "research an account", "build a BDR brief", "run account research", or mentions a company domain alongside words like "signals", "prospects", "10-K", "hiring", "events", "growth", "use cases", or "tenant".
+description: Generate a full account research report for any company. The Onfire MCP `account_research` tool fetches tenant config, 10-K extracts, employee technology footprint, intent signals, AI-scored prospects and live company context (priorities, dated developments, leadership, ownership, qualification flags, why-now hooks, deals, regulatory and safety record, site openings and closures, each with a source URL) in one call, with a rendering contract. This skill adds warehouse signals via `ask_onfire` (hiring, events, growth trends, deployment proof, hiring managers), enforces the contract, and produces a customer-facing A4 HTML file. Use whenever a user asks to "generate a report", "research an account", "build a BDR brief", "run account research", "what's new at", or mentions a company domain alongside words like "signals", "prospects", "10-K", "priorities", "recent news", "M&A", "hiring", "events", "growth", "use cases", or "tenant".
 ---
 
 # Account Research Report
@@ -31,10 +31,17 @@ Given a **company website** (e.g. `meridianbank.com`) and a **tenant ID**
    via a fixed set of structured `ask_onfire` queries (Step 1d). These feed
    the Why-Now, Confirmed-deployment, and Key-contacts sections.
 5. Builds the company card from warehouse firmographics when the account is
-   not an SEC filer (Step 1e), instead of narrating unsourced figures.
-6. Enforces the rendering contract on a self-contained A4 HTML file.
-7. Runs the pre-delivery checklist before delivery.
-8. Handles follow-up questions by slicing the datasets already produced, or
+   not an SEC filer (Step 1e), instead of narrating unsourced figures, and
+   adds the cited company summary and ownership from company context for
+   every company (Step 1f).
+6. Uses the envelope's **company context** block (Step 1f), asking only for
+   the sections the report needs: qualification flags open Why-Now, dated
+   developments, why-now hooks and dated deals, incidents and site events
+   feed it, and stated priorities and evergreen angles become use-case
+   talking points.
+7. Enforces the rendering contract on a self-contained A4 HTML file.
+8. Runs the pre-delivery checklist before delivery.
+9. Handles follow-up questions by slicing the datasets already produced, or
    by calling `ask_onfire` / one of the narrow typed tools when the user asks
    for genuinely new data.
 
@@ -64,14 +71,35 @@ principle, not an exception to it.
 Onfire MCP: account_research(
   company_website="<company_website>",
   tenant_id="<tenant_id>",
-  company_linkedin_url="<url>"   # optional but enables footprint
+  company_linkedin_url="<url>",   # optional but enables footprint
+  company_context_sections=["brief", "deals"]   # only what the report needs - see below
 )
 ```
 
 The `filings_10k`, `linkedin_footprint`, and `intent_signals` blocks are
 always complete on the first call. The `prospects` block is the output of the
 orchestrator's own `ai_prospecting` run - read it (Step 1b) rather than
-re-running prospecting from scratch.
+re-running prospecting from scratch. The `company_context` block is async too
+(1 to 6 minutes, at most 8) and usually arrives on a later call - see Step 1f.
+
+### Pick the company context sections
+
+`company_context_sections` takes any of `brief`, `deals`, `incidents` and
+`sites`; omitting it runs all four. The picked sections run in parallel. Ask
+only for what this report will render:
+
+| Section | What it holds | Pick it when |
+|---|---|---|
+| `brief` | Summary, ownership, stated priorities, dated recent developments (with site location when known), leadership changes, qualification flags, related companies, why-now hooks tailored to the tenant | Always for a full report |
+| `deals` | IPOs, funding rounds, mergers, acquisitions, divestitures and spin-offs from the last 36 months, plus any deal still open | Always for a full report: ownership and M&A change who buys and when |
+| `incidents` | Workplace-safety citations and fatalities, safety certifications, environmental enforcement, recalls, data breaches, fines and settlements | The tenant sells security, safety, compliance, risk or quality products, or the user asks about the company's record |
+| `sites` | Plants, offices, stores and facilities planned, opened, expanded, closing, closed or sold, and layoffs at a named site | The tenant sells into physical operations (plants, warehouses, stores, field teams) or the report weighs footprint and headcount, or the user asks about sites or layoffs |
+
+You need to know what the tenant sells before the first call. When the
+conversation doesn't already say, call `get_tenant_settings(tenant_id)` first
+(Step 1a needs it anyway; reuse the result there). Omit the argument when the
+user asks for everything. Keep the same list on every re-call: re-calls with
+the same arguments pick up the same runs.
 
 Fire `ai_prospecting_field_glossary` (Step 1c) concurrently with this call. It
 has no dependency on the envelope, and waiting for prospects before loading it
@@ -94,7 +122,8 @@ supports:
 Neither is a reason to distrust the envelope's data blocks - they are the reason
 to derive the *taxonomy* yourself, in two calls:
 
-1. `get_tenant_settings(tenant_id)` - returns the full
+1. `get_tenant_settings(tenant_id)` (reuse the result if you called it to
+   pick company context sections before Step 1) - returns the full
    `account_research.queries_sections` (`competitors`, `organization`,
    `technologies`, `cloud_providers`), plus `golden_persona` and
    `display_names_mapping`.
@@ -146,7 +175,15 @@ output, not a lesser copy of it.
 - `envelope.prospects.status == "completed"` -> **use it as-is.** Do not re-call
   `ai_prospecting`; that spends another round trip of up to 50s for rows you
   already hold.
-- `still_running`, `skipped`, or an `error` -> poll with
+- **While `envelope.company_context.status == "still_running"`, re-call
+  `account_research` with the same arguments** (the same
+  `company_context_sections` too). It resumes both async jobs
+  (prospects and company context) without starting duplicates. Polling
+  `ai_prospecting` never advances company context, so do not switch to it
+  while company context is still running.
+- Only when company context is already terminal (`completed`, `unavailable`
+  or `skipped`) and prospects alone are `still_running`, `skipped`, or an
+  `error` -> poll with
   `ai_prospecting(action="run", company_linkedin_url="<url>")`, re-calling with
   the returned `run_ids` (or identical arguments) until `status="completed"`.
   Runs dedup server-side, so this joins the in-flight run instead of
@@ -284,6 +321,88 @@ figures you cannot source. Build the company card from:
 Any figure that does not come from one of those must carry its source inline in
 the card, or be left out. An empty stat is better than an uncited one.
 
+For **every** company (filer or not), render `company_context.summary` and
+`company_context.ownership` in the card when present, each with its
+`source_url` linked. For non-filers this replaces narrated firmographics where
+the two overlap (what the company sells and to whom, who owns it). Warehouse
+firmographics and the 10-K remain the source for every number.
+
+## Step 1f - Company context
+
+Read `envelope.company_context`: live public-web context on the account,
+validated server-side (every item has a source URL; brief developments are
+dated and inside the last 12 months; deals, incidents and sites cover the last
+36 months, plus deals and sites still open; hooks rest on a dated development).
+
+| `status` | Do this |
+|---|---|
+| `completed` | At least one picked section finished. Use what came back per the rules below, and read `section_status` for which sections did. `coverage: "none"` on the brief is a real answer (nothing public was found), not an error: render without it, with no negative-state copy. |
+| `still_running` | At least one picked section is still running; the block carries only `section_status` until all finish. Re-call `account_research` with the same arguments (Step 1b) and render the completed blocks meanwhile. Runs take 1 to 6 minutes, at most 8. |
+| `unavailable` / `skipped` | No picked section finished. Render without it. Never fail the report, never mention it in the report. |
+
+`section_status` maps each picked section to its own `completed`,
+`unavailable` or `skipped`, and `section_reasons` says why one did not finish.
+A section that did not finish is absent from the block: render the others, keep
+the report silent about the gap, and tell the user in chat (Step 4).
+
+Where each field goes:
+
+- `summary`, `ownership` -> company card (Step 1e).
+- `qualification_flags` (acquired, merged or rebranded, spun off, sells a
+  competing product, regulatory warning, shut down) -> the **top of Why-Now**
+  as `hi` severity alerts, before any other point.
+- `recent_developments` (dated, with `location` and `business_unit` when the
+  source names a site) and `why_now_hooks` -> valid Why-Now sources.
+- `strategic_priorities`, `evergreen_angles` -> use-case cards as account
+  signals or talking points, **never** in Why-Now.
+- `leadership_changes` -> Why-Now when the role matters to the tenant's buyer,
+  or a contact note in Section 8.
+- `deals` -> the company card's events list (Section 2), and Why-Now when the
+  deal changes who buys or when (an acquisition, a merger, a spin-off, a new
+  funding round). Each deal carries `type`, `role` (the account's side:
+  acquirer, target, merging party, issuer, seller or parent), `counterparty`,
+  `status`, `value` and dates (`announced_date`, `status_date`, and
+  `expected_close` while open). **A deal with `status: "rumored"` is reported
+  but not confirmed by the company:** label it "reported, unconfirmed" every
+  time it appears, never as fact.
+- `incidents` -> the events list, and Why-Now when the tenant's product
+  addresses that risk (a breach for a security seller, a citation for a safety
+  seller). Each carries `type`, `date`, `authority`, `location`,
+  `business_unit`, `penalty` and `status`. State them factually; no
+  speculation beyond the record.
+- `sites` -> the events list, and Why-Now when the site matters to the
+  tenant's product (a new plant, a closing distribution center, a layoff at a
+  named site). Each carries `event`, `date`, `location`, and `site`,
+  `business_unit`, `headcount` and `effective` when stated.
+- `related_entities` -> companies the account spun off, sold, merged with, or
+  is parent or subsidiary of, each with `name`, `domain`, `relationship`,
+  `detail`, `date`, `source_url` and its own `developments`. Those
+  developments belong to **that** company: render them under its name in the
+  company card, never as the account's own news or Why-Now. When `domain` is
+  set, it is that company's account; offer to research it separately.
+- `checks_not_found` -> topics searched with nothing found, each with
+  `topic` and `sources_checked`. Render as "not found in the sources checked
+  ([sources])" under the events list, never as "no incidents" or a clean
+  record.
+
+Only dated items support a why-now claim: `recent_developments`,
+`why_now_hooks`, and the dated items in `deals`, `incidents` and `sites`.
+
+**SEC filers** (`latest_filing_date` is set): the 10-K stays the primary source
+for strategy and risk quotes. Company context adds what happened since the
+filing: in Why-Now prefer developments dated after `latest_filing_date`, and
+never repeat a point the 10-K quote already makes.
+
+Citations: company context items read `(company announcement, April 22, 2026)`
+when the source is the company's own site or press release, and
+`(industry news, July 2026)` otherwise, and `(public record, March 2025)` when
+the source is a regulator, court or government record (most incidents, some
+deals and sites), with the `source_url` linked. Every deal, incident and site
+item keeps its own date and source. The 10-K
+stays `(10-K, [date])` so readers can tell the two apart. Priorities and angles
+with no date say `undated`. Never say how company context was gathered; its
+items are "company announcement", "industry news" or "public web research".
+
 
 ## Response shape (the envelope you render from)
 
@@ -315,6 +434,47 @@ the card, or be left out. An empty stat is better than an uncited one.
   },
   "intent_signals": { dataset, preview_rows, facets, total_count },
   "prospects": { /* the orchestrator's own ai_prospecting run - see Step 1b */ },
+  "company_context": {
+    "status": "completed" | "still_running" | "unavailable" | "skipped",
+    "reason": "timeout" | "vendor_error" | "id_mismatch" | "not_entitled"
+              | "disabled_by_caller" | "daily_cap",   // only when unavailable / skipped
+    "section_status": { "brief": "completed", "deals": "completed", "sites": "unavailable" },
+    "section_reasons": { "sites": "timeout" },          // only for sections that did not finish
+    "as_of": "2026-10-13",
+    "window": { "from": "2025-10-13", "to": "2026-10-13" },   // the brief's window
+    "latest_filing_date": "2026-02-27" | null,         // set for SEC filers
+    "cache_hit": false,
+    "coverage": "full" | "partial" | "none",           // of the brief
+    // brief (when picked)
+    "company_name": "Northwind",
+    "summary": { "text", "source_url" },
+    "ownership": { "text", "source_url" },
+    "strategic_priorities": [{ priority, source_url }],
+    "recent_developments": [{ id, date, category, event, location?, business_unit?, source_url }],  // newest first
+    "leadership_changes": [{ date, person, role, change, source_url, date_unknown? }],
+    "qualification_flags": [{ type, detail, date, source_url }],
+    "related_entities": [{ name, domain, relationship, detail, date, source_url,
+                           developments: [{ id, date, category, event, source_url }] }],
+    "why_now_hooks": [{ hook, based_on_development_id, relevance_to_seller }],
+    "evergreen_angles": [{ angle, based_on, source_url }],
+    // deals, incidents, sites (each when picked and completed)
+    "deals": [{ type, role?, counterparty?, status, value?, listing?, announced_date,
+                status_date, expected_close?, summary, source_url }],
+    "incidents": [{ type, date, authority?, location?, business_unit?, penalty?,
+                    status?, summary, source_url }],
+    "sites": [{ event, date, location, site?, business_unit?, headcount?, effective?,
+                summary, source_url }],
+    "checks_not_found": [{ topic, sources_checked: [...] }]
+    // deals[].type: acquisition | merger | ipo | funding | spin_off | divestiture
+    //   | take_private | spac | other
+    // deals[].status: rumored | announced | filed | pending | priced | completed
+    //   | terminated | withdrawn  (rumored, announced, filed, pending = still open)
+    // incidents[].type: workplace_safety | environmental | product_recall | data_breach
+    //   | regulatory_action | certification | litigation | other
+    //   (a certification is a credential the company earned, not a violation)
+    // sites[].event: planned | under_construction | opened | expanded | closing
+    //   | closed | sold | transferred | layoff | other
+  },
   "datasets": { filings_10k, linkedin_footprint, intent_signals, prospects },
   "follow_up_tools": {
     // which tool answers a question this envelope does not:
@@ -365,8 +525,25 @@ component snippets.
 2. **Company header card** - name (LinkedIn link), ticker, HQ, stat
    grid, overview. When `filings_10k.found` is false, build the stat grid
    from the Step 1e warehouse pulls; every figure carries a source or is
-   dropped. Never narrate an uncited financial number.
-3. **Why this account - why now** - 3-5 points sourced from
+   dropped. Never narrate an uncited financial number. The overview uses
+   `company_context.summary` and an ownership line or stat from
+   `company_context.ownership`, each with its source linked (Step 1f).
+   Below the overview, when present: a **Related companies** line per
+   `related_entities` item (relationship, name, date, source) with that
+   company's own developments nested under it, and a compact **Recent
+   corporate events** list of `deals`, `incidents` and `sites` items, newest
+   first, each with its date and linked source, rumored deals labelled
+   "reported, unconfirmed", followed by any `checks_not_found` as "Not found
+   in the sources checked" (snippets in `references/report-structure.md`
+   Section 2). Keep the list to the items that matter for the tenant (about
+   8); the rest stay available for follow-up questions.
+3. **Why this account - why now** - when `company_context.qualification_flags`
+   is non-empty, open the section with each flag as a `hi` severity alert
+   (Style B snippet in `references/report-structure.md` Section 3), even if
+   the rest of the section uses Style A. Then 3-5 points sourced from
+   dated `company_context.recent_developments` and `why_now_hooks`, the
+   dated `deals`, `incidents` and `sites` items that bear on the tenant's
+   product (Step 1f; a rumored deal only as "reported, unconfirmed"),
    `filings_10k.filings[].sections`, `intent_signals.preview_rows`,
    the footprint dataset, **and the Step 1d `ask_onfire`
    enrichment** — open-role surges (`job_post`, with `date_posted`),
@@ -374,7 +551,10 @@ component snippets.
    event presence (`event_company` attendee counts, with the event
    year), and rising adoption (`growth_insight_monthly` /
    `headcount_monthly`, citing the month + growth direction). Every
-   point carries a parenthetical date or "current role" citation. Render
+   point carries a parenthetical date or "current role" citation. For SEC
+   filers prefer developments dated after `latest_filing_date` and never
+   repeat a point the 10-K quote already makes. Evergreen angles and stated
+   priorities never appear here. Render
    either as numbered prose rows or as a severity-tinted alert stack
    (see `references/report-structure.md` Section 3 Style A vs B).
 4. **Confirmed technology deployment** - render from the **Step 1d
@@ -445,7 +625,10 @@ component snippets.
    security category the tenant does not sell. Each card pulls relevant
    signals + verbatim talking-point
    quote (10-K, LinkedIn profile, public talk, or any other verifiable
-   source - see `report-structure.md` "Talking-points source citation")
+   source - see `report-structure.md` "Talking-points source citation").
+   `company_context.strategic_priorities` and `evergreen_angles` may appear
+   here as account signals or talking points, citing their `source_url`
+   (and `undated` when they carry no date)
    + prospect rows that map to that use case. The right column is
    brand-named: render its label as "[Tenant Display Name] solution
    alignment" (e.g. "Acme Security solution alignment"). Tag colors come from
@@ -488,6 +671,20 @@ in Step 1c - never invent score semantics.
 - **No internal tool names** anywhere in the HTML. Never write Onfire
   or MCP. Use: "market intelligence", "intent signals", "public
   filings", "industry research".
+- **Never say how company context was gathered.** Its items are
+  "company announcement", "industry news" or "public web research".
+- **Every company context item carries a date and a linked source URL**
+  (`undated` for priorities and angles that have no date).
+- **Evergreen angles are never Why-Now.** Only dated `recent_developments`,
+  `why_now_hooks` and dated `deals`, `incidents` and `sites` items support a
+  why-now claim.
+- **Qualification flags open Why-Now** as `hi` alerts when present.
+- **Rumored deals are unconfirmed.** A deal with `status: "rumored"` always
+  reads "reported, unconfirmed", never as a done deal.
+- **Related companies stay under their own name.** A `related_entities`
+  item's developments are never the account's news or Why-Now.
+- **Not found is not proof.** `checks_not_found` reads "not found in the
+  sources checked", never "no incidents" or "clean record".
 - **Signal messages quoted verbatim** - never paraphrase or reframe.
   Trim with leading/trailing ellipsis only.
 - **Company name is a LinkedIn link** - `<a href="[linkedin]">` with a
@@ -567,7 +764,8 @@ below. All must pass.
    its bold strong tag - `(... [date] / [date range] / "current role")`
    - with one of the acceptable source types (10-K, LinkedIn profile,
    conference, community Slack/Discord, LinkedIn post, company-change
-   records). No date-less Why Now points.
+   records, company announcement, industry news, public record). No
+   date-less Why Now points.
 
 4. **Prospect field interpretation**
    If the `ai_prospecting` response from Step 1b carries real rows
@@ -601,6 +799,17 @@ below. All must pass.
    no card rests on a single partial keyword match, and no card argues a
    product category the tenant does not sell.
 
+9. **Company context cited, placed and filtered**
+   Every company context item in the report carries a date (or `undated` for
+   priorities and angles) and a linked `source_url`, including every deal,
+   incident and site item. No evergreen angle or stated priority appears in
+   Why-Now. When `qualification_flags` is non-empty, the flags are the first
+   Why-Now items, as `hi` alerts. Every rumored deal is labelled "reported,
+   unconfirmed". Related companies' developments sit under their own name,
+   not the account's. `checks_not_found` reads "not found in the sources
+   checked". For SEC filers, no company context item restates the 10-K quote
+   used in the same report.
+
 If any check fails, fix the report and rerun all checks. Do not
 deliver until all pass.
 
@@ -623,11 +832,20 @@ Generate a **fully self-contained** HTML file:
 Tell the user:
 > "To convert to PDF: open in Chrome -> Cmd/Ctrl+P -> Save as PDF -> enable **Background graphics** -> Save."
 
+### Company context coverage (chat only)
+
+In the chat message that delivers the report, say in one line which company
+context sections came back, from `company_context.section_status`: for
+example "Company context: brief and deals included; sites didn't finish
+(timeout)", with the reason from `section_reasons`. Never put this line in
+the HTML report.
+
 ---
 
 ## Handling follow-up questions
 
-The orchestrator ships three dataset IDs in `envelope.datasets`
+Company context (`envelope.company_context`) is inline, with no dataset to
+slice. The orchestrator ships three dataset IDs in `envelope.datasets`
 (`filings_10k`, `linkedin_footprint`, `intent_signals`). The
 `ai_prospecting` call from Step 1b ships the fourth — the prospects
 dataset — on its own response (`dataset.id`). Every slicing question
@@ -672,6 +890,9 @@ relevant narrow typed tool. **Never write raw SQL.**
 | Employees carrying a different product / competitor | `ask_onfire` — `entity=contact`, filter `current_company_url eq <url>`, `insight_filters=[{kind:technology, value:[<product>, ...]}]` — a **list ORs in one call** (NOT a raw `JOB_SUMMARY` ILIKE) |
 | People in a given role / persona at the account | `ask_onfire` — `entity=contact`, filter `current_company_url eq <url>`, `insight_filters=[{kind:persona, value:<resolved persona>}]` |
 | When the incumbent was adopted / when they renew | `ask_onfire` — `entity=renewal_signal`, filter `signal_type eq product_adoption` + `company_linkedin_url eq <url>` (BETA - estimates, label them) |
+| What's new at the company / what are they focused on / any recent news | `online_company_context(company_website, sections=["brief"])` - the same block as `envelope.company_context`; for the account in this report, read the envelope instead |
+| IPO, funding or M&A news; safety citations, breaches or recalls; plant or office openings, closures or layoffs | The envelope's `deals`, `incidents` or `sites` when that section was picked; otherwise `online_company_context(company_website, sections=["deals"])` (or `["incidents"]`, `["sites"]`), polling while `still_running` |
+| A related company the report named (spun off, sold, parent) | `online_company_context` on that company's `domain`, or a new account research run for it |
 | Firmographics for a company with no 10-K | `ask_onfire` — `entity=company`, filter `linkedin_url eq <url>`, plus `get_company_headcount` |
 | More employee-footprint rows than the report showed | `query_datasets` on `envelope.datasets.linkedin_footprint` — free, no row budget |
 | Open roles / what the company is hiring for | `ask_onfire` — `entity=job_post`, filter `company_url eq <url>` (+ `job_function`/`seniority`/`open`) |
@@ -694,7 +915,11 @@ further sliceable via `query_datasets`.
 
 | Situation | Action |
 |-----------|--------|
-| `account_research` returns `status="still_running"` solely because of prospecting | Use the completed non-prospect blocks and poll prospects per Step 1b. Do not re-call the orchestrator. |
+| `account_research` returns `status="still_running"` and `company_context.status` is `still_running` | Re-call `account_research` with the same arguments (it resumes prospects and company context together). Do not poll `ai_prospecting` instead. |
+| `account_research` returns `status="still_running"` solely because of prospecting (company context already terminal) | Use the completed blocks and poll prospects per Step 1b. |
+| `company_context.status` is `unavailable` or `skipped` | No picked section finished. Render without it. Never mention it in the report. |
+| `company_context.status` is `completed` but `section_status` shows a section `unavailable` or `skipped` | Render the sections that came back. Keep the report silent about the gap; name it and its `section_reasons` entry in the chat message (Step 4). |
+| `company_context.coverage` is `"none"` | Nothing public was found. Omit company-context content silently, with no negative-state copy. |
 | `get_tenant_settings` fails or the tenant has no `organization` list | Fall back to `tenant_config.derived_use_cases`, and treat the resulting use-case set as generic rather than tenant-specific. |
 | Every vendor in Step 1a resolves only `partial` / `fuzzy` | Run no technology footprint pull. Render Confirmed deployment from the orchestrator dataset only, and only for rows whose `matched_keyword` is a real vendor. Never confirm a vendor off a partial match. |
 | Step 1d competitor footprint returns zero rows | Normal for a small or thinly covered account. Fall back to the orchestrator's footprint dataset; if that is empty too, omit the section. |

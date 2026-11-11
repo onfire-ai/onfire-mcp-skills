@@ -3,6 +3,61 @@
 Versions match `.claude-plugin/plugin.json`, which is what the marketplace serves.
 This file starts at 0.5.1; earlier versions predate it.
 
+## 0.10.0 — 2026-11-10
+
+Requires an Onfire MCP server whose company context takes sections
+(`company_context_sections` on `account_research`, `sections` on
+`online_company_context`).
+
+### Added
+
+- **Company context sections.** `account-research` picks only the sections the
+  report needs: `brief` and `deals` for a full report, `incidents` when the
+  tenant sells security, safety, compliance or risk products, `sites` when it
+  sells into physical operations. It keeps the same list on every re-call.
+- **Deals, incidents and sites.** The company card gets a compact Recent
+  corporate events list (deal type, role, counterparty, status, value and dates;
+  incident type, authority, location, penalty and status; site event, location,
+  headcount and effective date), each item dated and cited. Rumored deals always
+  read "reported, unconfirmed". Dated items that bear on the tenant's product
+  are Why-Now sources; regulator and court records cite as "public record".
+- **Related companies and empty checks.** `related_entities` render under their
+  own name in the company card, never as the account's news. `checks_not_found`
+  reads "not found in the sources checked", never as a clean record.
+- **Section coverage.** The chat message that delivers the report says which
+  sections came back, from `section_status` and `section_reasons`; the report
+  itself stays silent about gaps.
+- **Email openers.** `outreach-sequence-email-composer` asks for `brief` and
+  `deals` (plus `sites` or `incidents` when they fit the tenant), uses dated deal
+  and site events as triggers, and never opens on a rumored deal.
+
+## 0.9.2 — 2026-11-10
+
+Requires an Onfire MCP server that returns the `company_context` block and the `online_company_context` tool.
+
+### Added
+
+- **Company context in account research.** `account-research` reads the new
+  `company_context` block (live, cited public-web context: summary, ownership, stated
+  priorities, dated recent developments, leadership changes, qualification flags and
+  why-now hooks). Summary and ownership go in the company card for every company;
+  qualification flags open Why-Now as `hi` alerts; dated developments and hooks are
+  Why-Now sources cited as "company announcement" or "industry news"; priorities and
+  evergreen angles are use-case talking points, never Why-Now. SEC filers keep the 10-K
+  as the primary strategy source and get what happened after the latest filing.
+- **Opener triggers.** `outreach-sequence-email-composer` uses dated developments and
+  why-now hooks as preferred hooks, and stops for the user when a qualification flag
+  (acquired, rebranded, competitor, regulatory warning, shut down) is present.
+
+### Changed
+
+- **Polling.** While `company_context` is `still_running`, `account-research`
+  re-calls `account_research` with the same arguments (it resumes both async jobs);
+  it polls `ai_prospecting` directly only once company context is terminal.
+- **Checklist.** New checks require a date and source on every company-context item,
+  no evergreen angle in Why-Now, and flags first. The report never says how company
+  context was gathered.
+
 ## 0.9.1 — 2026-11-03
 
 Clears the automated-check warnings on the plugin directory submission
