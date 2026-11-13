@@ -3,6 +3,15 @@
 Versions match `.claude-plugin/plugin.json`, which is what the marketplace serves.
 This file starts at 0.5.1; earlier versions predate it.
 
+## 0.10.1 — 2026-11-13
+
+### Changed
+
+- **Out of credits.** Company context costs 1 credit per company. When the
+  tenant is out of credits, `account-research` renders the report without it
+  and shows the user its `message` once, outside the report. Company context no
+  longer stops at a daily run limit.
+
 ## 0.10.0 — 2026-11-10
 
 Requires an Onfire MCP server whose company context takes sections
