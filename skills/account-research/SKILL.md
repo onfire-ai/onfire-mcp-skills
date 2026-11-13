@@ -339,6 +339,7 @@ dated and inside the last 12 months; deals, incidents and sites cover the last
 | `completed` | At least one picked section finished. Use what came back per the rules below, and read `section_status` for which sections did. `coverage: "none"` on the brief is a real answer (nothing public was found), not an error: render without it, with no negative-state copy. |
 | `still_running` | At least one picked section is still running; the block carries only `section_status` until all finish. Re-call `account_research` with the same arguments (Step 1b) and render the completed blocks meanwhile. Runs take 1 to 6 minutes, at most 8. |
 | `unavailable` / `skipped` | No picked section finished. Render without it. Never fail the report, never mention it in the report. |
+| `skipped` with `reason: "credit_limit"` | Render without it, and tell the user once, outside the report, using its `message`: the tenant is out of credits. |
 
 `section_status` maps each picked section to its own `completed`,
 `unavailable` or `skipped`, and `section_reasons` says why one did not finish.
@@ -437,7 +438,7 @@ items are "company announcement", "industry news" or "public web research".
   "company_context": {
     "status": "completed" | "still_running" | "unavailable" | "skipped",
     "reason": "timeout" | "vendor_error" | "id_mismatch" | "not_entitled"
-              | "disabled_by_caller" | "daily_cap",   // only when unavailable / skipped
+              | "disabled_by_caller" | "credit_limit",   // only when unavailable / skipped
     "section_status": { "brief": "completed", "deals": "completed", "sites": "unavailable" },
     "section_reasons": { "sites": "timeout" },          // only for sections that did not finish
     "as_of": "2026-10-13",
@@ -918,6 +919,7 @@ further sliceable via `query_datasets`.
 | `account_research` returns `status="still_running"` and `company_context.status` is `still_running` | Re-call `account_research` with the same arguments (it resumes prospects and company context together). Do not poll `ai_prospecting` instead. |
 | `account_research` returns `status="still_running"` solely because of prospecting (company context already terminal) | Use the completed blocks and poll prospects per Step 1b. |
 | `company_context.status` is `unavailable` or `skipped` | No picked section finished. Render without it. Never mention it in the report. |
+| `company_context.reason` is `"credit_limit"` | Render without it. Outside the report, show the user its `message` once: the tenant is out of credits. |
 | `company_context.status` is `completed` but `section_status` shows a section `unavailable` or `skipped` | Render the sections that came back. Keep the report silent about the gap; name it and its `section_reasons` entry in the chat message (Step 4). |
 | `company_context.coverage` is `"none"` | Nothing public was found. Omit company-context content silently, with no negative-state copy. |
 | `get_tenant_settings` fails or the tenant has no `organization` list | Fall back to `tenant_config.derived_use_cases`, and treat the resulting use-case set as generic rather than tenant-specific. |
